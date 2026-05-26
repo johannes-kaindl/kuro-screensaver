@@ -1,0 +1,12 @@
+node_modules
+dist
+.DS_Store
+*.log
+
+# Local session state
+.remember/tmp
+.remember/logs
+
+# Editors
+.vscode
+.idea

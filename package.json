@@ -1,0 +1,24 @@
+{
+  "name": "kuro-animation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone retro-CRT 3D screensaver engine — extracted from kuro-companion plugin.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "^0.164.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.164.0",
+    "typescript": "^5.4.0",
+    "vite": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
