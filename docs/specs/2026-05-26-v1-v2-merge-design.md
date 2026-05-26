@@ -145,3 +145,39 @@ Pragmatische Lösung: **getrennte File-Versionen, gemeinsames Repo + Build.**
 - `KURO_THEME=v2 npm run build` → `_kuro2-theme-settings/main.js` (663 KB), Aspect-Code enthalten.
 - Manifest-IDs korrekt getrennt.
 - Branch `feat/v1-v2-merge` → main gemerged (commit `1777aac`).
+
+---
+
+## Outcome Phase 2 (2026-05-26 spätabends)
+
+Der Follow-up wurde doch noch eingelöst: **unified legacy.ts via Build-Time-Defines**.
+
+Statt Subclass-Pattern (initial geplant) wurde ein pragmatischer Build-Time-Replace eingesetzt:
+
+```ts
+// In legacy.ts:
+declare const __STYLE_TAG_ID__: string;   // ersetzt durch esbuild
+declare const __BODY_CLASS__: string;     // ersetzt durch esbuild
+declare const __HAS_ASPECTS__: boolean;   // ersetzt durch esbuild
+const HAS_ASPECTS = __HAS_ASPECTS__;
+```
+
+Esbuild's `define`-Feature ersetzt die `__XXX__`-Identifier zur Build-Zeit pro Variant:
+- v1: `__HAS_ASPECTS__='false'`, `__STYLE_TAG_ID__='_kuro-overrides'`, `__BODY_CLASS__='_kuro-active'`
+- v2: `__HAS_ASPECTS__='true'`, `__STYLE_TAG_ID__='_kuro2-overrides'`, `__BODY_CLASS__='_kuro2-active'`
+
+In `apply()` werden Aspect-bezogene Calls hinter `if (HAS_ASPECTS) ...` geguarded. Esbuild eliminiert die Branches als Dead Code im v1-Bundle.
+
+**Code-Reduktion:** `git diff --stat` zeigt -1368 Zeilen netto (legacy.v1.ts gelöscht, legacy.v2.ts → legacy.ts renamed).
+
+**Was übrig bleibt unverändert:**
+- `main.v1.ts` und `main.v2.ts` bleiben getrennt (v2 hat den Statusbar-Chip-Setup), aber importieren aus dem unified `legacy.ts`.
+- `settings/tab.v1.ts` und `tab.v2.ts` bleiben getrennt (v2 hat den Aspect-Picker), beide aus unified `legacy.ts`.
+
+**Bundle-Footprint:**
+- v1: 650 → 661 KB (+11 KB für nicht-tree-shakebare Aspect-Methoden auf der Plugin-Klasse). Funktional korrekt, akzeptabel.
+- v2: 663 KB unverändert.
+
+Verbessert: Wenn ein Bug in der Plugin-Klassen-Logik gefixt wird, profitieren ab sofort beide Varianten ohne Duplikat-Edit.
+
+Merge-Commit: `1a11d5f`.
