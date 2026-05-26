@@ -114,3 +114,34 @@ export default class Plugin extends Plugin {
 - Engine als externes pnpm-Workspace-Package extrahieren (= übernächste Iteration).
 - v1+v2 Theme-Files (`Kuro/`) konsolidieren (= separater Refactor, Themes sind nicht Plugin).
 - kuro-gamification Source-Reconstruction (= separate Aufgabe).
+
+---
+
+## Outcome (2026-05-26)
+
+Umgesetzte Variante: **Dual-Legacy statt unified ThemeVariant-Hooks.**
+
+Beim Reverse-Engineering der Plugin-Klassen stellte sich heraus, dass der Aspect-Code in v2 nicht als Block-Erweiterung lebt, sondern tief in `KuroThemeSettingsPlugin` verzahnt ist (~349 Zeilen verteilt über `_resolveActiveAspect`, `_syncAspectBg`, `_isAspectPinnedByFrontmatter`, Hanko-Renderer, DEFAULT_SETTINGS, …). Ein Hook-Refactor wäre stundenlang gewesen.
+
+Pragmatische Lösung: **getrennte File-Versionen, gemeinsames Repo + Build.**
+
+- `src/main.{v1,v2}.ts`, `src/legacy.{v1,v2}.ts`, `src/settings/tab.{v1,v2}.ts`, `styles.{v1,v2}.css`, `manifest.{v1,v2}.json` — getrennte Quellfiles
+- `src/themes/presets.ts` — gemeinsame Color-Presets (war früher in beiden legacys dupliziert)
+- `src/screensaver/`, `src/settings/tab-screensaver.ts` — komplett unverändert, geteilt
+- esbuild liest `process.env.KURO_THEME`, wählt entry-point und kopiert variant-spezifische Assets
+- Scripts: `npm run build:v1`, `build:v2`, `build:all`; analog `sync:v1`, `sync:v2`
+
+**Was damit gewonnen ist:**
+- 1 Repo statt 2 (kuro2-theme-settings → `_attic/`)
+- Gemeinsame `src/screensaver/`-Engine — wenn dort etwas gefixt wird, profitieren beide Varianten
+- Gemeinsame Presets
+- Klare Build-Wege, keine versteckte Drift mehr
+
+**Was bewusst NICHT gemacht ist:**
+- `legacy.v1.ts` und `legacy.v2.ts` haben ~95% identischen Plugin-Klassen-Code. Ein vollständiger Merge mit ThemeVariant-Boundary bleibt als Follow-up. Realistisch ein 4-8h-Refactor wenn das Mal nötig wird.
+
+**Verifikation:**
+- `KURO_THEME=v1 npm run build` → `_kuro-theme-settings/main.js` (650 KB), enthält keine Aspect-Symbole.
+- `KURO_THEME=v2 npm run build` → `_kuro2-theme-settings/main.js` (663 KB), Aspect-Code enthalten.
+- Manifest-IDs korrekt getrennt.
+- Branch `feat/v1-v2-merge` → main gemerged (commit `1777aac`).
