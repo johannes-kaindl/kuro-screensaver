@@ -6,6 +6,7 @@ dist
 # Local session state
 .remember/tmp
 .remember/logs
+.claude/
 
 # Editors
 .vscode
