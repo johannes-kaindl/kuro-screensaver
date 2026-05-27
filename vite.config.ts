@@ -5,6 +5,13 @@ export default defineConfig({
   build: {
     target: 'esnext',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three: ['three'],
+        },
+      },
+    },
   },
   server: {
     port: 5173,
