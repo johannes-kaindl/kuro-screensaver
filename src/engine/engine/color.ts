@@ -1,6 +1,4 @@
-// Color resolver — reads from Kuro plugin's CSS variables (when present) or settings overrides.
-// In a non-Obsidian host, the kuro-auto mode falls back to FALLBACK if the CSS vars
-// are not set on document.body.
+// Color resolver — reads from Kuro plugin's CSS variables or settings overrides.
 import { PRESETS } from '../data/presets';
 import type { ScreensaverSettings } from '../data/defaults';
 
@@ -42,7 +40,65 @@ function fromHex(hex: string): ResolvedColor {
   };
 }
 
+/**
+ * v1.1 — Live-Test 2026-05-11. Maps a vault aspect to the KSP signal
+ * preset whose accent matches the aspect's role. The screensaver uses
+ * this when `aspectPaletteMode === 'matchAspect'` so the idle palette
+ * tracks whichever aspect is currently driving the vault chrome.
+ */
+const ASPECT_TO_PRESET: Record<'shugo' | 'gunshi' | 'kantoku' | 'sensei', string> = {
+  shugo:   'phosphor',
+  gunshi:  'spectre',
+  kantoku: 'crimson',
+  sensei:  'ember',
+};
+
+function colorFromAspect(aspect: 'shugo' | 'gunshi' | 'kantoku' | 'sensei'): ResolvedColor | null {
+  const key = ASPECT_TO_PRESET[aspect];
+  const p = (PRESETS as any)[key];
+  return p ? fromHex(p.darkAccent.color) : null;
+}
+
+/**
+ * v1.2 — Time-of-day aspect mood mapping (Live-Test 2026-05-13).
+ * Used when aspectPaletteMode === 'matchAspect' but no data-aspect is set
+ * on <html>: instead of always falling to aspectPaletteFixed, pick an
+ * aspect that matches the wall-clock hour. Gives the screensaver a
+ * subtle natural rhythm across the day even on vaults that don't drive
+ * the aspect attribute themselves.
+ */
+function timeOfDayAspect(): 'shugo' | 'gunshi' | 'kantoku' | 'sensei' {
+  const h = new Date().getHours();
+  if (h >= 6  && h < 10) return 'shugo';   // Morning — fresh phosphor
+  if (h >= 10 && h < 17) return 'gunshi';  // Day — neutral spectre
+  if (h >= 17 && h < 22) return 'kantoku'; // Evening — intense crimson
+  return 'sensei';                          // Night — warm ember
+}
+
 export function resolveColor(s: ScreensaverSettings): ResolvedColor {
+  // 1. Aspect-palette override (new in v1.1, default for fresh installs).
+  if (s.aspectPaletteMode === 'matchAspect') {
+    const live = (document.documentElement.getAttribute('data-aspect') || '').toLowerCase();
+    if (live === 'shugo' || live === 'gunshi' || live === 'kantoku' || live === 'sensei') {
+      const c = colorFromAspect(live);
+      if (c) return c;
+    }
+    // v1.2 — No vault aspect set: use time-of-day mood instead of the
+    // hardcoded fixed default. Falls back to aspectPaletteFixed only if
+    // the time-of-day resolution somehow fails.
+    const tod = timeOfDayAspect();
+    const ctod = colorFromAspect(tod);
+    if (ctod) return ctod;
+    const c = colorFromAspect(s.aspectPaletteFixed);
+    if (c) return c;
+  }
+  if (s.aspectPaletteMode === 'pickFixed') {
+    const c = colorFromAspect(s.aspectPaletteFixed);
+    if (c) return c;
+  }
+
+  // 2. Legacy v1.0 paths — used when aspectPaletteMode === 'inherit' or
+  //    when the aspect path failed to resolve.
   if (s.colorMode === 'custom') {
     try { return fromHex(s.colorCustom); } catch { /* fall through */ }
   }

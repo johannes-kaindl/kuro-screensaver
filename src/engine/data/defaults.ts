@@ -12,6 +12,27 @@ export interface ScreensaverSettings {
   colorPreset: string;
   colorCustom: string;
 
+  /**
+   * v1.1 — Live-Test 2026-05-11. Determines how the screensaver picks its
+   * primary palette tone.
+   *
+   *  'matchAspect' (default)
+   *      The screensaver reads `html[data-aspect]` on open and maps the
+   *      aspect to its KSP signal preset (shugo → phosphor, gunshi →
+   *      spectre, kantoku → crimson, sensei → ember). Idle mode feels
+   *      like a natural extension of the active Vault persona.
+   *
+   *  'pickFixed'
+   *      Use the aspect stored in `aspectPaletteFixed` regardless of which
+   *      aspect is active in the vault.
+   *
+   *  'inherit' (v1.0 behaviour)
+   *      Defer to `colorMode` / `colorPreset` / `colorCustom`. Kept so
+   *      users who explicitly liked the old behaviour can opt back in.
+   */
+  aspectPaletteMode: 'matchAspect' | 'pickFixed' | 'inherit';
+  aspectPaletteFixed: 'shugo' | 'gunshi' | 'kantoku' | 'sensei';
+
   fx: {
     bloom:               { on: boolean; strength: number };
     trails:              { on: boolean; damp: number };
@@ -60,6 +81,7 @@ export interface ScreensaverSettings {
     master: boolean; volume: number;
     hum: boolean; scanlineWhine: boolean; sceneSwitch: boolean;
     bootSounds: boolean; boost: boolean; radarPing: boolean;
+    synthSoundscape: 'off' | 'carpenter' | 'bach';
   };
 
   autoCycle:   { on: boolean; intervalMin: 2 | 5 | 10 };
@@ -107,6 +129,9 @@ export const DEFAULT_SCREENSAVER: ScreensaverSettings = {
   colorPreset: 'toxic-haze',
   colorCustom: '#00ff41',
 
+  aspectPaletteMode: 'matchAspect',
+  aspectPaletteFixed: 'shugo',
+
   fx: {
     bloom:               { on: true,  strength: 1.4 },
     trails:              { on: false, damp: 0.84 },
@@ -145,6 +170,7 @@ export const DEFAULT_SCREENSAVER: ScreensaverSettings = {
     master: true, volume: 0.4,
     hum: true, scanlineWhine: false, sceneSwitch: true,
     bootSounds: true, boost: true, radarPing: true,
+    synthSoundscape: 'carpenter',
   },
 
   autoCycle: { on: false, intervalMin: 5 },

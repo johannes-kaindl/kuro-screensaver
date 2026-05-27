@@ -1,11 +1,9 @@
-// localStorage-backed ScreensaverHost implementation for the web host.
+// localStorage-backed settings store for the standalone Web-Host.
 //
-// Mirrors the Obsidian plugin's pattern of holding a mutable settings object
-// in memory and persisting it on saveSettings(). Stats updates from the
-// controller mutate the in-memory object directly (via getSettings()), then
-// the controller debounces saveSettings() calls.
+// Holds a mutable settings object in memory and persists it on
+// saveSettings(). The plugin-shim adapts this onto a Plugin-shaped object
+// for the engine controller (see plugin-shim.ts).
 
-import type { ScreensaverHost } from '../engine/host';
 import type { ScreensaverSettings } from '../engine/data/defaults';
 import { DEFAULT_SCREENSAVER } from '../engine/data/defaults';
 
@@ -44,7 +42,7 @@ export interface WebHostOptions {
   overrides?: Partial<ScreensaverSettings>;  // applied once at startup
 }
 
-export class WebHost implements ScreensaverHost {
+export class WebHost {
   private settings: ScreensaverSettings;
 
   constructor(private options: WebHostOptions = {}) {

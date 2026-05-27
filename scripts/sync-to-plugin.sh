@@ -2,12 +2,17 @@
 # Sync the standalone Screensaver engine from animation/ to the kuro-theme-settings plugin.
 #
 # Direction: animation/src/engine/ → kuro-theme-settings/src/screensaver/
-# Excludes:  host-obsidian.ts, embed-view.ts (plugin-only files)
+# Excludes:  embed-view.ts (plugin-only Obsidian view)
 # Mode:      one-way (no reverse). Re-run after edits in animation/.
 #
 # Usage:
 #   ./scripts/sync-to-plugin.sh           # dry-run preview
 #   ./scripts/sync-to-plugin.sh --apply   # actually copy files
+#
+# History: between 2026-05-27 (Companion-Rollback) and the plugin reconciliation
+# in feat/reconcile-with-companion-rollback, this script carried a hard guard
+# that required --i-know-what-im-doing. The guard is gone now that the plugin
+# is back in sync with the rolled-back engine.
 
 set -euo pipefail
 
@@ -28,8 +33,8 @@ APPLY=0
 if [[ "${1:-}" == "--apply" ]]; then APPLY=1; fi
 
 RSYNC_OPTS=(
-  -rc                       # recursive + checksum-based (timestamp-blind)
-  --exclude='host-obsidian.ts'   # plugin-only adapter
+  -rc                            # recursive + checksum-based (timestamp-blind)
+  --delete                       # mirror deletions (e.g. removed host.ts/menubar would propagate)
   --exclude='embed-view.ts'      # plugin-only Obsidian view
 )
 

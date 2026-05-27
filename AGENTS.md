@@ -6,10 +6,17 @@ Conventions for AI assistants working in this repo.
 
 Standalone Retro-CRT 3D Screensaver engine — extracted from the
 `kuro-companion` Obsidian plugin (source lives in `kuro-theme-settings`).
-Vite/TypeScript project, runs in any modern browser. Engine is
-host-agnostic (`ScreensaverHost` interface in `src/engine/host.ts`);
-this repo ships the Web-Host (`src/host-web/`). The plugin imports the
-same engine code via `scripts/sync-to-plugin.sh`.
+Vite/TypeScript project, runs in any modern browser.
+
+After the 2026-05-27 rollback (see
+`docs/specs/2026-05-27-companion-rollback.md`), the engine is **Plugin-
+shaped**: `controller.ts` expects a host object with a settings tree and
+`saveData()`. The Plugin-type itself is declared locally in
+`controller.ts` (`HostPlugin`), so the engine does NOT import
+`obsidian` directly. The standalone Web-Host bridges this via
+`src/host-web/plugin-shim.ts` (settings live in localStorage, see
+`persistence.ts`). The Obsidian plugin uses its own real `Plugin`
+instance — no shim needed there.
 
 ## Workflow conventions
 
@@ -18,6 +25,10 @@ same engine code via `scripts/sync-to-plugin.sh`.
 - **Build:** `npm run build` → `dist/`.
 - **Backport to plugin:** `./scripts/sync-to-plugin.sh --apply`, then in
   `kuro-theme-settings/`: `npm run build:all && npm run sync:v1 && npm run sync:v2`.
+  **NOTE (post-rollback):** the sync script currently refuses to run without
+  `--i-know-what-im-doing`, because the plugin still carries the 2026-05-26
+  `ScreensaverHost` adapter (`host-obsidian.ts`) which is incompatible with
+  the rolled-back engine. Decide a strategy first (see rollback spec).
 - **Commit style:** Conventional Commits. AI-pair commits get a
   `Co-Authored-By: Claude <model> <noreply@anthropic.com>` trailer.
 
@@ -35,12 +46,18 @@ same engine code via `scripts/sync-to-plugin.sh`.
 
 ## Architecture notes
 
-- **Host boundary:** the engine never imports `obsidian` or any
-  host-specific module. Adding such an import is a bug. CI-check
-  (manual until automated): `! grep -r "from 'obsidian'" src/engine/`.
-- **`src/engine/` is byte-identical to** `kuro-theme-settings/src/screensaver/`.
-  Plugin pulls changes via the sync script. Excluded from sync:
-  `host-obsidian.ts`, `embed-view.ts` (plugin-only).
+- **Host boundary:** the engine must not `import` from `obsidian`. The
+  Plugin shape it depends on (`HostPlugin` in `controller.ts`) is
+  declared locally. CI-check (manual until automated):
+  `! grep -r "from 'obsidian'" src/engine/`. DOM helpers Obsidian adds to
+  `HTMLElement` (`createEl`/`createDiv`/`createSpan`/`empty`) are
+  polyfilled in the Web-Host (`src/host-web/obsidian-dom-polyfill.ts`).
+- **`src/engine/` diverges from `kuro-theme-settings/src/screensaver/`**
+  after the 2026-05-27 rollback. The plugin side has not yet caught up.
+  Sync is paused until the plugin's `host-obsidian.ts` is reconciled
+  with the rolled-back engine — see rollback spec for options A/B/C.
+  Excluded from sync (when re-enabled): `host-obsidian.ts`,
+  `embed-view.ts`, `host.ts` (plugin-only or unused-in-plugin).
 - **Engine sub-layout** (note the doubled `engine/` is intentional —
   outer `engine/` is the library namespace, inner is the THREE-renderer):
   - `engine/{core,materials,rng,color,scenes/}` — render loop + scenes
@@ -49,8 +66,13 @@ same engine code via `scripts/sync-to-plugin.sh`.
   - `terminal/{narrative,persona,typing,script-bank}.ts` — bottom-strip narrative
   - `hud/{index,boot}.ts` — DOM overlay
   - `data/{defaults,dictionary,presets}.ts` — static config
-  - `controller.ts` — overlay lifecycle, hotkeys, fullscreen
-  - `host.ts` — host interface
+  - `controller.ts` — overlay lifecycle, hotkeys, fullscreen; declares
+    local `HostPlugin` interface
+  - `menubar.ts` — embed-pane control bar (unused in standalone, kept for
+    plugin backport)
+  - `host.ts` — leftover `ScreensaverHost` interface from the 2026-05-26
+    boundary refactor; not consumed by the rolled-back controller. Will
+    be re-evaluated on the next sync roundtrip.
 - **Presets:** `src/engine/data/presets.ts` holds the color presets that
   used to live in `kuro-theme-settings/src/legacy.ts`. Both repos now
   import from the engine path.
