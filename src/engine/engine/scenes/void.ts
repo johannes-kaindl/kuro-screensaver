@@ -1,95 +1,190 @@
-// VOID — orbiting polyhedra in deep space, with inter-shape lines and starfield.
+// VOID — asteroid-field flythrough. Forward-flight + side-drift + tiny yaw/pitch.
+// Streaming pool (spawn ahead, recycle behind), belt-density on Y, no-spawn-zone forward.
 import * as THREE from 'three';
 import type { SceneCtx, SceneModule, SceneUpdater } from './scene-base';
 import { SPEED_VALUES } from '../../data/defaults';
 
 export const VoidScene: SceneModule = {
-  modeLabels: ['DRIFT', 'DEEP VOID', 'ORBIT'] as const,
-  triCount: '10K',
+  modeLabels: ['DRIFT', 'BELT', 'SWARM'] as const,
+  triCount: '20K',
 
   build(ctx: SceneCtx): SceneUpdater {
     const { world, cam, mats, scene, rng } = ctx;
-    scene.fog = new THREE.FogExp2(0x000000, 0.004);
-    cam.position.set(0, 0, 45); cam.lookAt(0, 0, 0);
 
-    const GF = [
-      () => new THREE.IcosahedronGeometry(4, 1),
-      () => new THREE.OctahedronGeometry(3.5),
-      () => new THREE.TetrahedronGeometry(4.2),
-      () => new THREE.DodecahedronGeometry(3.2),
-      () => new THREE.IcosahedronGeometry(2.5, 0),
-    ];
-    interface VoidShape {
-      mesh: THREE.Mesh;
-      rx: number; ry: number; rz: number;
-      fp: number; fa: number;
-      orb?: THREE.Mesh;
+    scene.fog = new THREE.FogExp2(0x000000, 0.006);
+    cam.position.set(0, 0, 0);
+    cam.rotation.set(0, 0, 0);
+
+    // ── Geometry templates (re-used across asteroids) ──────────────────
+    // Detail-2 ico ≈ 320 tri · Detail-1 ico ≈ 80 · Detail-0 ico ≈ 20
+    // Dodeca ≈ 36 · Irregular (icosa+displacement, detail-1) ≈ 80
+    interface Tpl { geo: THREE.BufferGeometry; w: number }
+    const TPL: Tpl[] = [];
+    TPL.push({ geo: new THREE.IcosahedronGeometry(1, 2), w: 0.20 });
+    TPL.push({ geo: new THREE.IcosahedronGeometry(1, 1), w: 0.32 });
+    TPL.push({ geo: new THREE.IcosahedronGeometry(1, 0), w: 0.18 });
+    TPL.push({ geo: new THREE.DodecahedronGeometry(1),    w: 0.15 });
+    {
+      const irr = new THREE.IcosahedronGeometry(1, 1);
+      const pos = irr.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < pos.count; i++) {
+        const j = 0.62 + rng() * 0.55;
+        pos.setXYZ(i, pos.getX(i) * j, pos.getY(i) * j, pos.getZ(i) * j);
+      }
+      irr.computeVertexNormals();
+      TPL.push({ geo: irr, w: 0.15 });
     }
-    const shapes: VoidShape[] = [];
-    for (let i = 0; i < 22; i++) {
+    const cumW: number[] = [];
+    { let acc = 0; for (const t of TPL) { acc += t.w; cumW.push(acc); } }
+    const pickGeo = (): THREE.BufferGeometry => {
+      const r = rng() * cumW[cumW.length - 1];
+      for (let i = 0; i < cumW.length; i++) if (r < cumW[i]) return TPL[i].geo;
+      return TPL[0].geo;
+    };
+
+    // ── Field params ────────────────────────────────────────────────────
+    const POOL    = 90;      // simultaneous asteroids
+    const FAR     = -68;     // spawn z (relative to camera, always ahead)
+    const FAR_VAR = 45;      // additional random depth at spawn (broad)
+    const BEHIND  = 10;      // recycle when this far behind camera
+    const FIELD_W = 44;      // x half-width
+    const BELT_S  = 14;      // belt sigma on y (gauss-like, 3D-volume)
+    const OFFBELT_P = 0.08;  // probability for off-belt y (uniform ±25)
+    const NOSPAWN = 5.5;     // cylinder radius around predicted flight path
+    const SCALE_MIN = 0.9, SCALE_SPAN = 3.0;  // 0.9-3.9 range
+
+    // Y: gauss-like belt with rare wide off-belt outliers (3D volume, not disk).
+    const sampleBeltY = () => {
+      if (rng() < OFFBELT_P) return (rng() - 0.5) * 50;  // uniform ±25
+      return ((rng() - 0.5) + (rng() - 0.5)) * BELT_S * 1.6;
+    };
+
+    // Cylinder check around the predicted flight path (camera xy projected forward).
+    const inFlightTube = (x: number, y: number, cx: number, cy: number) => {
+      const dx = x - cx, dy = y - cy;
+      return dx * dx + dy * dy < NOSPAWN * NOSPAWN;
+    };
+
+    // initial seed: spread over corridor depth, reserve a near-zone (camera +18)
+    // so the scene doesn't open inside a swarm. Camera starts at (0,0,0).
+    const seedInitial = () => {
+      const seedZ = () => -18 - rng() * (Math.abs(FAR) + FAR_VAR - 18);
+      for (let tries = 0; tries < 5; tries++) {
+        const x = (rng() - 0.5) * 2 * FIELD_W;
+        const y = sampleBeltY();
+        const z = seedZ();
+        if (!inFlightTube(x, y, 0, 0)) return { x, y, z };
+      }
+      // fall through with edge-of-tube offset
+      const side = rng() < 0.5 ? -1 : 1;
+      return { x: side * (NOSPAWN + 1.5 + rng() * 10), y: sampleBeltY(), z: seedZ() };
+    };
+
+    // re-spawn ahead of camera, rejection-sample out of the flight tube.
+    const respawn = (camX: number, camY: number, camZ: number) => {
+      for (let tries = 0; tries < 5; tries++) {
+        const x = (rng() - 0.5) * 2 * FIELD_W;
+        const y = sampleBeltY();
+        if (!inFlightTube(x, y, camX, camY))
+          return { x, y, z: camZ + FAR - rng() * FAR_VAR };
+      }
+      // skip-frame fallback: push behind recycleZ so we try again next frame
+      return null;
+    };
+
+    interface Ast { mesh: THREE.Mesh; rx: number; ry: number; rz: number }
+    const asteroids: Ast[] = [];
+    for (let i = 0; i < POOL; i++) {
       const mesh = new THREE.Mesh(
-        GF[i % GF.length](),
-        mats.M({ transparent: true, opacity: 0.6 + rng() * 0.35 }),
+        pickGeo(),
+        mats.M({ transparent: true, opacity: 0.60 + rng() * 0.30 }),
       );
-      const r = 12 + rng() * 30, a = rng() * Math.PI * 2;
-      mesh.position.set(Math.cos(a) * r, (rng() - 0.5) * 24, Math.sin(a) * r - 5);
-      const sh: VoidShape = {
-        mesh,
-        rx: (rng() - 0.5) * 0.018,
-        ry: (rng() - 0.5) * 0.018,
-        rz: (rng() - 0.5) * 0.013,
-        fp: rng() * Math.PI * 2,
-        fa: rng() * 0.9,
-      };
+      mesh.scale.setScalar(SCALE_MIN + rng() * SCALE_SPAN);
+      const p = seedInitial();
+      mesh.position.set(p.x, p.y, p.z);
+      mesh.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
       world.add(mesh);
-      if (i < 8) {
-        const orb = new THREE.Mesh(
-          new THREE.TorusGeometry(5.5 + rng() * 2, 0.04, 4, 48),
-          mats.M({ transparent: true, opacity: 0.42 }),
-        );
-        orb.position.copy(mesh.position);
-        orb.rotation.x = rng() * 0.6 + 0.2;
-        world.add(orb);
-        sh.orb = orb;
-      }
-      shapes.push(sh);
+      asteroids.push({
+        mesh,
+        rx: (rng() - 0.5) * 0.024,
+        ry: (rng() - 0.5) * 0.024,
+        rz: (rng() - 0.5) * 0.020,
+      });
     }
 
-    // Inter-shape connection lines
-    for (let i = 0; i < shapes.length; i++) {
-      for (let j = i + 1; j < shapes.length; j++) {
-        if (shapes[i].mesh.position.distanceTo(shapes[j].mesh.position) < 22 && rng() < 0.35) {
-          const lg = new THREE.BufferGeometry().setFromPoints([
-            shapes[i].mesh.position.clone(), shapes[j].mesh.position.clone(),
-          ]);
-          world.add(new THREE.Line(lg, mats.ML(0.22)));
-        }
-      }
-    }
+    // ── Starfield (kept) ────────────────────────────────────────────────
+    const sv: number[] = [];
+    for (let i = 0; i < 2200; i++)
+      sv.push((rng() - 0.5) * 240, (rng() - 0.5) * 140, (rng() - 0.5) * 260 - 50);
+    const sg = new THREE.BufferGeometry();
+    sg.setAttribute('position', new THREE.Float32BufferAttribute(sv, 3));
+    world.add(new THREE.Points(sg, mats.MP(0.09)));
 
-    // Starfield
-    const pv: number[] = [];
-    for (let i = 0; i < 2000; i++) pv.push((rng() - 0.5) * 130, (rng() - 0.5) * 80, (rng() - 0.5) * 130);
-    const pg = new THREE.BufferGeometry();
-    pg.setAttribute('position', new THREE.Float32BufferAttribute(pv, 3));
-    world.add(new THREE.Points(pg, mats.MP(0.1)));
+    // ── Speed particles — fewer than tunnel, streaming with camera ─────
+    const SPV = 56;
+    const spv: number[] = [];
+    for (let i = 0; i < SPV; i++)
+      spv.push((rng() - 0.5) * 24, (rng() - 0.5) * 16, -rng() * 60);
+    const spg = new THREE.BufferGeometry();
+    spg.setAttribute('position', new THREE.Float32BufferAttribute(spv, 3));
+    const speedPts = new THREE.Points(spg, mats.MP(0.14));
+    world.add(speedPts);
 
+    // ── Update ──────────────────────────────────────────────────────────
+    // dt from core is in ms; convert via t-diff (clockT is in seconds).
+    let lastT = 0;
     return (t: number, _dt: number) => {
-      for (const s of shapes) {
-        s.mesh.rotation.x += s.rx;
-        s.mesh.rotation.y += s.ry;
-        s.mesh.rotation.z += s.rz;
-        s.mesh.position.y += Math.sin(t + s.fp) * s.fa * 0.007;
-        if (s.orb) {
-          s.orb.rotation.z += 0.009;
-          s.orb.position.y = s.mesh.position.y;
+      const dts = lastT === 0 ? 0.016 : Math.min(0.1, t - lastT);
+      lastT = t;
+      const spd = SPEED_VALUES[ctx.settings.speed];
+
+      // Forward flight — dt-safe step.
+      cam.position.z -= spd * 14 * dts;
+
+      // Side drift — meaningful amplitude so the camera curves visibly.
+      // Path is the integral of these forces, damped to keep us roughly
+      // centered. Steady-state offset ~6 units, oscillating.
+      const dx = Math.sin(t * 0.13) * 1.4 + Math.sin(t * 0.31) * 0.55;
+      const dy = Math.cos(t * 0.09) * 0.75 + Math.sin(t * 0.27) * 0.30;
+      cam.position.x = cam.position.x * 0.993 + dx * dts * 1.2;
+      cam.position.y = cam.position.y * 0.993 + dy * dts * 1.2;
+
+      // Yaw/pitch — slight wobble.
+      cam.rotation.x = Math.cos(t * 0.11) * 0.06;
+      cam.rotation.y = Math.sin(t * 0.07) * 0.10;
+
+      // Asteroid rotation + recycle.
+      const camX = cam.position.x;
+      const camY = cam.position.y;
+      const camZ = cam.position.z;
+      const recycleZ = camZ + BEHIND;
+      for (const a of asteroids) {
+        a.mesh.rotation.x += a.rx * spd;
+        a.mesh.rotation.y += a.ry * spd;
+        a.mesh.rotation.z += a.rz * spd;
+        if (a.mesh.position.z > recycleZ) {
+          const p = respawn(camX, camY, camZ);
+          if (p) {
+            a.mesh.position.set(p.x, p.y, p.z);
+            a.mesh.scale.setScalar(SCALE_MIN + rng() * SCALE_SPAN);
+            a.mesh.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
+          }
+          // else: rejection failed 5x — leave asteroid at last pos, retry next frame
         }
       }
-      const R = 42, sp2 = SPEED_VALUES[ctx.settings.speed] * 0.006;
-      cam.position.x = Math.cos(t * sp2) * R;
-      cam.position.z = Math.sin(t * sp2) * R;
-      cam.position.y = Math.sin(t * sp2 * 0.4) * 10;
-      cam.lookAt(0, 0, 0);
+
+      // Speed particles cycle past camera.
+      const spa = speedPts.geometry.attributes.position as THREE.BufferAttribute;
+      const arr = spa.array as Float32Array;
+      for (let i = 0; i < SPV; i++) {
+        const zi = i * 3 + 2;
+        if (arr[zi] > camZ + 2) {
+          arr[zi] = camZ - 40 - rng() * 30;
+          arr[i * 3]     = (rng() - 0.5) * 24 + cam.position.x;
+          arr[i * 3 + 1] = (rng() - 0.5) * 16 + cam.position.y;
+        }
+      }
+      spa.needsUpdate = true;
     };
   },
 };

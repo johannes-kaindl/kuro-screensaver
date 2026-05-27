@@ -2,8 +2,10 @@
 // and starts the screensaver on user click (browsers require a user gesture
 // for fullscreen + AudioContext).
 
+import './obsidian-dom-polyfill';
 import { ScreensaverController } from '../engine/controller';
 import { WebHost, type WebHostOptions } from './persistence';
+import { makePluginShim } from './plugin-shim';
 
 export interface MountOptions extends WebHostOptions {
   /** Element whose click triggers start. Default: document.getElementById('start-btn'). */
@@ -19,7 +21,7 @@ export function mountScreensaver(opts: MountOptions = {}): ScreensaverController
     overrides: opts.overrides,
   });
 
-  const controller = new ScreensaverController(host);
+  const controller = new ScreensaverController(makePluginShim(host));
 
   const trigger = opts.startTrigger ?? document.getElementById('start-btn');
   const hideEl = opts.hideOnStart ?? document.getElementById('boot-hint');

@@ -108,7 +108,14 @@ export class Engine {
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.FogExp2(0x000000, 0.01);
     this.world = new THREE.Group(); this.scene.add(this.world);
-    this.cam = new THREE.PerspectiveCamera(72, W / H, 0.1, 600);
+    // v1.2 — Aspect-aware FoV (Mobile landscape feedback 2026-05-13):
+    //   Jay reported CITY in landscape felt cramped. PerspectiveCamera FoV
+    //   is vertical — at a 2:1 landscape ratio a 72° vertical gives a near-
+    //   fisheye horizontal FoV that makes objects feel close. defaultFov()
+    //   widens vertical FoV on portrait (more building heights visible) and
+    //   shrinks it on landscape (less wide-angle distortion + more apparent
+    //   distance to scene objects).
+    this.cam = new THREE.PerspectiveCamera(Engine.defaultFov(W, H), W / H, 0.1, 600);
 
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.cam));
@@ -138,11 +145,33 @@ export class Engine {
     window.addEventListener('resize', this.onResize);
   }
 
+  /**
+   * v1.2 — Pick a vertical FoV based on viewport aspect ratio.
+   *   - Portrait (≤ 0.75 W/H, e.g. phone vertical): 84° — taller scenes
+   *     show building heights / tunnel rings without panning up.
+   *   - Wide landscape (≥ 1.6 W/H, phone horizontal or wide desktop): 62°
+   *     — narrower vertical FoV gives a longer apparent distance and
+   *     reduces wide-angle distortion that was making CITY feel cramped.
+   *   - In between (desktop window, tablet): 72° — the v1.0/v1.1 default.
+   */
+  static defaultFov(W: number, H: number): number {
+    const a = W / H;
+    if (a >= 1.6) return 62;
+    // v1.2 update — Jay 2026-05-13: portrait still felt cramped at 84°.
+    // Raised to 95° so phone-portrait shows substantially more scene
+    // vertically. The wider near-edges are acceptable in atmosphere mode
+    // (no objects directly at the rim that distortion would warp visibly).
+    if (a <= 0.75) return 95;
+    return 72;
+  }
+
   private onResize = () => {
     const W = window.innerWidth, H = window.innerHeight;
     this.renderer.setSize(W, H);
     this.composer.setSize(W, H);
-    this.cam.aspect = W / H; this.cam.updateProjectionMatrix();
+    this.cam.aspect = W / H;
+    this.cam.fov = Engine.defaultFov(W, H);
+    this.cam.updateProjectionMatrix();
   };
 
   loadScene(id: SceneId) {
@@ -156,7 +185,11 @@ export class Engine {
     this.mats.disposeAll();
     this.mats.setColorHex(this.color.hex);
 
-    this.cam.fov = 72; this.cam.updateProjectionMatrix();
+    // v1.2 — Reset FoV to aspect-aware default (not hard-coded 72°). Some
+    // scenes (tunnel) push FoV during boost; this restores the baseline on
+    // each scene-load so boosts compose against the current viewport.
+    this.cam.fov = Engine.defaultFov(window.innerWidth, window.innerHeight);
+    this.cam.updateProjectionMatrix();
 
     // Re-seed per scene to keep layouts varied but reproducible per session
     this.rng = mkRng(this.seed + this.hashId(id));
@@ -228,6 +261,24 @@ export class Engine {
   setColor(c: ResolvedColor) {
     this.color = c;
     this.mats.setColorHex(c.hex);
+  }
+
+  /**
+   * v1.1 — Live-Test 2026-05-11 (screensaver speed-button bug).
+   *
+   * Each scene captures `ctx.settings` at build time and reads
+   * `ctx.settings.speed` every frame. The controller's effectiveSettings()
+   * clones the screensaver settings via JSON.parse(JSON.stringify(…)) so
+   * the engine and the plugin's persistent settings live in different
+   * objects. The v1.0 speed-button handler only mutated the plugin's copy,
+   * which the running engine never saw.
+   *
+   * Fix: mutate the engine's settings object in place. The scene's
+   * `ctx.settings` is a reference to `this.settings`, so this propagates
+   * to the next frame without touching the scene-build path.
+   */
+  setSpeed(speed: ScreensaverSettings['speed']) {
+    this.settings.speed = speed;
   }
 
   applyFxSettings(s: ScreensaverSettings) {

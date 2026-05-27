@@ -1,6 +1,10 @@
 // Screensaver controller — owns overlay lifecycle, hotkeys, fullscreen, modes.
-// Host-agnostic: the only environment hook is the ScreensaverHost interface
-// (read/write settings, optional theme preset + vault kanji).
+//
+// Host coupling: this file expects a Plugin-shaped host (settings tree +
+// saveData). In the Obsidian plugin that's the actual `Plugin` instance; in
+// the standalone web build it's a shim around WebHost (see
+// `src/host-web/plugin-shim.ts`). The shape is declared locally so the engine
+// stays free of `from 'obsidian'`.
 import { Engine, ALL_SCENES } from './engine/core';
 import { resolveColor, readKuroFxDefaults } from './engine/color';
 import { Hud } from './hud';
@@ -10,10 +14,21 @@ import { DICT } from './data/dictionary';
 import type { ScreensaverSettings, SceneId } from './data/defaults';
 import { HUD_PRESETS, SCENES, SCENE_LABELS } from './data/defaults';
 import { PRESETS } from './data/presets';
+
+export interface HostPlugin {
+  settings: {
+    screensaver: ScreensaverSettings;
+    activePreset?: string;
+    vaultKanji?: string;
+    vaultKanjiCustom?: string;
+    [k: string]: any;
+  };
+  saveData: (data: any) => Promise<void>;
+  app?: { workspace?: { getActiveFile?: () => { basename?: string } | null } };
+}
 import { NarrativeRunner } from './terminal/narrative';
 import { mkRng, freshSeed } from './engine/rng';
 import { CrtSim } from './fx/crt-sim';
-import type { ScreensaverHost } from './host';
 
 export interface OverlayState {
   open: boolean;
@@ -37,12 +52,12 @@ export class ScreensaverController {
   private openedAt = 0;
   private statsSaveDebounce = 0;
 
-  constructor(public host: ScreensaverHost) {
+  constructor(public plugin: HostPlugin) {
     this.startIdleWatcher();
   }
 
   get s(): ScreensaverSettings {
-    return this.host.getSettings();
+    return this.plugin.settings.screensaver;
   }
 
   /** Enrich with theme-derived defaults if fxInheritFromTheme is set. */
@@ -70,6 +85,11 @@ export class ScreensaverController {
     this.state.embed = !!opts.embed;
 
     const s = this.applyHudPreset(this.effectiveSettings());
+    // v1.1 (Live-Test 2026-05-11): aspectPaletteMode === 'matchAspect'
+    // makes resolveColor read `data-aspect` off <html> and pick the matching
+    // signal preset. The lookup itself lives in engine/color.ts; the explicit
+    // mention here is a traceability anchor so anyone tracing palette flow
+    // from the controller sees the data-aspect dependency.
     const color = resolveColor(s);
     const scene: SceneId = opts.scene || s.defaultScene;
 
@@ -88,8 +108,23 @@ export class ScreensaverController {
     // HUD
     this.hud = new Hud(this.overlay, s, color, this.engine);
 
-    // Vault kanji from host (Obsidian: from kuro plugin settings; Web: from host config)
-    this.hud.setKanji(this.host.getVaultKanji?.() ?? '');
+    // Vault kanji — aspect-aware (v1.2, 2026-05-13).
+    //   Resolution order: explicit user override (vaultKanjiCustom) wins,
+    //   then the current vault-aspect's signature kanji (護/軍/監/霊),
+    //   then the global vaultKanji setting, then empty.
+    //   Aspect-mapping mirrors KSP: Shugo=護(guard), Gunshi=軍(strategy),
+    //   Kantoku=監(oversight), Sensei=霊(spirit).
+    const kuroSettings = (this.plugin as any).settings;
+    const ASPECT_KANJI: Record<string, string> = {
+      shugo: '護', gunshi: '軍', kantoku: '監', sensei: '霊',
+    };
+    const liveAspect = (document.documentElement.getAttribute('data-aspect') || '').toLowerCase();
+    const aspectKanji = ASPECT_KANJI[liveAspect];
+    const k = kuroSettings.vaultKanjiCustom
+           || aspectKanji
+           || kuroSettings.vaultKanji
+           || '';
+    this.hud.setKanji(k);
 
     // Audio
     this.audio = new AudioLayer(s);
@@ -130,6 +165,36 @@ export class ScreensaverController {
         if (this.hud?.isControlBarVisible()) this.hud.hideControlBar();
       });
 
+      // v1.2 — Touch parity for Mobile (Obsidian iOS).
+      //   WebView mousemove is not generated for touch — without explicit
+      //   touchstart/touchmove handlers the control bar never reveals on
+      //   phone. We mirror the mouse code paths so the bar shows on first
+      //   tap and parallax follows touch position.
+      //   Also: first touch is used to unlock the AudioContext (iOS Safari
+      //   only resumes audio after a user gesture).
+      const handleTouch = (ev: TouchEvent) => {
+        const t = ev.touches[0] || ev.changedTouches[0];
+        if (!t) return;
+        if (s.hud.controlBar && this.hud) {
+          this.hud.showControlBar(this.s.controlBarAutoHideSec);
+        }
+        if (s.parallax && this.engine) {
+          this.engine.parallaxEnabled = true;
+          if (t.clientY < 80) {
+            this.engine.parallaxTargetX = 0;
+            this.engine.parallaxTargetY = 0;
+          } else {
+            this.engine.parallaxTargetX = (t.clientX / window.innerWidth) * 2 - 1;
+            this.engine.parallaxTargetY = (t.clientY / window.innerHeight) * 2 - 1;
+          }
+        }
+        // Unlock audio on first user gesture (iOS WKWebView requirement).
+        // Cheap to call repeatedly — resume() on a running context is a no-op.
+        try { (this.audio as any)?.ctx?.resume?.(); } catch {}
+      };
+      this.overlay.addEventListener('touchstart', handleTouch, { passive: true });
+      this.overlay.addEventListener('touchmove', handleTouch, { passive: true });
+
       if (s.hud.controlBar) this.buildControlBar(s);
     }
     if (s.hud.controlBar && !this.state.embed) {
@@ -166,7 +231,7 @@ export class ScreensaverController {
     // Stats
     this.s.stats.scenesLoaded = (this.s.stats.scenesLoaded || 0) + 1;
     this.s.stats.perScene[scene] = (this.s.stats.perScene[scene] || 0) + 1;
-    void this.host.saveSettings(this.s);
+    void this.plugin.saveData(this.plugin.settings);
 
     // CRT signal-degradation simulator — fires h-tear, brightness flicker,
     // chroma spikes, scanline pulse, hum bar, interlace flicker, etc. on top
@@ -236,6 +301,66 @@ export class ScreensaverController {
       }, 1500);
     }
 
+    // v1.2 — Real-note flash (Live-Test 2026-05-13 cool-idea).
+    //   Every ~60s with a 12% chance, slip the currently active vault
+    //   note title into the narrative terminal as if it were a CORP-OS
+    //   command. Subtle enough that the operator-narrative still feels
+    //   coherent, but means the screensaver gestures at *your* work.
+    //   Skipped if narrative-terminal is off or terminal-strip hidden.
+    (this as any)._noteFlashInterval = window.setInterval(() => {
+      if (!this.hud || !s.narrativeTerminal || !s.hud.terminal) return;
+      if (Math.random() > 0.12) return;
+      const file = (this.plugin as any).app?.workspace?.getActiveFile?.();
+      const name = file?.basename;
+      if (!name) return;
+      const out = this.hud.termOut;
+      const el = document.createElement('div');
+      el.className = 'tl';
+      el.textContent = `$ open "${name}"`;
+      out.appendChild(el);
+      // Keep scrollback bounded — narrative cleans its own, this is a guest.
+      while (out.children.length > 40) out.firstChild?.remove();
+    }, 60_000);
+
+    // v1.2 — Idle-drift mode (Live-Test 2026-05-13 cool-idea).
+    //   After ~5 minutes without user interaction, slowly bias the engine
+    //   toward "drift" — current speed-multiplier eases toward 0.55, the
+    //   ambient hum gets a touch louder, and the narrative terminal pauses.
+    //   On any touch / mousemove the state restores within a few seconds.
+    //   Subtle by design — meant to feel like the screensaver settles into
+    //   contemplation, not that it broke.
+    let lastInteractionT = performance.now();
+    const driftHandler = () => { lastInteractionT = performance.now(); };
+    this.overlay!.addEventListener('mousemove', driftHandler, { passive: true });
+    this.overlay!.addEventListener('touchstart', driftHandler, { passive: true });
+    this.overlay!.addEventListener('touchmove', driftHandler, { passive: true });
+    let inDrift = false;
+    let preDriftBloom = 0, preDriftFog = 0;
+    (this as any)._driftInterval = window.setInterval(() => {
+      if (!this.engine) return;
+      const idleMs = performance.now() - lastInteractionT;
+      const shouldDrift = idleMs > 5 * 60_000;
+      const fog = this.engine.scene.fog as any;
+      if (shouldDrift && !inDrift) {
+        inDrift = true;
+        // Visual drift: gentler bloom + thicker fog gives a "settling" feel
+        preDriftBloom = this.engine.bloomPass.strength;
+        preDriftFog = fog?.density ?? 0.01;
+        this.engine.bloomPass.strength = preDriftBloom * 0.65;
+        if (fog) fog.density = preDriftFog * 1.45;
+        if (this.audio?.master) this.audio.master.gain.value = Math.min(1.0, this.s.sound.volume * 1.3);
+        this.audio?.pauseSoundscape?.();
+        this.narrative?.pause();
+      } else if (!shouldDrift && inDrift) {
+        inDrift = false;
+        this.engine.bloomPass.strength = preDriftBloom;
+        if (fog) fog.density = preDriftFog;
+        if (this.audio?.master) this.audio.master.gain.value = this.s.sound.volume;
+        this.audio?.resumeSoundscape?.();
+        this.narrative?.resume();
+      }
+    }, 5_000);
+
     // Day/night cycle: subtle modulation of bloom strength + fog density
     if (s.dayNightCycle.on) {
       const periodMs = s.dayNightCycle.periodMin * 60_000;
@@ -284,8 +409,31 @@ export class ScreensaverController {
       bar.appendChild(b); return b;
     };
 
+    // CLOSE + AUDIO at the very front of the bar
+    //
+    // v1.2 — Live-Test 2026-05-13: with all FX/COLOR/SCENE/FX+ buttons, the
+    // bar overflows on the default desktop width and `flex-wrap:wrap` pushes
+    // the last items onto a 2nd row. Audio and Close had ended up on that
+    // 2nd row — small, easy to miss. Pinning them first keeps them in row 1.
+    // If a wrap is needed it now drops the less-critical FX+ block (vignette,
+    // ping, noise) onto row 2 instead.
+    const closeBtn = btn('×', false, () => { void this.close(); }, 'Close screensaver');
+    closeBtn.style.cssText += 'color:rgba(255,200,200,.85);font-size:14px;line-height:1;padding:2px 9px;';
+
+    btn(s.sound.master ? '🔊' : '🔇', s.sound.master, () => {
+      this.s.sound.master = !this.s.sound.master;
+      if (!this.s.sound.master) {
+        this.audio?.dispose();
+      } else {
+        this.audio = new AudioLayer(this.effectiveSettings());
+        this.audio.start();
+      }
+      this.saveSettingsDebounced();
+      this.rebuildBar();
+    }, this.s.sound.master ? 'Audio on (toggle)' : 'Audio muted (toggle)');
+
     // SCENE
-    lbl('SCENE');
+    sep(); lbl('SCENE');
     SCENES.forEach(sc => btn(SCENE_LABELS[sc], this.engine?.currentScene === sc, () => this.switchScene(sc)));
 
     // SPD
@@ -293,17 +441,38 @@ export class ScreensaverController {
     (['slow', 'norm', 'fast'] as const).forEach(sp => btn(
       sp === 'slow' ? '▶' : sp === 'norm' ? '▶▶' : '▶▶▶',
       s.speed === sp,
-      () => { this.s.speed = sp; this.saveSettingsDebounced(); this.rebuildBar(); },
+      () => {
+        // v1.1 — Live-Test 2026-05-11. Persist + push to the running engine.
+        // Without the engine.setSpeed() call, scenes keep reading their
+        // captured ctx.settings reference and the button click is a no-op.
+        this.s.speed = sp;
+        this.engine?.setSpeed(sp);
+        this.saveSettingsDebounced();
+        this.rebuildBar();
+      },
     ));
 
     // COLOR — cycle through Kuro presets via colored dots
+    //
+    // v1.2 — Live-Test 2026-05-13 (color-button no-op fix):
+    //   In v1.1 we introduced `aspectPaletteMode: 'matchAspect'` as the new
+    //   default — resolveColor() reads `html[data-aspect]` and overrides
+    //   colorMode/colorPreset. That means a click on the COLOR-button set the
+    //   preset but resolveColor() then ignored it and returned the aspect-
+    //   matched color → user-visible no-op.
+    //   Fix: an explicit user pick on the COLOR-button is interpreted as
+    //   override intent, so we flip aspectPaletteMode to 'inherit'. The user
+    //   can re-enable matchAspect from the settings tab.
     sep(); lbl('COLOR');
     const presetKeys = Object.keys(PRESETS);
     presetKeys.forEach(key => {
       const p = (PRESETS as any)[key];
-      const isActive = (s.colorMode === 'kuro-preset' && s.colorPreset === key) ||
-                       (s.colorMode === 'kuro-auto' && this.host.getActivePreset?.() === key);
+      const isActive = (s.aspectPaletteMode !== 'matchAspect') && (
+        (s.colorMode === 'kuro-preset' && s.colorPreset === key) ||
+        (s.colorMode === 'kuro-auto' && this.plugin.settings.activePreset === key)
+      );
       const b = btn('', isActive, () => {
+        this.s.aspectPaletteMode = 'inherit';   // explicit user pick wins over aspect-match
         this.s.colorMode = 'kuro-preset';
         this.s.colorPreset = key;
         this.saveSettingsDebounced();
@@ -317,23 +486,50 @@ export class ScreensaverController {
     });
 
     // FX primary
+    //
+    // v1.2 — Live-Test 2026-05-13 hard-merge of overlapping FX toggles:
+    //   • TRAILS + BURN were both `AfterimagePass` (different damp). Now a single
+    //     AFTER-button cycles 3 stages: off → trails (mild) → burn (heavy) → off.
+    //   • CRT-Sim already produces chromatic aberration spikes, so the separate
+    //     CHRM button is hidden — exposing it created a "two-effect-doing-the-
+    //     same-thing" puzzle. The underlying fx.chromaticAberration setting is
+    //     preserved internally for users who scripted it.
+    //   • DRIFT (scanline drift) only makes sense when SCAN is on. It's now an
+    //     implicit sub-setting of SCAN — turning SCAN on enables DRIFT, turning
+    //     SCAN off disables DRIFT. No separate DRIFT button.
     sep(); lbl('FX');
-    (['bloom', 'matrix', 'trails', 'scan'] as const).forEach(fx => btn(
+    (['bloom', 'matrix', 'scan'] as const).forEach(fx => btn(
       fx.toUpperCase(), (s.fx as any)[fx].on, () => this.toggleFx(fx),
     ));
-    // CRT sim toggle (replaces glitch)
+    // CRT sim toggle (replaces glitch + subsumes chromatic aberration)
     btn('CRT', s.crtSim.on, () => {
       this.s.crtSim.on = !this.s.crtSim.on;
       this.saveSettingsDebounced();
       this.rebuildBar();
     });
+    // AFTER — 3-stage cycler: off → trails → burn → off
+    const afterStage = s.fx.burnDecay.on ? 'BURN' : (s.fx.trails.on ? 'TRAIL' : 'OFF');
+    const afterActive = afterStage !== 'OFF';
+    btn(`AFTER:${afterStage}`, afterActive, () => {
+      // Cycle order matches stages above
+      if (!this.s.fx.trails.on && !this.s.fx.burnDecay.on) {
+        this.s.fx.trails.on = true; this.s.fx.burnDecay.on = false;
+      } else if (this.s.fx.trails.on && !this.s.fx.burnDecay.on) {
+        this.s.fx.trails.on = false; this.s.fx.burnDecay.on = true;
+      } else {
+        this.s.fx.trails.on = false; this.s.fx.burnDecay.on = false;
+      }
+      this.saveSettingsDebounced();
+      const eff = this.effectiveSettings();
+      this.engine?.applyFxSettings(eff);
+      this.rebuildBar();
+    }, 'After-image / motion-blur stages: off · mild trails · heavy burn-in');
 
-    // FX advanced
+    // FX advanced — remaining toggles that don't overlap with anything else
     sep(); lbl('FX+');
-    (['vignette', 'scanlineDrift', 'radarPing', 'burnDecay', 'chromaticAberration', 'noiseBursts'] as const).forEach(fx => {
+    (['vignette', 'radarPing', 'noiseBursts'] as const).forEach(fx => {
       const labels: Record<string, string> = {
-        vignette: 'VIG', scanlineDrift: 'DRIFT', radarPing: 'PING',
-        burnDecay: 'BURN', chromaticAberration: 'CHRM', noiseBursts: 'NOISE',
+        vignette: 'VIG', radarPing: 'PING', noiseBursts: 'NOISE',
       };
       btn(labels[fx], (s.fx as any)[fx].on, () => this.toggleFx(fx as any));
     });
@@ -356,6 +552,10 @@ export class ScreensaverController {
 
   private toggleFx(fx: keyof ScreensaverSettings['fx']) {
     (this.s.fx as any)[fx].on = !(this.s.fx as any)[fx].on;
+    // v1.2 — DRIFT is an implicit sub-setting of SCAN (see buildControlBar
+    // hard-merge comment). When SCAN toggles, DRIFT follows so the visible
+    // result matches user intent without exposing a separate DRIFT button.
+    if (fx === 'scan') this.s.fx.scanlineDrift.on = this.s.fx.scan.on;
     this.saveSettingsDebounced();
     const eff = this.effectiveSettings();
     this.engine?.applyFxSettings(eff);
@@ -421,7 +621,7 @@ export class ScreensaverController {
       else { this.audio = new AudioLayer(this.effectiveSettings()); this.audio.start(); }
       return true;
     }
-    if (k === 'p' || k === 'P') {
+    if (k === 'p' || k === 'P' || k === ' ') {
       e.preventDefault(); e.stopPropagation();
       if (this.engine) {
         if ((this.engine as any)._paused) {
@@ -449,15 +649,28 @@ export class ScreensaverController {
   switchScene(id: SceneId) {
     if (!this.engine || !this.hud) return;
     this.audio?.sceneSwitch();
-    this.engine.loadScene(id);
-    const labels = DICT.MODE_LABELS[id];
-    this.hud.setMode(labels[0]);
-    this.hud.setTri(this.engine.getSceneObj()?.triCount || '----');
-    this.hud.flashSceneLabel(id);
-    this.s.stats.scenesLoaded = (this.s.stats.scenesLoaded || 0) + 1;
-    this.s.stats.perScene[id] = (this.s.stats.perScene[id] || 0) + 1;
-    this.saveSettingsDebounced();
-    this.rebuildBar();
+    // v1.2 — Cross-fade transition (Live-Test 2026-05-13 cool-idea).
+    //   Old behaviour: scene loadScene() was synchronous, the next frame
+    //   showed entirely different geometry — visually a hard cut.
+    //   New: 200ms fade-to-black on the canvas, then load + fade back.
+    //   Total of ~420ms feels like a "TV switching channels" beat without
+    //   disrupting the narrative-terminal pacing or hotkeys.
+    const canvas = this.engine.canvas;
+    canvas.style.transition = 'opacity 200ms ease-out';
+    canvas.style.opacity = '0';
+    window.setTimeout(() => {
+      if (!this.engine || !this.hud) return;
+      this.engine.loadScene(id);
+      const labels = DICT.MODE_LABELS[id];
+      this.hud.setMode(labels[0]);
+      this.hud.setTri(this.engine.getSceneObj()?.triCount || '----');
+      this.hud.flashSceneLabel(id);
+      canvas.style.opacity = '1';
+      this.s.stats.scenesLoaded = (this.s.stats.scenesLoaded || 0) + 1;
+      this.s.stats.perScene[id] = (this.s.stats.perScene[id] || 0) + 1;
+      this.saveSettingsDebounced();
+      this.rebuildBar();
+    }, 210);
   }
 
   cycleScene() {
@@ -465,6 +678,25 @@ export class ScreensaverController {
     const cur = this.engine.currentScene;
     const idx = ALL_SCENES.indexOf(cur as any);
     const next = ALL_SCENES[(idx + 1) % ALL_SCENES.length];
+
+    // v1.2 — cool-idea: when autoCycle is on, also rotate the screensaver
+    // palette through the 4 KSP aspects in sync with the scene change.
+    // Each scene gets its own "personality" — shugo phosphor for terrain,
+    // gunshi spectre for city, kantoku crimson for rift, sensei ember for
+    // tunnel/void. We only touch the screensaver's local color settings,
+    // not html[data-aspect] (so the vault chrome stays where it is).
+    if (this.s.autoCycle?.on) {
+      const ASPECT_PRESETS = ['phosphor', 'spectre', 'crimson', 'ember'] as const;
+      const curIdx = ASPECT_PRESETS.indexOf(this.s.colorPreset as any);
+      const nextPreset = ASPECT_PRESETS[((curIdx >= 0 ? curIdx : -1) + 1) % ASPECT_PRESETS.length];
+      this.s.aspectPaletteMode = 'inherit';
+      this.s.colorMode = 'kuro-preset';
+      this.s.colorPreset = nextPreset;
+      const newColor = resolveColor(this.effectiveSettings());
+      this.engine?.setColor(newColor);
+      this.hud?.applyColor(newColor);
+    }
+
     this.switchScene(next);
   }
 
@@ -487,6 +719,8 @@ export class ScreensaverController {
     clearInterval((this as any)._dayNightInterval);
     clearInterval((this as any)._stormInterval);
     clearInterval((this as any)._perfInterval);
+    clearInterval((this as any)._driftInterval);
+    clearInterval((this as any)._noteFlashInterval);
     clearInterval(this.fpsBarTimer);
     this.fpsBarTimer = 0;
     this.fpsBarEl = null;
@@ -494,7 +728,7 @@ export class ScreensaverController {
     // Update uptime stat
     if (this.openedAt > 0) {
       this.s.stats.totalUptimeMs = (this.s.stats.totalUptimeMs || 0) + (Date.now() - this.openedAt);
-      void this.host.saveSettings(this.s);
+      void this.plugin.saveData(this.plugin.settings);
       this.openedAt = 0;
     }
 
@@ -514,7 +748,7 @@ export class ScreensaverController {
   // Debounced settings save — call this from frequent paths (scene-switch stats, etc.)
   private saveSettingsDebounced() {
     clearTimeout(this.statsSaveDebounce);
-    this.statsSaveDebounce = window.setTimeout(() => this.host.saveSettings(this.s), 1500);
+    this.statsSaveDebounce = window.setTimeout(() => this.plugin.saveData(this.plugin.settings), 1500);
   }
 
   // Idle watcher

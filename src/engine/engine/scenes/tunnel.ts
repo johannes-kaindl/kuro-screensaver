@@ -60,6 +60,51 @@ function buildSpine(rng: () => number): THREE.Vector3[] {
       }
     }
   }
+  // v1.2 — Live-Test 2026-05-13: append a closure-arc so the spine ends where
+  // it began (with matching tangents). The CatmullRomCurve3 below uses
+  // closed:true and gets a smooth wrap — no more visible "tunnel restart" jump
+  // when camera.u wraps 0.999 → 0.
+  return closeSpine(pts);
+}
+
+/**
+ * Append a smooth cubic-bezier-style arc from the spine's end back to its
+ * start. Tangents at both ends match the in/out directions of the spine so
+ * CatmullRomCurve3(closed:true) interpolates seamlessly across the seam.
+ *
+ * Sample count scales with the gap distance so ring spacing stays roughly
+ * uniform across the closure segment.
+ */
+function closeSpine(pts: THREE.Vector3[]): THREE.Vector3[] {
+  if (pts.length < 4) return pts;
+  const last     = pts[pts.length - 1];
+  const lastPrev = pts[pts.length - 2];
+  const first    = pts[0];
+  const second   = pts[1];
+
+  const lastDir  = last.clone().sub(lastPrev).normalize();
+  const firstDir = second.clone().sub(first).normalize();
+
+  const gap = last.distanceTo(first);
+  const closureSamples = Math.max(20, Math.floor(gap / RING_SPACING) + 12);
+
+  // Cubic-bezier control points — push tangents ~35% of gap into space so the
+  // arc curves smoothly rather than snapping toward the origin.
+  const d  = gap * 0.35;
+  const p1 = last.clone().add(lastDir.clone().multiplyScalar(d));
+  const p2 = first.clone().sub(firstDir.clone().multiplyScalar(d));
+
+  // de Casteljau evaluation. Stop one step short of `first` — closed:true
+  // will weld last→first automatically and we don't want a duplicate vertex.
+  for (let i = 1; i < closureSamples; i++) {
+    const t = i / closureSamples;
+    const a  = last.clone().lerp(p1, t);
+    const b  = p1.clone().lerp(p2, t);
+    const c  = p2.clone().lerp(first, t);
+    const ab = a.clone().lerp(b, t);
+    const bc = b.clone().lerp(c, t);
+    pts.push(ab.clone().lerp(bc, t));
+  }
   return pts;
 }
 
@@ -72,7 +117,10 @@ export const TunnelScene: SceneModule = {
     scene.fog = new THREE.FogExp2(0x000000, 0.024);
 
     const spinePts = buildSpine(rng);
-    const curve = new THREE.CatmullRomCurve3(spinePts, false, 'catmullrom', 0.5);
+    // v1.2 — closed:true makes the curve cyclic. Combined with the closure
+    // segment appended in buildSpine() this gives a seamless infinite loop
+    // when camera.u wraps from 0.999 back to 0.
+    const curve = new THREE.CatmullRomCurve3(spinePts, true, 'catmullrom', 0.5);
 
     // Pre-compute Frenet frames once — used for ring placement and parallel tube.
     const samples = RING_COUNT;
@@ -98,24 +146,17 @@ export const TunnelScene: SceneModule = {
       );
       grp.add(ring);
 
-      // 8 spokes
-      for (let s = 0; s < 8; s++) {
-        const a = (s / 8) * Math.PI * 2;
-        const spoke = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.025, 0.025, r * 2, 4),
-          mats.M({ transparent: true, opacity: 0.28 }),
-        );
-        spoke.rotateZ(Math.PI / 2);
-        spoke.rotation.z = a;
-        grp.add(spoke);
-      }
+      // v1.2 — Live-Test 2026-05-13: Jay preferred clean rings. The 8-spoke
+      // wagon-wheel pattern read as "crosses" in the tunnel center,
+      // overlapping when looking forward through several rings at once.
+      // Rings + cross-bars (already removed) + secondary rings + parallel
+      // tube + floor neon strip + beacons still provide enough depth cue.
 
-      // Cross-bars every 5
-      if (i % 5 === 0) {
-        const b1 = new THREE.Mesh(new THREE.BoxGeometry(r * 2.6, 0.06, 0.06), mats.M({ transparent: true, opacity: 0.55 }));
-        const b2 = new THREE.Mesh(new THREE.BoxGeometry(0.06, r * 2.6, 0.06), mats.M({ transparent: true, opacity: 0.55 }));
-        grp.add(b1, b2);
-      }
+      // v1.2 — Cross-bars removed (Live-Test 2026-05-13).
+      // The horizontal+vertical box pair every 5th ring read visually as a
+      // tunnel obstacle / "+"-shaped barrier rather than as structural detail.
+      // Rings + spokes + secondary rings + parallel detail tube already
+      // provide enough depth cue without them.
 
       // Secondary inner ring every 8
       if (i % 8 === 0 && i > 0) {
@@ -140,21 +181,14 @@ export const TunnelScene: SceneModule = {
       world.add(grp);
     }
 
-    // ── Inner spine tube (subtle) ──
-    world.add(new THREE.Mesh(
-      new THREE.TubeGeometry(curve, 600, 0.04, 6, false),
-      mats.M({ transparent: true, opacity: 0.32 }),
-    ));
-
-    // ── Parallel detail tube — laterally offset for depth cue ──
-    const offsetPts = spinePts.map((p, i) => {
-      const N = frenet.normals[Math.min(i, samples - 1)];
-      return p.clone().add(N.clone().multiplyScalar(2.4));
-    });
-    world.add(new THREE.Mesh(
-      new THREE.TubeGeometry(new THREE.CatmullRomCurve3(offsetPts), 400, 0.05, 4, false),
-      mats.M({ transparent: true, opacity: 0.5 }),
-    ));
+    // v1.2 — Live-Test 2026-05-13: removed inner spine tube + parallel
+    // detail tube. With closeSpine() the parallel tube's offset relied on
+    // `frenet.normals[i]` clamped to samples-1 — the last ~20 closure-arc
+    // points all got the SAME normal, producing a spiral "spinning strand"
+    // through the tunnel center where the seam closes. The inner spine
+    // tube ran along the curve too and showed the same artifact at the
+    // seam. Rings + secondary rings + floor strip + beacons + particles
+    // already give plenty of depth cue without these two layers.
 
     // ── Floor neon strip — line geometry hugging bottom of tunnel along curve ──
     const floorPts: number[] = [];
@@ -217,10 +251,15 @@ export const TunnelScene: SceneModule = {
       u = (u + baseStep) % 1;
       state.u = u;
 
-      const clamp = (v: number) => Math.min(0.999, Math.max(0.001, v));
-      const here  = curve.getPointAt(u);
-      const ahead = curve.getPointAt(clamp(u + 0.005));
-      const farr  = curve.getPointAt(clamp(u + 0.025));
+      // v1.2 — Seamless loop: with closed:true the curve is cyclic, but
+      // getPointAt(u) still requires u ∈ [0,1]. The old clamp(v) snapped
+      // ahead/farr to 0.999 near the end of the spine, freezing camera
+      // direction at the wrap point. Replaced with modulo wrap so ahead/farr
+      // sample the closure-arc and the start of the curve seamlessly.
+      const wrap = (v: number) => ((v % 1) + 1) % 1;
+      const here  = curve.getPointAt(wrap(u));
+      const ahead = curve.getPointAt(wrap(u + 0.005));
+      const farr  = curve.getPointAt(wrap(u + 0.025));
 
       // Curvature: difference of consecutive normalized tangents.
       // Magnitude ≈ sin(angle-between-tangents); typical values 0.005–0.08 in our spines.
@@ -285,7 +324,7 @@ export const TunnelScene: SceneModule = {
         p.u -= baseStep * 1.3 / PARTICLE_RANGE; // drift relative
         if (p.u < 0) p.u += 1;
         const targetU = (u + p.u * PARTICLE_RANGE) % 1;
-        const pp = curve.getPointAt(clamp(targetU));
+        const pp = curve.getPointAt(wrap(targetU));
         arr[i * 3]     = pp.x + p.offX;
         arr[i * 3 + 1] = pp.y + p.offY;
         arr[i * 3 + 2] = pp.z;

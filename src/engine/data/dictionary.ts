@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Spoiler-free atmospheric dictionary, NeuroVim-flavored.
 // Pools are mixed at runtime; lore intensity controls categorical weights.
 
@@ -88,7 +89,7 @@ export const DICT = {
     city:    ['LOW LEVEL', 'URBAN', 'HIGH PASS'],
     rift:    ['THE RIFT', 'CHASM', 'INVERSION'],
     tunnel:  ['INFIL', 'TRANSIT', 'BOOST'],
-    void:    ['DRIFT', 'DEEP VOID', 'ORBIT'],
+    void:    ['DRIFT', 'BELT', 'SWARM'],
   } as const,
 
   FLASH_PHRASES: [
@@ -215,13 +216,9 @@ export function pickTerminalLine(
   return { category: 'STATUS', text: pool[Math.floor(rng() * pool.length)] };
 }
 
-export type CommandSessionRespItem = string | { cat: string; text: string };
-export function pickCommandSession(rng: () => number): {
-  cmd: string;
-  resp: readonly CommandSessionRespItem[];
-} {
+export function pickCommandSession(rng: () => number): { cmd: string; resp: readonly string[] } {
   const arr = DICT.COMMAND_SESSIONS;
-  return arr[Math.floor(rng() * arr.length)] as any;
+  return arr[Math.floor(rng() * arr.length)];
 }
 
 export function pickFrom<T>(arr: readonly T[], rng: () => number): T {

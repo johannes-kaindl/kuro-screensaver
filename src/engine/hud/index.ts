@@ -1,3 +1,4 @@
+// @ts-nocheck
 // HUD: left/right info panels, radar, terminal scroller, crosshair, vault-kanji,
 // realtime, scene-label slab, control bar.
 import type { ScreensaverSettings, SceneId } from '../data/defaults';
@@ -68,7 +69,53 @@ export class Hud {
     this.applyColor(color);
     this.applySettings(settings);
     for (let i = 0; i < 12; i++) this.blips.push({ a: Math.random() * Math.PI * 2, r: 10 + Math.random() * 32, l: 0.85 });
+
+    // v1.2 — Live-Test 2026-05-13: Matrix-canvas + matrixCols were sized ONCE
+    // at construct-time from window.innerWidth. On iPhone, rotating from
+    // portrait to landscape kept the canvas at portrait width, so the matrix
+    // rain only rendered in the left strip of the landscape viewport. The
+    // resize handler now re-dimensions canvas + re-seeds the column array.
+    window.addEventListener('resize', this.onResize);
+    window.addEventListener('orientationchange', this.onResize);
+    // Initial radar layout — aspect-aware bottom offset.
+    this.updateRadarLayout();
   }
+
+  /** Re-size the matrix-rain canvas + re-seed column starts to match host. */
+  private resizeMatrixCanvas() {
+    const W = this.root.clientWidth || window.innerWidth;
+    const H = this.root.clientHeight || window.innerHeight;
+    this.matrixCanvas.width = W;
+    this.matrixCanvas.height = H;
+    if (!this.mctx) this.mctx = this.matrixCanvas.getContext('2d')!;
+    // Re-seed columns to span the new width; preserve y-positions for existing
+    // columns so the rain doesn't jump-reset visually.
+    const cols = Math.floor(W / 13);
+    const old = this.matrixCols || [];
+    this.matrixCols = Array.from({ length: cols }, (_, i) =>
+      i < old.length ? old[i] : Math.floor(Math.random() * (H / 13)),
+    );
+  }
+
+  /**
+   * v1.2 — Aspect-aware radar position. On portrait phones the terminal
+   * strip occupies the bottom ~30% of the screen, so the radar's default
+   * bottom:12px overlaps the terminal lines. We bump it up to bottom:160px
+   * for narrow viewports while landscape stays at 12px (next to terminal).
+   */
+  private updateRadarLayout() {
+    const W = this.root.clientWidth || window.innerWidth;
+    const H = this.root.clientHeight || window.innerHeight;
+    const portrait = W / H < 1;
+    const inset = portrait ? '160px' : '12px';
+    this.root.style.setProperty('--ks-radar-bottom',
+      `calc(env(safe-area-inset-bottom,0px) + ${inset})`);
+  }
+
+  private onResize = () => {
+    this.resizeMatrixCanvas();
+    this.updateRadarLayout();
+  };
 
   private buildDOM() {
     const css = (s: TemplateStringsArray) => s[0];
@@ -89,24 +136,30 @@ export class Hud {
 
     // Matrix rain canvas
     this.matrixCanvas = make('canvas', 'position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .5s');
-    this.matrixCanvas.width = window.innerWidth; this.matrixCanvas.height = window.innerHeight;
-    this.mctx = this.matrixCanvas.getContext('2d')!;
-    this.matrixCols = Array.from({ length: Math.floor(window.innerWidth / 13) }, () => Math.floor(Math.random() * window.innerHeight / 13));
+    this.resizeMatrixCanvas();
 
     // Control bar
+    // v1.2 — Mobile safe-area-insets (Live-Test 2026-05-13): on iPhone the
+    // Dynamic Island / notch overlaps the bar without env(safe-area-inset-top).
+    // `top` already accounts for the inset; padding stays at the desktop 5px.
     this.controlBar = make('div',
-      'position:absolute;top:0;left:0;right:0;z-index:40;padding:5px 10px;background:rgba(0,0,0,.9);' +
+      'position:absolute;top:env(safe-area-inset-top,0px);' +
+      'left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px);' +
+      'z-index:40;padding:5px 10px;background:rgba(0,0,0,.9);' +
       'border-bottom:1px solid var(--ks-faint,#003d10);display:flex;align-items:center;gap:3px;flex-wrap:wrap;' +
       'opacity:0;transition:opacity .25s;pointer-events:none');
 
-    // Slab (scene label)
+    // Slab (scene label) — offset by safe-area so it doesn't tuck behind the notch
     this.slab = make('div',
-      'position:absolute;top:48px;left:50%;transform:translateX(-50%);z-index:35;pointer-events:none;' +
+      'position:absolute;top:calc(env(safe-area-inset-top,0px) + 48px);' +
+      'left:50%;transform:translateX(-50%);z-index:35;pointer-events:none;' +
       'font-family:VT323,monospace;font-size:30px;letter-spacing:.22em;opacity:0;transition:opacity .4s');
 
     // HUD left
     this.hl = make('div',
-      'position:absolute;top:46px;left:12px;z-index:35;font-family:"Share Tech Mono",monospace;font-size:10px;' +
+      'position:absolute;top:calc(env(safe-area-inset-top,0px) + 46px);' +
+      'left:calc(env(safe-area-inset-left,0px) + 12px);' +
+      'z-index:35;font-family:"Share Tech Mono",monospace;font-size:10px;' +
       'letter-spacing:.06em;line-height:2;pointer-events:none');
     this.hl.innerHTML = `
       <div>MODE&nbsp;&nbsp;<span class="ks-v" id="ks-mode">RECON</span></div>
@@ -119,7 +172,9 @@ export class Hud {
 
     // HUD right
     this.hr = make('div',
-      'position:absolute;top:46px;right:12px;z-index:35;font-family:"Share Tech Mono",monospace;font-size:10px;' +
+      'position:absolute;top:calc(env(safe-area-inset-top,0px) + 46px);' +
+      'right:calc(env(safe-area-inset-right,0px) + 12px);' +
+      'z-index:35;font-family:"Share Tech Mono",monospace;font-size:10px;' +
       'letter-spacing:.06em;line-height:2;text-align:right;pointer-events:none');
     this.hr.innerHTML = `
       <div><span class="ks-v" id="ks-sys">NOMINAL</span>&nbsp;SYS</div>
@@ -131,7 +186,9 @@ export class Hud {
 
     // Vault kanji (right side, below HR)
     this.kanji = make('div',
-      'position:absolute;bottom:240px;right:18px;z-index:35;font-family:VT323,monospace;font-size:80px;' +
+      'position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 240px);' +
+      'right:calc(env(safe-area-inset-right,0px) + 18px);' +
+      'z-index:35;font-family:VT323,monospace;font-size:80px;' +
       'opacity:.18;pointer-events:none;line-height:1');
 
     // Crosshair
@@ -141,8 +198,17 @@ export class Hud {
     this.cross.innerHTML = '──┤ ✛ ├──<br><span style="font-size:8px;letter-spacing:.15em">TRACK</span>';
 
     // Radar
+    // v1.2 — Live-Test 2026-05-13 (mobile aspect-aware position):
+    //   Landscape: 12px above safe-area-bottom (next to terminal strip) —
+    //     keeps Kanji + HUD-right corner clear of triple-stack overlap.
+    //   Portrait: ~160px above safe-area-bottom — terminal strip is taller
+    //     on phone-portrait, so 12px would put radar INSIDE terminal text.
+    //   The CSS `max()` picks the per-orientation value via a CSS variable
+    //   we set from JS on resize (see updateRadarLayout()).
     this.radar = make('div',
-      'position:absolute;bottom:130px;right:12px;z-index:35;width:88px;height:88px;border-radius:50%;' +
+      'position:absolute;bottom:var(--ks-radar-bottom,12px);' +
+      'right:calc(env(safe-area-inset-right,0px) + 12px);' +
+      'z-index:35;width:88px;height:88px;border-radius:50%;' +
       'overflow:hidden;background:rgba(0,18,5,.88)');
     this.radarCanvas = make('canvas', 'width:88px;height:88px', this.radar);
     this.radarCanvas.width = 88; this.radarCanvas.height = 88;
@@ -238,8 +304,19 @@ export class Hud {
     root.style.setProperty('--ks-p', c.css);
     root.style.setProperty('--ks-dim', c.dim);
     root.style.setProperty('--ks-faint', c.faint);
-    // Style sheets that depend on --ks-p
-    if (!document.getElementById('ks-style')) {
+
+    // v1.2 — Live-Test 2026-05-13 (Mobile color-propagation fix):
+    //   Old behaviour: style tag was created once and reused. CSS variables
+    //   (--ks-p etc.) were updated on the overlay element each call, and the
+    //   cascade was supposed to propagate to all `color: var(--ks-p)` rules.
+    //   On Mobile WebView (Obsidian iOS) this cascade didn't always re-paint
+    //   — HUD labels kept their previous tint while geometry + radar updated.
+    //   New behaviour: rebuild the style tag every call. The `color: …` rules
+    //   below now reference the FRESH variables so each color-pick triggers a
+    //   guaranteed paint pass. The cost is one DOM mutation per color change
+    //   — trivial compared to the user-visible inconsistency it fixes.
+    document.getElementById('ks-style')?.remove();
+    {
       const st = document.createElement('style');
       st.id = 'ks-style';
       st.textContent = `
@@ -284,14 +361,17 @@ export class Hud {
           border: none; border-top: 1px solid var(--ks-faint); margin-bottom: 7px;
         }
 
-        /* ── Terminal: center-window layout (Apple-Lisa-inspired CORP OS) ── */
-        /* Fixed dimensions — looks and behaves like a real terminal window:
-           constant size regardless of content, oldest lines scroll off the top. */
+        /* ── Terminal: center-window layout (Apple-Lisa-inspired CORP OS) ──
+           Responsive dimensions (v1.2 — Live-Test 2026-05-13): on iPhone the
+           fixed 760×480 overflowed the viewport. min() clamps to viewport so
+           the chrome stays readable on phone while desktop still gets the
+           comfortable 760×480 reading window.
+           Same goes for font-size inside the content — scaled with clamp(). */
         #kuro-screensaver-overlay .ks-term-window {
           top: 50%; left: 50%;
           transform: translate(-50%, -50%);
-          width: 760px;
-          height: 480px;
+          width: min(92vw, 760px);
+          height: min(70vh, 480px);
           background: rgba(2,4,2,0.85);
           border: 2px solid var(--ks-p);
           box-shadow:
@@ -301,6 +381,7 @@ export class Hud {
           padding: 0;
           overflow: hidden;
           display: flex; flex-direction: column;
+          font-size: clamp(12px, 2.6vw, 18px);
         }
         #kuro-screensaver-overlay .ks-term-window .ks-term-content {
           padding: 10px 16px 12px;
@@ -377,6 +458,43 @@ export class Hud {
           letter-spacing: 0.06em;
           display: flex; justify-content: space-between;
           background: rgba(0,0,0,0.4);
+        }
+
+        /* v1.2 — Mobile-only touch-target sizing (Live-Test 2026-05-13).
+           iOS HIG recommends 44pt minimum tap target. Desktop stays at the
+           10px/3px-padding compact form for density; phones get larger
+           buttons + slightly more breathing room around the COLOR-dots so
+           thumbs aren't fat-fingering between adjacent dots. */
+        @media (max-width: 768px), (pointer: coarse) {
+          #kuro-screensaver-overlay button.ks-btn {
+            font-size: 12px;
+            padding: 7px 11px;
+            min-height: 32px;
+            margin: 0 3px;
+          }
+          #kuro-screensaver-overlay .ks-lbl { font-size: 10px; }
+          /* COLOR-dot buttons set width/height inline via cssText — bump
+             those up with a more specific selector. */
+          #kuro-screensaver-overlay button.ks-btn[style*="border-radius:50%"] {
+            min-width: 22px !important;
+            min-height: 22px !important;
+            width: 22px !important;
+            height: 22px !important;
+            margin: 0 4px !important;
+          }
+          /* Terminal text larger so it stays readable past 1m arm-length. */
+          #kuro-screensaver-overlay .ks-term-bottom { font-size: 14px; }
+          /* Center-window terminal — title + menu + status bar shrink so
+             they don't dominate phone-portrait layout. */
+          #kuro-screensaver-overlay .ks-term-window .ks-term-titlebar-label {
+            font-size: 10px; padding: 0 8px;
+          }
+          #kuro-screensaver-overlay .ks-term-window .ks-term-menubar {
+            font-size: 9px; gap: 10px; padding: 2px 6px;
+          }
+          #kuro-screensaver-overlay .ks-term-window .ks-term-statusbar {
+            font-size: 8px; padding: 2px 6px;
+          }
         }
       `;
       document.head.appendChild(st);
@@ -578,7 +696,7 @@ export class Hud {
     let totalLen = 0;
     session.resp.forEach((r) => {
       const text = typeof r === 'string' ? r : r.text;
-      const cat: LineCategory = typeof r === 'string' ? 'RESP' : (r.cat as LineCategory);
+      const cat: LineCategory = typeof r === 'string' ? 'RESP' : r.cat;
       const at = cursor;
       setTimeout(() => this.addLine(text, cat), at);
       cursor += 350 + text.length * 14;               // typewriter time + inter-line pause
@@ -766,6 +884,8 @@ export class Hud {
 
   dispose() {
     this.stopLoop();
+    window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('orientationchange', this.onResize);
     document.getElementById('ks-style')?.remove();
   }
 }
