@@ -2,19 +2,20 @@ import * as THREE from 'three';
 import type { SceneCtx, SceneModule, SceneUpdater } from './scene-base';
 import { SPEED_VALUES } from '../../data/defaults';
 
-// Heightfield is a function of LOGICAL world position + time. Each chunk carries
+// Heightfield is a pure function of LOGICAL world position. Each chunk carries
 // its own constant logicalOffset (NOT its rendered position.z). The offset only
 // changes when the chunk wraps to the back; during normal scrolling it stays put,
 // so per-vertex heights stay constant per cycle → the chunk's hills travel
-// forward with the chunk geometry (= forward-flight illusion preserved).
+// forward with the chunk geometry (= forward-flight illusion preserved, no
+// wave-like undulation).
 //
 // At the seam, neighbour-chunk offsets always differ by exactly D (chunk length),
 // matching the local-z gap of 2·(D/2) = D between the meeting edges → heights
 // agree at the boundary, no visible discontinuity.
-const heightAt = (x: number, z: number, t: number): number =>
-  Math.sin(x * 0.33 + t * 0.26) * Math.cos(z * 0.2) * 2.8 +
-  Math.sin(x * 0.77 + z * 0.26 + t * 0.18) * 0.95 +
-  Math.cos(x * 0.16 - z * 0.13 + t * 0.12) * 1.8;
+const heightAt = (x: number, z: number): number =>
+  Math.sin(x * 0.33) * Math.cos(z * 0.2) * 2.8 +
+  Math.sin(x * 0.77 + z * 0.26) * 0.95 +
+  Math.cos(x * 0.16 - z * 0.13) * 1.8;
 
 export const TerrainScene: SceneModule = {
   modeLabels: ['RECON', 'SWEEP', 'PATROL'] as const,
@@ -69,18 +70,28 @@ export const TerrainScene: SceneModule = {
 
     const p1 = g1.attributes.position, p2 = g2.attributes.position;
 
+    // Heightfield depends only on (x, z + logicalOffset) — both constant between
+    // wraps — so we sample once at build time and re-sample only when a chunk
+    // wraps. Was previously ~37k setY+ 2 normal recomputes per frame.
+    const sampleChunk = (geom: THREE.PlaneGeometry, attr: THREE.BufferAttribute, logicalZ: number) => {
+      for (let i = 0; i < attr.count; i++) attr.setY(i, heightAt(attr.getX(i), attr.getZ(i) + logicalZ));
+      attr.needsUpdate = true;
+      geom.computeVertexNormals();
+    };
+    sampleChunk(g1, p1 as THREE.BufferAttribute, logicalA);
+    sampleChunk(g2, p2 as THREE.BufferAttribute, logicalB);
+
     return (t: number, _dt: number) => {
       const spd = SPEED_VALUES[ctx.settings.speed] * 0.2;
       t1.position.z += spd; t2.position.z += spd;
-      if (t1.position.z > D / 2 + 12) { t1.position.z -= D * 2; logicalA -= D * 2; }
-      if (t2.position.z > D / 2 + 12) { t2.position.z -= D * 2; logicalB -= D * 2; }
-
-      // Sample heightfield at LOGICAL z (constant per cycle) — heights move WITH
-      // the chunk, not against it.
-      for (let i = 0; i < p1.count; i++) p1.setY(i, heightAt(p1.getX(i), p1.getZ(i) + logicalA, t));
-      for (let i = 0; i < p2.count; i++) p2.setY(i, heightAt(p2.getX(i), p2.getZ(i) + logicalB, t));
-      p1.needsUpdate = true; p2.needsUpdate = true;
-      g1.computeVertexNormals(); g2.computeVertexNormals();
+      if (t1.position.z > D / 2 + 12) {
+        t1.position.z -= D * 2; logicalA -= D * 2;
+        sampleChunk(g1, p1 as THREE.BufferAttribute, logicalA);
+      }
+      if (t2.position.z > D / 2 + 12) {
+        t2.position.z -= D * 2; logicalB -= D * 2;
+        sampleChunk(g2, p2 as THREE.BufferAttribute, logicalB);
+      }
 
       cam.position.y = 6 + Math.sin(t * 0.33) * 0.9;
       cam.rotation.z = Math.sin(t * 0.17) * 0.009;
