@@ -1,10 +1,15 @@
 import Cocoa
 import WebKit
 
-/// WKWebView for the viewer. It's an interactive fullscreen app (not a passive
-/// screen saver), so clicks reach the web HUD (scene tabs, FX toggles) and only
-/// Esc quits. The engine manages the cursor itself (hidden at rest, shown on
-/// mouse-move, re-hidden after idle), so we don't force-hide it natively.
+/// A borderless NSWindow returns canBecomeKey == false by default, so it never
+/// receives keyboard events — which means Esc/Cmd-Q silently do nothing and the
+/// fullscreen window traps the user. Overriding these fixes that.
+final class KeyableWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+}
+
+/// WKWebView for the viewer. Interactive: clicks reach the web HUD; Esc quits.
 final class ExitWebView: WKWebView {
     var onExit: (() -> Void)?
 
@@ -18,14 +23,18 @@ final class ExitWebView: WKWebView {
     }
 }
 
-/// Fullscreen host for the web screensaver engine. Runs in a normal app
-/// process, so WebGL composites correctly (unlike the .saver in the sandboxed
-/// legacyScreenSaver process). Reuses WebSchemeHandler + the bundled web/.
+/// Fullscreen host for the web screensaver engine, in a normal app process so
+/// WebGL composites. Multiple independent exit paths (Esc via responder, Esc /
+/// Cmd-Q via a local event monitor, and a Cmd-Q menu item) so the fullscreen
+/// window can never trap the user.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow?
     private var webView: ExitWebView?
+    private var keyMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installMenu()
+
         let screen = NSScreen.main ?? NSScreen.screens.first
         let frame = screen?.frame ?? NSRect(x: 0, y: 0, width: 1280, height: 800)
 
@@ -42,7 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         wv.layer?.backgroundColor = NSColor.black.cgColor
         webView = wv
 
-        let win = NSWindow(
+        let win = KeyableWindow(
             contentRect: frame,
             styleMask: [.borderless],
             backing: .buffered,
@@ -59,16 +68,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         NSApp.presentationOptions = [.hideDock, .hideMenuBar]
         NSApp.activate(ignoringOtherApps: true)
+
+        // Safety net: intercept Esc / Cmd-Q before the responder chain, so the
+        // app always quits regardless of focus state.
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == 53 {                                  // Esc
+                NSApplication.shared.terminate(nil)
+                return nil
+            }
+            if event.modifierFlags.contains(.command),
+               event.charactersIgnoringModifiers?.lowercased() == "q" {  // Cmd-Q
+                NSApplication.shared.terminate(nil)
+                return nil
+            }
+            return event
+        }
+
         // Cursor is managed by the web engine (CSS cursor: none at rest, shown
         // on mouse-move) — don't force-hide it natively, or the user can't aim
         // at the on-screen controls.
 
-        // Scene/audio could later come from CLI args or a menu; v1 is random
-        // scene, audio off (same contract as the web entry).
         let urlString = "\(WebSchemeHandler.scheme)://local/screensaver.html?scene=random&audio=off"
         if let url = URL(string: urlString) {
             wv.load(URLRequest(url: url))
         }
+    }
+
+    /// Minimal main menu so the standard Cmd-Q quit works (the menu bar is
+    /// hidden, but the keyboard shortcut still fires).
+    private func installMenu() {
+        let mainMenu = NSMenu()
+        let appItem = NSMenuItem()
+        mainMenu.addItem(appItem)
+        let appMenu = NSMenu()
+        appMenu.addItem(
+            withTitle: "Quit Kuro Screensaver",
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        )
+        appItem.submenu = appMenu
+        NSApp.mainMenu = mainMenu
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
