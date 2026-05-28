@@ -1,0 +1,70 @@
+# Release pipeline — builds the Windows .scr on a Linux runner and attaches it
+# to the Codeberg release for the pushed tag.
+#
+# ACTIVATION (one-time, user side — see docs/specs/...-port-design.md):
+#   1. Enable Forgejo Actions for the repo (Settings → Actions).
+#   2. Add a repository secret RELEASE_TOKEN = a Codeberg access token with
+#      repository read/write (used to create the release + upload assets).
+#
+# The macOS .saver needs a macOS build host (Codeberg has Linux runners only).
+# Build it locally with `bash scripts/package-macos.sh` and upload the
+# resulting dist-native/KuroScreensaver-macos.zip to the same release, or add a
+# GitHub Actions macOS job later.
+
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  windows-scr:
+    runs-on: docker
+    container:
+      image: node:20-bookworm
+    steps:
+      - name: Install build tools
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends git curl zip unzip ca-certificates
+
+      - uses: actions/checkout@v4
+
+      - name: Install .NET 8 SDK
+        run: |
+          curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh
+          bash /tmp/dotnet-install.sh --channel 8.0 --install-dir "$HOME/.dotnet"
+          echo "$HOME/.dotnet" >> "$GITHUB_PATH"
+
+      - name: Build web + package Windows .scr
+        run: |
+          npm ci
+          bash scripts/package-windows.sh
+
+      - name: Create release and upload the Windows zip
+        env:
+          TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          API: ${{ github.server_url }}/api/v1/repos/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Create the release for this tag (ignore "already exists").
+          create=$(curl -sS -X POST "$API/releases" \
+            -H "Authorization: token $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"tag_name\":\"$TAG\",\"name\":\"$TAG\",\"body\":\"Kuro Screensaver $TAG\"}" \
+            -w "\n%{http_code}")
+          body=$(printf '%s' "$create" | head -n -1)
+          code=$(printf '%s' "$create" | tail -n1)
+          echo "create release HTTP $code"
+
+          # Resolve the release id (works whether it was just created or existed).
+          rel_id=$(curl -sS "$API/releases/tags/$TAG" \
+            -H "Authorization: token $TOKEN" | sed -n 's/.*"id":[[:space:]]*\([0-9]\+\).*/\1/p' | head -n1)
+          test -n "$rel_id"
+
+          curl -sS -X POST "$API/releases/$rel_id/assets?name=KuroScreensaver-windows.zip" \
+            -H "Authorization: token $TOKEN" \
+            -F "attachment=@dist-native/KuroScreensaver-windows.zip" \
+            -w "upload HTTP %{http_code}\n" -o /dev/null

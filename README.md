@@ -23,6 +23,24 @@ hosting (Codeberg Pages) and for embedding on a homepage.
 
 ---
 
+## Download — native screensavers
+
+Prefer a real OS screensaver over the web version? The same engine ships as
+native screensavers for macOS and Windows:
+
+| Platform | File | Install |
+|---|---|---|
+| **macOS** | `KuroScreensaver-macos.zip` → `.saver` | Unzip, double-click the `.saver`, confirm in **System Settings → Screen Saver**. |
+| **Windows** | `KuroScreensaver-windows.zip` → `.scr` | Unzip, right-click `KuroScreensaver.scr` → **Install**. Needs the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (preinstalled on current Win10/11). |
+
+**[↓ Latest release](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)**
+
+Scene (random by default, or a fixed scene) and audio are set in the
+screensaver's options panel. Builds are **unsigned** for now — macOS
+Gatekeeper / Windows SmartScreen will ask you to confirm on first run.
+
+---
+
 ## Quickstart
 
 ```bash
