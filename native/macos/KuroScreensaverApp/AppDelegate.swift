@@ -1,16 +1,21 @@
 import Cocoa
 import WebKit
 
-/// WKWebView that quits the app on any key press or mouse click — gives the
-/// app a screensaver-like dismissal. Mouse movement does NOT quit (so an
-/// accidental bump won't kill it the moment you launch it).
+/// WKWebView for the viewer. It's an interactive fullscreen app (not a passive
+/// screen saver), so clicks reach the web HUD (scene tabs, FX toggles) and only
+/// Esc quits. The engine manages the cursor itself (hidden at rest, shown on
+/// mouse-move, re-hidden after idle), so we don't force-hide it natively.
 final class ExitWebView: WKWebView {
     var onExit: (() -> Void)?
 
     override var acceptsFirstResponder: Bool { true }
-    override func keyDown(with event: NSEvent) { onExit?() }
-    override func mouseDown(with event: NSEvent) { onExit?() }
-    override func rightMouseDown(with event: NSEvent) { onExit?() }
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 53 {        // Esc
+            onExit?()
+        } else {
+            super.keyDown(with: event)  // everything else → web content
+        }
+    }
 }
 
 /// Fullscreen host for the web screensaver engine. Runs in a normal app
@@ -54,7 +59,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         NSApp.presentationOptions = [.hideDock, .hideMenuBar]
         NSApp.activate(ignoringOtherApps: true)
-        NSCursor.hide()
+        // Cursor is managed by the web engine (CSS cursor: none at rest, shown
+        // on mouse-move) — don't force-hide it natively, or the user can't aim
+        // at the on-screen controls.
 
         // Scene/audio could later come from CLI args or a menu; v1 is random
         // scene, audio off (same contract as the web entry).

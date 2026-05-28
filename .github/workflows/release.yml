@@ -35,7 +35,7 @@ jobs:
           node-version: "20"
       - name: Install xcodegen
         run: brew install xcodegen
-      - name: Build .saver
+      - name: Build macOS app
         run: |
           npm ci
           bash scripts/package-macos.sh
