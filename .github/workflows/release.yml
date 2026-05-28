@@ -78,16 +78,17 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Create the release for this tag (ignore "already exists").
+          # Create the release for this tag (ignore "already exists" → 409).
           curl -sS -X POST "$API/releases" \
             -H "Authorization: token $TOKEN" \
             -H "Content-Type: application/json" \
             -d "{\"tag_name\":\"$TAG\",\"name\":\"$TAG\",\"body\":\"Kuro Screensaver $TAG\"}" \
             -o /dev/null -w "create release HTTP %{http_code}\n" || true
 
-          rel_id=$(curl -sS "$API/releases/tags/$TAG" \
-            -H "Authorization: token $TOKEN" \
-            | sed -n 's/.*"id":[[:space:]]*\([0-9]\+\).*/\1/p' | head -n1)
+          # Resolve the release id with a JSON parser. (A greedy sed regex on the
+          # single-line JSON grabs the wrong "id" — author/asset — so use python.)
+          rel_id=$(curl -sS "$API/releases/tags/$TAG" -H "Authorization: token $TOKEN" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
           test -n "$rel_id"
 
           for f in \
@@ -96,7 +97,17 @@ jobs:
           do
             [ -f "$f" ] || { echo "missing $f"; continue; }
             name=$(basename "$f")
-            curl -sS -X POST "$API/releases/$rel_id/assets?name=$name" \
+
+            # Make re-runs idempotent: delete any existing asset of the same name.
+            existing=$(curl -sS "$API/releases/$rel_id/assets" -H "Authorization: token $TOKEN" \
+              | python3 -c "import sys,json; print(next((a['id'] for a in json.load(sys.stdin) if a['name']=='$name'), ''))")
+            if [ -n "$existing" ]; then
+              curl -sS -X DELETE "$API/releases/$rel_id/assets/$existing" \
+                -H "Authorization: token $TOKEN" \
+                -o /dev/null -w "delete old $name HTTP %{http_code}\n"
+            fi
+
+            curl -sS --fail-with-body -X POST "$API/releases/$rel_id/assets?name=$name" \
               -H "Authorization: token $TOKEN" \
               -F "attachment=@$f" \
               -o /dev/null -w "upload $name HTTP %{http_code}\n"
