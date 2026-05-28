@@ -1,0 +1,47 @@
+# xcodegen manifest — generates KuroScreensaver.xcodeproj reproducibly.
+#   brew install xcodegen && xcodegen generate
+# Then build the .saver bundle:
+#   xcodebuild -project KuroScreensaver.xcodeproj -scheme KuroScreensaver -configuration Release
+#
+# The web build is bundled into KuroScreensaver/web/ by scripts/bundle-web.sh
+# before building (gitignored; referenced as a folder resource below).
+
+name: KuroScreensaver
+
+options:
+  bundleIdPrefix: com.kuro
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "11.0"
+
+targets:
+  KuroScreensaver:
+    type: bundle
+    platform: macOS
+    sources:
+      - path: KuroScreensaver
+        excludes:
+          - "web/**"
+          - "Info.plist"
+      - path: KuroScreensaver/web
+        type: folder
+        optional: true
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_NAME: KuroScreensaver
+        PRODUCT_BUNDLE_IDENTIFIER: com.kuro.screensaver
+        WRAPPER_EXTENSION: saver
+        INFOPLIST_FILE: KuroScreensaver/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        SWIFT_VERSION: "5.0"
+        MACOSX_DEPLOYMENT_TARGET: "11.0"
+        SKIP_INSTALL: YES
+        # Unsigned for v1 — users dismiss the Gatekeeper warning on install.
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: NO
+    dependencies:
+      - sdk: ScreenSaver.framework
+      - sdk: WebKit.framework
+      - sdk: Cocoa.framework
