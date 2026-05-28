@@ -1,7 +1,7 @@
 # Native Screensaver Port — Design
 
 **Date:** 2026-05-28
-**Status:** Approved (design), implementation in progress
+**Status:** Implemented (web + Windows verified; macOS scaffold built where Xcode is present)
 **Topic:** Port the standalone browser screensaver to native macOS (`.saver`)
 and Windows (`.scr`) screensavers, offered as downloads.
 
