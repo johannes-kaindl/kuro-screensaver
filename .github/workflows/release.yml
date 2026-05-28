@@ -1,0 +1,103 @@
+# Release pipeline (GitHub Actions).
+#
+# Why GitHub and not Codeberg CI: building the macOS .saver needs a macOS
+# runner with Xcode, which Codeberg's hosted CI (Linux only) doesn't provide.
+# GitHub's macos-latest has Xcode preinstalled and is free for public repos —
+# so nobody has to download ~10 GB of Xcode locally.
+#
+# Codeberg stays the primary repo. Set up a Codeberg → GitHub *push mirror*
+# (Codeberg repo Settings → Repository → Mirror) so commits and tags sync
+# automatically; pushing a tag then triggers this workflow on the mirror.
+#
+# SETUP (one-time, user side):
+#   1. Create an empty GitHub repo (e.g. jkaindl/kuro-screensaver).
+#   2. Codeberg → Settings → add a Push Mirror to that GitHub repo (incl. tags).
+#   3. GitHub repo → Settings → Secrets → add CODEBERG_TOKEN
+#      (a Codeberg access token with repo write — used to upload release assets).
+#   4. Tag a release on Codeberg: `git tag v0.1.0 && git push origin v0.1.0`.
+#      The mirror forwards the tag; this workflow builds both artifacts and
+#      attaches them to the Codeberg release for that tag.
+
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install xcodegen
+        run: brew install xcodegen
+      - name: Build .saver
+        run: |
+          npm ci
+          bash scripts/package-macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-macos
+          path: dist-native/KuroScreensaver-macos.zip
+
+  windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build .scr (win-x64 cross-build)
+        run: |
+          npm ci
+          bash scripts/package-windows.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows
+          path: dist-native/KuroScreensaver-windows.zip
+
+  publish:
+    needs: [macos, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Attach artifacts to the Codeberg release
+        env:
+          TOKEN: ${{ secrets.CODEBERG_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          API: https://codeberg.org/api/v1/repos/jkaindl/kuro-screensaver
+        run: |
+          set -euo pipefail
+
+          # Create the release for this tag (ignore "already exists").
+          curl -sS -X POST "$API/releases" \
+            -H "Authorization: token $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"tag_name\":\"$TAG\",\"name\":\"$TAG\",\"body\":\"Kuro Screensaver $TAG\"}" \
+            -o /dev/null -w "create release HTTP %{http_code}\n" || true
+
+          rel_id=$(curl -sS "$API/releases/tags/$TAG" \
+            -H "Authorization: token $TOKEN" \
+            | sed -n 's/.*"id":[[:space:]]*\([0-9]\+\).*/\1/p' | head -n1)
+          test -n "$rel_id"
+
+          for f in \
+            artifacts/dist-macos/KuroScreensaver-macos.zip \
+            artifacts/dist-windows/KuroScreensaver-windows.zip
+          do
+            [ -f "$f" ] || { echo "missing $f"; continue; }
+            name=$(basename "$f")
+            curl -sS -X POST "$API/releases/$rel_id/assets?name=$name" \
+              -H "Authorization: token $TOKEN" \
+              -F "attachment=@$f" \
+              -o /dev/null -w "upload $name HTTP %{http_code}\n"
+          done

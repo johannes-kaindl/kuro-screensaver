@@ -85,10 +85,11 @@ OS options panel → persisted defaults → URL query (?scene=…&audio=…)
 - Packaging scripts:
   - `scripts/package-macos.sh` — `xcodebuild` → `KuroScreensaver.saver` → zip (runs where Xcode exists).
   - `scripts/package-windows.sh` — `dotnet publish -r win-x64` → rename `.scr`.
-- CI on git tag:
-  - Windows `.scr`: built in CI (Linux cross-build if it holds, else GitHub Windows runner).
-  - macOS `.saver`: built locally / on a macOS runner and uploaded.
-  - Both attached as **Codeberg Release assets** via the API (token in `Authorization` header — verified working from this environment 2026-05-28).
+- CI on git tag (GitHub Actions, `.github/workflows/release.yml`):
+  - macOS `.saver`: `macos-latest` runner (Xcode preinstalled — avoids a local ~10 GB Xcode download).
+  - Windows `.scr`: `ubuntu-latest` Linux cross-build (verified).
+  - A `publish` job attaches both as **Codeberg Release assets** via the API (token in `Authorization` header — verified working from this environment 2026-05-28).
+  - Codeberg stays primary; a Codeberg → GitHub **push mirror** forwards tags so the workflow triggers. (Codeberg's hosted CI is Linux-only and cannot build the `.saver` — hence GitHub.)
 - Page/README: download buttons pointing at the latest release.
 
 ---
@@ -104,9 +105,9 @@ OS options panel → persisted defaults → URL query (?scene=…&audio=…)
 
 ## Autonomy boundary (what needs the user)
 
-1. **macOS `.saver` build** — install Xcode, run `scripts/package-macos.sh`. Code is scaffolded autonomously; only the build needs Xcode.
-2. **CI activation + secrets** — enable Codeberg/Forgejo Actions (or set up the GitHub-mirror fallback) and add the release token secret.
-3. **Release creation** — tag + publish; asset upload uses the verified token API.
+1. **GitHub mirror + secret** — create a GitHub repo, add a Codeberg → GitHub push mirror (forwards tags), and add a `CODEBERG_TOKEN` secret to the GitHub repo (release-asset upload). This replaces a local macOS build: the `.saver` is built on GitHub's `macos-latest` runner, so no local Xcode is needed.
+2. **Release creation** — tag on Codeberg (`git tag v0.1.0 && git push origin v0.1.0`); the mirror triggers the GitHub workflow, which builds both artifacts and attaches them to the Codeberg release.
+3. **Local macOS build (optional fallback)** — only if not using CI: install Xcode and run `scripts/package-macos.sh`.
 
 Everything else (web screensaver entry, Windows project + verified cross-build, packaging scripts, CI YAML, download UI) is done autonomously.
 
