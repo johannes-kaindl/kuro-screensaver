@@ -23,21 +23,25 @@ hosting (Codeberg Pages) and for embedding on a homepage.
 
 ---
 
-## Download — native screensavers
+## Download — native builds
 
-Prefer a real OS screensaver over the web version? The same engine ships as
-native screensavers for macOS and Windows:
+The same engine ships natively for both platforms — a real screen saver on
+Windows, and a fullscreen app on macOS:
 
-| Platform | Download | Install |
+| Platform | Download | Run |
 |---|---|---|
-| **macOS** | **[↓ KuroScreensaver-macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/download/v0.1.0/KuroScreensaver-macos.zip)** | Unzip, double-click the `.saver`, confirm in **System Settings → Screen Saver**. |
-| **Windows** | **[↓ KuroScreensaver-windows.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/download/v0.1.0/KuroScreensaver-windows.zip)** | Unzip, right-click `KuroScreensaver.scr` → **Install**. Needs the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (preinstalled on current Win10/11). |
+| **Windows** (`.scr` screen saver) | **[↓ KuroScreensaver-windows.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/download/v0.1.1/KuroScreensaver-windows.zip)** | Unzip, right-click `KuroScreensaver.scr` → **Install**. Needs the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (preinstalled on current Win10/11). |
+| **macOS** (fullscreen `.app`) | **[↓ KuroScreensaver-macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/download/v0.1.1/KuroScreensaver-macos.zip)** | Unzip, then (unsigned → clear the download quarantine once): `xattr -dr com.apple.quarantine KuroScreensaver.app` and double-click it. Any key or click exits. |
 
 All versions: **[releases page](https://codeberg.org/jkaindl/kuro-screensaver/releases)**.
 
-Scene (random by default, or a fixed scene) and audio are set in the
-screensaver's options panel. Builds are **unsigned** for now — macOS
-Gatekeeper / Windows SmartScreen will ask you to confirm on first run.
+> **Why an app on macOS, not a `.saver`?** WebGL doesn't composite inside
+> macOS's sandboxed screen-saver process, so a real `.saver` stays blank. A
+> normal app window renders the 3D engine correctly. (The `.saver` scaffold is
+> kept in `native/macos/` for a possible future native rewrite.)
+
+Builds are **unsigned** — macOS Gatekeeper / Windows SmartScreen will ask you
+to confirm on first run.
 
 ---
 

@@ -1,7 +1,19 @@
 # Native Screensaver Port — Design
 
 **Date:** 2026-05-28
-**Status:** Implemented (web + Windows verified; macOS scaffold built where Xcode is present)
+**Status:** Implemented. Windows = real `.scr`. **macOS pivoted from `.saver` to a fullscreen `.app`** (see update below).
+
+> **Update 2026-05-28 — macOS `.saver` → fullscreen `.app`.** On-device testing
+> (preview *and* full-screen) confirmed the `.saver` stays gray after boot:
+> WebGL renders but isn't composited in the sandboxed `legacyScreenSaver`
+> process (the `com.apple.WebKit.GPU` process launches fine — it's a host
+> compositing limit, not a sandbox/code bug; the 2D CSS boot does show). Not
+> fixable from our code, and a native fix needs private WebKit flags. Decision:
+> ship macOS as a fullscreen **app** (`native/macos/KuroScreensaverApp/`) that
+> hosts the same WKWebView in a normal app process (WebGL composites there).
+> The `.saver` scaffold stays in `native/macos/KuroScreensaver/` for a possible
+> future native (Metal/SceneKit) rewrite — the only route to a *real* macOS
+> system screen saver with this 3D look.
 **Topic:** Port the standalone browser screensaver to native macOS (`.saver`)
 and Windows (`.scr`) screensavers, offered as downloads.
 

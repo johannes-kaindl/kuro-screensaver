@@ -1,10 +1,17 @@
 # xcodegen manifest — generates KuroScreensaver.xcodeproj reproducibly.
 #   brew install xcodegen && xcodegen generate
-# Then build the .saver bundle:
-#   xcodebuild -project KuroScreensaver.xcodeproj -scheme KuroScreensaver -configuration Release
+#
+# Two targets:
+#   KuroScreensaverApp  — the shipped product: a fullscreen .app hosting the
+#                         web engine in a WKWebView (WebGL composites in a
+#                         normal app process). Build:
+#                           xcodebuild -scheme KuroScreensaverApp -configuration Release
+#   KuroScreensaver     — the .saver bundle (kept for reference / a possible
+#                         future native rewrite). NOT shipped: WebGL does not
+#                         composite in the sandboxed legacyScreenSaver process.
 #
 # The web build is bundled into KuroScreensaver/web/ by scripts/bundle-web.sh
-# before building (gitignored; referenced as a folder resource below).
+# before building (gitignored; referenced as a folder resource by both targets).
 
 name: KuroScreensaver
 
@@ -15,6 +22,36 @@ options:
     macOS: "11.0"
 
 targets:
+
+  KuroScreensaverApp:
+    type: application
+    platform: macOS
+    sources:
+      - path: KuroScreensaverApp
+        excludes:
+          - "Info.plist"
+      - path: KuroScreensaver/WebSchemeHandler.swift   # shared with the .saver
+      - path: KuroScreensaver/web
+        type: folder
+        optional: true
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_NAME: KuroScreensaver
+        PRODUCT_BUNDLE_IDENTIFIER: com.kuro.screensaver.app
+        INFOPLIST_FILE: KuroScreensaverApp/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        SWIFT_VERSION: "5.0"
+        MACOSX_DEPLOYMENT_TARGET: "11.0"
+        # Ad-hoc signed (free, no Apple account) so it runs on Apple Silicon.
+        # package-macos.sh re-signs with proper resource sealing afterward.
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: YES
+    dependencies:
+      - sdk: WebKit.framework
+      - sdk: Cocoa.framework
+
   KuroScreensaver:
     type: bundle
     platform: macOS
@@ -37,11 +74,22 @@ targets:
         SWIFT_VERSION: "5.0"
         MACOSX_DEPLOYMENT_TARGET: "11.0"
         SKIP_INSTALL: YES
-        # Unsigned for v1 — users dismiss the Gatekeeper warning on install.
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGNING_REQUIRED: NO
-        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_ALLOWED: YES
     dependencies:
       - sdk: ScreenSaver.framework
       - sdk: WebKit.framework
       - sdk: Cocoa.framework
+
+# Explicit shared scheme so `xcodebuild -scheme KuroScreensaverApp` is
+# deterministic (don't rely on xcodebuild auto-creating schemes).
+schemes:
+  KuroScreensaverApp:
+    build:
+      targets:
+        KuroScreensaverApp: all
+    run:
+      config: Release
+    archive:
+      config: Release
