@@ -16,6 +16,10 @@
   </a>
 </p>
 
+<p align="center">
+  <img alt="Kuro Screensaver — procedural CRT terrain" src="docs/images/hero.jpg" width="100%">
+</p>
+
 Extracted from the `kuro-companion` Obsidian plugin into a focused,
 browser-hosted engine. The standalone is the primary development line —
 the plugin gets changes backported only when needed. Designed for static
@@ -23,25 +27,102 @@ hosting (Codeberg Pages) and for embedding on a homepage.
 
 ---
 
+## Gallery
+
+Five seeded procedural scenes, each recolored by any of 13 phosphor presets:
+
+<table>
+  <tr>
+    <td width="50%"><img alt="Terrain" src="docs/images/scene-terrain.jpg"><br><sub><b>TERRAIN</b> — seam-free infinite wireframe landscape</sub></td>
+    <td width="50%"><img alt="The Rift" src="docs/images/scene-rift.jpg"><br><sub><b>THE RIFT</b> — barrel-roll dynamics through a fracture</sub></td>
+  </tr>
+  <tr>
+    <td><img alt="City" src="docs/images/scene-city.jpg"><br><sub><b>CITY</b> — drifting wireframe towers</sub></td>
+    <td><img alt="Tunnel" src="docs/images/scene-tunnel.jpg"><br><sub><b>TUNNEL</b> — banking flight down a Catmull-Rom spine</sub></td>
+  </tr>
+  <tr>
+    <td><img alt="Void" src="docs/images/scene-void.jpg"><br><sub><b>VOID</b> — suspended particle fields</sub></td>
+    <td valign="center"><sub>Same seed → same run. The renderer recolors the
+    entire material pool in a single pass on a preset switch.</sub></td>
+  </tr>
+</table>
+
+<p align="center">
+  <img alt="Live motion" src="docs/images/motion.gif" width="70%"><br>
+  <sub>Live engine — terrain flythrough (Ember preset)</sub>
+</p>
+
+### 13 phosphor presets
+
+<p align="center"><img alt="All 13 color presets" src="docs/images/presets.jpg" width="100%"></p>
+
+<sub>Kuro · Neural Bleed · Rust Signal · Toxic Haze · Biolink · Ghost Protocol ·
+Voidwitch · Circuit · Crimson · Phosphor · Ember · Spectre · Pearl</sub>
+
+---
+
+## The loop that never repeats the same way
+
+Each run is a CORP operator's shift, told through the narrative terminal:
+`ROUTINE → INTRUSION → ALARM → PANIC → SILENCE`. When the shift ends the
+system **crashes** — a choreographed CRT collapse to a power-off line, then
+black, then an unstable reboot into a fresh shift with a new persona.
+
+<p align="center"><img alt="The diegetic CRT crash sequence" src="docs/images/crash-sequence.jpg" width="100%"></p>
+
+<sub>Signal failure → glitch storm → power-off collapse → dead screen → reboot →
+new shift. In the pre-rendered video screensaver, this black moment is also the
+seamless loop point — the loop is diegetic, not a hidden crossfade.</sub>
+
+---
+
 ## Download — native builds
 
-The same engine ships natively for both platforms — a real screen saver on
-Windows, and a fullscreen app on macOS:
+The same engine ships natively for both platforms:
 
 | Platform | Download | Run |
 |---|---|---|
-| **Windows** (`.scr` screen saver) | **[↓ KuroScreensaver-windows.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/download/v0.1.6/KuroScreensaver-windows.zip)** | Unzip, right-click `KuroScreensaver.scr` → **Install**. Needs the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (preinstalled on current Win10/11). |
-| **macOS** (fullscreen `.app`) | **[↓ KuroScreensaver-macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/download/v0.1.6/KuroScreensaver-macos.zip)** | Unzip, then (unsigned → clear the download quarantine once): `xattr -dr com.apple.quarantine KuroScreensaver.app` and double-click it. Move the mouse to reveal the cursor + on-screen controls (switch scene / toggle effects); **Esc** or **⌘Q** exits. |
+| **Windows** (`.scr` screen saver) | **[↓ windows.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** | Unzip, right-click `KuroScreensaver.scr` → **Install**. Needs the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (preinstalled on current Win10/11). |
+| **macOS** (`.saver`, one per preset) | **[↓ savers-macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** | Unzip, copy the `.saver` bundles into `~/Library/Screen Savers/`, then pick one in **System Settings ▸ Screen Saver**. Pre-rendered video loops — a real screensaver. |
+| **macOS** (live `.app`) | **[↓ macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** | The live WebGL engine in a fullscreen window (full procedural variation). Unsigned → clear quarantine once: `xattr -dr com.apple.quarantine KuroScreensaver.app`. **Esc**/**⌘Q** exits. |
 
 All versions: **[releases page](https://codeberg.org/jkaindl/kuro-screensaver/releases)**.
 
-> **Why an app on macOS, not a `.saver`?** WebGL doesn't composite inside
-> macOS's sandboxed screen-saver process, so a real `.saver` stays blank. A
-> normal app window renders the 3D engine correctly. (The `.saver` scaffold is
-> kept in `native/macos/` for a possible future native rewrite.)
+> **Why both a `.saver` and an `.app` on macOS?** WebGL doesn't composite inside
+> macOS's sandboxed screen-saver process, so the *live* engine can't run as a
+> real `.saver`. The video `.saver` sidesteps this by playing a pre-rendered
+> loop (AVFoundation video composites fine there) — a true screensaver that
+> starts on idle. The `.app` keeps the live, fully procedural engine for when
+> you want it.
 
 Builds are **unsigned** — macOS Gatekeeper / Windows SmartScreen will ask you
 to confirm on first run.
+
+---
+
+## What it does
+
+- **Five seeded procedural 3D scenes** — `TERRAIN · CITY · THE RIFT ·
+  TUNNEL · VOID`. Logical-offset chunk tiling for seam-free infinite
+  landscapes; a curved Catmull-Rom tunnel spine with banking flight;
+  barrel-roll dynamics in The Rift. Same seed → same run.
+- **Narrative terminal** — a bottom strip that types itself out: a
+  scripted persona working a shift, driven by a realistic typing engine
+  (typos, hesitations, abandoned lines) over a phase-modulated script
+  bank. Ends each shift with a diegetic system crash (see above).
+- **CRT simulation** — a composite signal-degradation post-pass:
+  H-sync tear, V-roll, brightness flicker, black-frame drops, VHS-style
+  rolling band, chromatic spikes, wave distortion, static bursts,
+  scanline pulse / hum bar / interlace flicker. One intensity knob drives
+  the whole chain.
+- **HUD overlay** — DOM info panels, sweeping radar, scrolling terminal,
+  crosshair, vault kanji (黒), real-time clock, scene-label slab, plus a
+  power-on boot sequence.
+- **Synthetic audio** — a fully procedural Web Audio layer (CRT hum,
+  scanline whine, boot beeps, scene-switch whoosh, jet crescendo on
+  tunnel boost, sonar ping). No audio assets.
+- **13 color presets** — phosphor palettes in `engine/data/presets.ts`.
+  The renderer recolors the whole material pool in one pass on a switch.
 
 ---
 
@@ -59,32 +140,14 @@ npm run typecheck  # tsc --noEmit (run before committing src/ changes)
 Open the page and hit **▶ Start Screensaver**. It goes fullscreen; press
 **Esc** to exit.
 
+To re-render the video screensavers (needs a GPU + ffmpeg):
+
+```bash
+npm run dev &                              # serve the screensaver entry
+node scripts/render-saver-videos.mjs       # one looping H.265 clip per preset
+```
+
 ---
-
-## What it does
-
-- **Five seeded procedural 3D scenes** — `TERRAIN · CITY · THE RIFT ·
-  TUNNEL · VOID`. Logical-offset chunk tiling for seam-free infinite
-  landscapes; a curved Catmull-Rom tunnel spine with banking flight;
-  barrel-roll dynamics in The Rift. Same seed → same run.
-- **Narrative terminal** — a bottom strip that types itself out: a
-  scripted persona working a shift, driven by a realistic typing engine
-  (typos, hesitations, abandoned lines) over a phase-modulated script
-  bank.
-- **CRT simulation** — a composite signal-degradation post-pass:
-  H-sync tear, V-roll, brightness flicker, black-frame drops, VHS-style
-  rolling band, chromatic spikes, wave distortion, static bursts,
-  scanline pulse / hum bar / interlace flicker. One intensity knob drives
-  the whole chain.
-- **HUD overlay** — DOM info panels, sweeping radar, scrolling terminal,
-  crosshair, vault kanji (黒), real-time clock, scene-label slab, plus a
-  power-on boot sequence.
-- **Synthetic audio** — a fully procedural Web Audio layer (CRT hum,
-  scanline whine, boot beeps, scene-switch whoosh, jet crescendo on
-  tunnel boost, sonar ping). No audio assets.
-- **Color presets** — phosphor palettes in `engine/data/presets.ts`
-  (default: Toxic Haze). The renderer recolors the whole material pool in
-  one pass on a preset switch.
 
 ## Controls
 
@@ -112,30 +175,30 @@ therefore be backported into the Obsidian plugin unchanged.
 ```
 src/
 ├── main.ts                       Standalone browser entry (sane non-Obsidian defaults)
+├── screensaver/main.ts           Screensaver-mode entry (?preset= / ?scene= / ?storyScale=)
 ├── host-web/                     Web host — bridges the plugin-shaped engine to the browser
-│   ├── mount.ts                  Boots the engine; imports the DOM polyfill first
 │   ├── plugin-shim.ts            Fulfils the HostPlugin contract (settings tree + saveData)
 │   ├── persistence.ts            Settings in localStorage
 │   └── obsidian-dom-polyfill.ts  Polyfills createEl / createDiv / createSpan / empty
 └── engine/                       The screensaver engine (no `import` from 'obsidian')
     ├── controller.ts             Overlay lifecycle, hotkeys, fullscreen; declares HostPlugin
-    ├── menubar.ts                Embed-pane control bar (unused standalone; kept for backport)
     ├── engine/                   THREE renderer (inner namespace — intentional doubling)
     │   ├── core.ts               Renderer + composer + scene manager + frame loop
     │   ├── color.ts              Color resolver (kuro-preset / custom)
     │   ├── materials.ts          Material pool (recolor / dispose en masse)
     │   ├── rng.ts                Seeded LCG
     │   └── scenes/               terrain · city · rift · tunnel · void (+ scene-base)
-    ├── fx/crt-sim.ts             CRT signal-degradation post-pass
+    ├── fx/crt-sim.ts             CRT signal-degradation post-pass (+ the crash sequence)
     ├── audio/synth.ts            Synthetic Web Audio layer
     ├── terminal/                 Bottom-strip narrative (narrative · persona · typing · script-bank)
     ├── hud/                      DOM overlay (index + boot sequence)
     └── data/                     Static config (defaults · dictionary · presets)
 ```
 
+Native builds live in `native/` (Windows `.scr`, macOS video `.saver` +
+live `.app`); the video render + `.saver` pipeline is in `scripts/`.
 Conventions for AI assistants and contributors live in
-[`AGENTS.md`](AGENTS.md). Design history is under
-[`docs/specs/`](docs/specs/).
+[`AGENTS.md`](AGENTS.md). Design history is under [`docs/specs/`](docs/specs/).
 
 ---
 
@@ -153,18 +216,15 @@ bash scripts/push-to-codeberg.sh
 ```
 
 Both scripts authenticate via SSH (your Codeberg SSH key); no token is
-required or stored.
-
-Codeberg serves any branch named exactly `pages` automatically; the
-`deploy-page.sh` snapshot is force-pushed (no history kept on that
-branch).
+required or stored. Codeberg serves any branch named exactly `pages`
+automatically.
 
 ---
 
 ## Compatibility
 
 - **Modern browsers** — Chromium ≥ 90, Firefox ≥ 90, Safari ≥ 14.
-- **WebGL2** required (three.js renderer). 
+- **WebGL2** required (three.js renderer).
 - **Desktop-oriented** — uses `requestFullscreen` and `AudioContext`;
   audio starts on the first user gesture (the Start button).
 
