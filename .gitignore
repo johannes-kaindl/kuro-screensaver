@@ -22,3 +22,6 @@ native/macos/*.xcodeproj
 native/**/web
 # Packaged native distributables
 dist-native
+
+# Phase-0 render proof artifacts
+render-out/
