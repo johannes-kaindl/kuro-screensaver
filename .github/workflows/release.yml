@@ -39,10 +39,30 @@ jobs:
         run: |
           npm ci
           bash scripts/package-macos.sh
+      - name: Build video .savers
+        run: |
+          # Fetch pre-rendered preset videos from the dedicated asset release
+          # (uploaded via scripts/upload-video-assets.sh — rendering needs a GPU
+          # and ~90 min, too expensive per CI run). Skip gracefully if absent so
+          # a release still ships the .app even before videos are uploaded.
+          API="https://codeberg.org/api/v1/repos/jkaindl/kuro-screensaver"
+          mkdir -p render-out/videos
+          urls=$(curl -sS "$API/releases/tags/assets-videos" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); [print(a['browser_download_url']) for a in d.get('assets',[]) if a['name'].endswith('.mov')]" 2>/dev/null || true)
+          if [ -z "$urls" ]; then
+            echo "::warning::no video assets found at tag 'assets-videos' — skipping .saver build"
+            exit 0
+          fi
+          echo "$urls" | while read -r u; do [ -n "$u" ] && ( cd render-out/videos && curl -sSL -O "$u" ); done
+          ls -la render-out/videos/
+          bash scripts/build-video-savers.sh
       - uses: actions/upload-artifact@v4
         with:
           name: dist-macos
-          path: dist-native/KuroScreensaver-macos.zip
+          if-no-files-found: ignore
+          path: |
+            dist-native/KuroScreensaver-macos.zip
+            dist-native/KuroScreensaver-savers-macos.zip
 
   windows:
     runs-on: ubuntu-latest
@@ -93,6 +113,7 @@ jobs:
 
           for f in \
             artifacts/dist-macos/KuroScreensaver-macos.zip \
+            artifacts/dist-macos/KuroScreensaver-savers-macos.zip \
             artifacts/dist-windows/KuroScreensaver-windows.zip
           do
             [ -f "$f" ] || { echo "missing $f"; continue; }

@@ -12,12 +12,25 @@
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
+ROOT="$(pwd)"
 
 VIDEO_DIR="render-out/videos"
 MACOS="native/macos"
 BUILD="$MACOS/build"
 DERIVED="$BUILD/DerivedData"
 OUT="$BUILD/savers"
+DIST="dist-native"
+
+if ! command -v xcodebuild >/dev/null 2>&1 || ! xcodebuild -version >/dev/null 2>&1; then
+  cat >&2 <<'EOF'
+ERROR: a full Xcode is required (CommandLineTools are not enough).
+  1. Install Xcode (App Store or `xcodes install --latest`).
+  2. sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+  3. Re-run: bash scripts/build-video-savers.sh
+EOF
+  exit 1
+fi
+command -v xcodegen >/dev/null 2>&1 || { echo "ERROR: xcodegen missing — brew install xcodegen" >&2; exit 1; }
 
 # preset key → human label (matches PRESETS in src/engine/data/presets.ts)
 labels() {
@@ -70,6 +83,13 @@ for v in "${videos[@]}"; do
 done
 
 rm -f "$MACOS/KuroVideoSaver/loop.mov"
+
+# Zip all bundles into one distributable (preserves .saver bundle structure).
+mkdir -p "$ROOT/$DIST"
+ZIP="$ROOT/$DIST/KuroScreensaver-savers-macos.zip"
+rm -f "$ZIP"
+( cd "$OUT" && zip -rqy "$ZIP" ./*.saver )
+
 echo ""
-echo "Done: ${#videos[@]} .saver bundle(s) in $OUT"
+echo "Done: ${#videos[@]} .saver bundle(s) → $DIST/KuroScreensaver-savers-macos.zip"
 echo "Test: cp -R \"$OUT/\"*.saver ~/Library/Screen\\ Savers/  then open System Settings ▸ Screen Saver"
