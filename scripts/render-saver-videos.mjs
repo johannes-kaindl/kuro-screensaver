@@ -62,7 +62,11 @@ function sceneFor(i) { return SCENES[i % SCENES.length]; }
  * Drops the boot-sequence black at the very start (before the first shift).
  */
 function findCrashBlacks(webm) {
-  const r = spawnSync('ffmpeg', ['-i', webm, '-vf', 'blackdetect=d=0.4:pix_th=0.10', '-f', 'null', '-'],
+  // d=0.2: the crash's solid-black block is only ~0.3-0.5s (the reboot flicker
+  // breaks it with bright spikes), so a 0.4s minimum misses it sporadically.
+  // pix_th=0.10 keeps normal dark scenes (always lit by wireframes/HUD) from
+  // registering — only the opacity-1 crash overlay is black enough.
+  const r = spawnSync('ffmpeg', ['-i', webm, '-vf', 'blackdetect=d=0.2:pix_th=0.10', '-f', 'null', '-'],
     { encoding: 'utf8' });
   const out = (r.stderr || '') + (r.stdout || '');
   const blacks = [];
