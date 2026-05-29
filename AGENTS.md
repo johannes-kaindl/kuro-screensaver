@@ -80,6 +80,24 @@ instance — no shim needed there.
   repo. Engine code is variant-agnostic — same engine bundle in both
   plugin builds.
 
+## Native builds (`native/`)
+
+The engine also ships natively, both hosting the shared screensaver-mode web
+entry (`screensaver.html` + `src/screensaver/main.ts`) in a WebView:
+
+- **Windows** — a real `.scr` (`native/windows/`, .NET WinForms + WebView2).
+  Cross-builds on macOS/Linux via `dotnet publish -r win-x64`.
+- **macOS** — a fullscreen **`.app`** (`native/macos/KuroScreensaverApp/`), **not
+  a `.saver`**: WebGL does not composite in the sandboxed `legacyScreenSaver`
+  process (confirmed on-device). The `.saver` scaffold under
+  `native/macos/KuroScreensaver/` is kept only for a possible future native
+  (Metal/SceneKit) rewrite. Build needs Xcode (macOS CI runner).
+
+Releases: GitHub Actions in `johannes-kaindl/kuro-screensaver` builds both and
+attaches them to the Codeberg release. Cut one with
+`git tag vX && git push origin vX && git push github vX` (tag both remotes).
+See `docs/specs/2026-05-28-screensaver-native-port-*.md`.
+
 ## Sibling repos
 
 - `kuro-theme-settings/` — the Obsidian plugin (v1 + v2 unified via
