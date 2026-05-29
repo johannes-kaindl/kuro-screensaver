@@ -82,7 +82,7 @@ export class ScreensaverController {
     return s;
   }
 
-  async open(opts: { embed?: boolean; scene?: SceneId } = {}) {
+  async open(opts: { embed?: boolean; scene?: SceneId; storyScale?: number } = {}) {
     if (this.state.open) return;
     this.state.open = true;
     this.state.embed = !!opts.embed;
@@ -260,7 +260,7 @@ export class ScreensaverController {
         // End of shift → diegetic CRT crash, then reboot into a fresh shift.
         onShiftEnd: (clearScreen) =>
           this.crt?.playCrash(clearScreen) ?? Promise.resolve(),
-      }, mkRng(freshSeed()));
+      }, mkRng(freshSeed()), opts.storyScale);
       this.narrative.start();
     }
 

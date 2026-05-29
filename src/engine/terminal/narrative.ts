@@ -73,7 +73,13 @@ export class NarrativeRunner {
   // Persona for the current shift
   persona: OperatorPersona;
 
-  constructor(public d: NarrativeRunnerDeps, rng: () => number) {
+  /**
+   * @param durationScale  Scales every phase's duration. 1 = full ~6-9 min
+   *   shift (live default). The video render uses ~⅓ for a ~2-3 min loop;
+   *   tiny values (~0.04) run a whole cycle in seconds for crash-seam testing.
+   *   Does NOT speed up typing or beats — only how long each phase lasts.
+   */
+  constructor(public d: NarrativeRunnerDeps, rng: () => number, private durationScale = 1) {
     this.persona = makePersona(rng);
     this.refreshPrompt();
   }
@@ -115,7 +121,7 @@ export class NarrativeRunner {
     const myGen = this.generation;
     this.phase = p;
     const [lo, hi] = PHASE_DURATION[p];
-    this.phaseEndsAt = Date.now() + (lo + Math.random() * (hi - lo)) * 1000;
+    this.phaseEndsAt = Date.now() + (lo + Math.random() * (hi - lo)) * 1000 * this.durationScale;
     this.scheduleTransition();
     this.runPhaseLoop(myGen);
   }

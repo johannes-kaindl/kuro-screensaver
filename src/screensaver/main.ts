@@ -16,6 +16,7 @@ import { ScreensaverController } from '../engine/controller';
 import { WebHost } from '../host-web/persistence';
 import { makePluginShim } from '../host-web/plugin-shim';
 import { SCENES, type SceneId } from '../engine/data/defaults';
+import { PRESETS } from '../engine/data/presets';
 
 const params = new URLSearchParams(location.search);
 
@@ -25,14 +26,30 @@ const scene: SceneId =
     ? (sceneParam as SceneId)
     : SCENES[Math.floor(Math.random() * SCENES.length)];
 
+// Color preset — ?preset=<key>, validated against PRESETS. One rendered
+// .saver per preset, so the video pipeline drives this per build.
+const presetParam = params.get('preset') ?? '';
+const preset = presetParam in PRESETS ? presetParam : 'toxic-haze';
+
+// Story duration scaling — ?storyScale=<n>. The video render uses ~0.33 for a
+// ~2-3 min loop; default 1 is the full live shift. Clamped to [0.02, 1].
+const scaleParam = parseFloat(params.get('storyScale') ?? '');
+const storyScale = Number.isFinite(scaleParam)
+  ? Math.min(1, Math.max(0.02, scaleParam))
+  : 1;
+
 const audioOn = params.get('audio') === 'on';
 
 const host = new WebHost({
-  activePreset: 'toxic-haze',
-  vaultKanji: '黒',
+  activePreset: preset,
+  vaultKanji: PRESETS[preset].kanji,
   overrides: {
+    // Force the explicit preset path. Default 'matchAspect' takes precedence
+    // in resolveColor() and, with no Obsidian data-aspect present, falls back
+    // to a time-of-day palette — which would ignore ?preset= entirely.
+    aspectPaletteMode: 'inherit',
     colorMode: 'kuro-preset',
-    colorPreset: 'toxic-haze',
+    colorPreset: preset,
     defaultScene: scene,
     liveHotkeysEnabled: false,
     // The standalone app runs on capable hardware and the user explicitly
@@ -61,7 +78,7 @@ controller.close = async () => {
   await origClose();
 };
 
-void controller.open({ scene });
+void controller.open({ scene, storyScale });
 
 // DEV-only: expose the controller so the crash-preview render script can
 // trigger playCrash() directly instead of waiting for a full ~8-min shift.
