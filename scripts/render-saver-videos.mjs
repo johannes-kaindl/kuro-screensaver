@@ -21,7 +21,7 @@
 
 import { chromium } from 'playwright';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, rmSync, statSync } from 'node:fs';
+import { mkdirSync, rmSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 // ── Config ────────────────────────────────────────────────────────────────
@@ -31,7 +31,10 @@ const WIDTH = 2560, HEIGHT = 1440;     // 1440p
 const FPS = 25;
 const BITRATE = process.env.BITRATE ?? '6M';   // ~125 MB per 2.5min preset
 const STORY_SCALE = Number(process.env.STORY_SCALE ?? 0.3);   // ~2.5 min shift cycle
-const CAPTURE_SECONDS = Number(process.env.CAPTURE_SECONDS ?? 400); // ~2 cycles + buffer → 2 crashes
+// ~2 cycles + buffer → 2 crashes. Max cycle ≈178s, so the 2nd crash can land
+// near ~356s; 480s leaves headroom for the worst-case RNG draw.
+const CAPTURE_SECONDS = Number(process.env.CAPTURE_SECONDS ?? 480);
+const FORCE = process.env.FORCE === '1';      // re-render even if the .mov exists
 const BASE_URL = 'http://localhost:5173/screensaver.html';
 const OUT_DIR = 'render-out';
 const VIDEO_DIR = join(OUT_DIR, 'videos');
@@ -75,6 +78,11 @@ function findCrashBlacks(webm) {
 
 // ── Render one preset ────────────────────────────────────────────────────────
 async function renderPreset(browser, preset, idx) {
+  const out = join(VIDEO_DIR, `kuro-${preset}.mov`);
+  if (!FORCE && existsSync(out)) {
+    console.log(`\n▶ ${preset} — already rendered, skipping (FORCE=1 to redo)`);
+    return { preset, out, mb: (statSync(out).size / 1e6).toFixed(1), skipped: true };
+  }
   const scene = sceneFor(idx);
   const url = `${BASE_URL}?preset=${preset}&scene=${scene}&storyScale=${STORY_SCALE}`;
   const capDir = join(OUT_DIR, `cap-${preset}`);
@@ -104,7 +112,6 @@ async function renderPreset(browser, preset, idx) {
 
   // Trim to the segment, resample to constant FPS, encode H.265 for AVPlayer.
   mkdirSync(VIDEO_DIR, { recursive: true });
-  const out = join(VIDEO_DIR, `kuro-${preset}.mov`);
   ff([
     '-y', '-ss', t0.toFixed(3), '-to', t1.toFixed(3), '-i', webm,
     '-vf', `fps=${FPS},format=yuv420p`,
@@ -145,5 +152,8 @@ for (let i = 0; i < presets.length; i++) {
 await browser.close();
 
 console.log('\n── Summary ──');
-for (const r of results) console.log(`  ${r.preset.padEnd(16)} ${r.mb} MB  ${r.loopDur.toFixed(1)}s`);
+for (const r of results) {
+  const tail = r.skipped ? '(skipped — already present)' : `${r.loopDur.toFixed(1)}s loop`;
+  console.log(`  ${r.preset.padEnd(16)} ${r.mb} MB  ${tail}`);
+}
 console.log(`Done: ${results.length}/${presets.length} videos in ${VIDEO_DIR}`);
