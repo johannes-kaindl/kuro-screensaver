@@ -146,11 +146,14 @@ ships two helper scripts for the Codeberg setup:
 
 ```bash
 # Publish dist/ to the `pages` branch → https://jkaindl.codeberg.page/kuro-screensaver/
-CODEBERG_TOKEN=xxxxxx bash scripts/deploy-page.sh
+bash scripts/deploy-page.sh
 
-# Push the source repo to Codeberg (token stays out of .git/config)
-CODEBERG_TOKEN=xxxxxx bash scripts/push-to-codeberg.sh
+# Push the source repo to Codeberg (SSH — no token needed)
+bash scripts/push-to-codeberg.sh
 ```
+
+Both scripts authenticate via SSH (your Codeberg SSH key); no token is
+required or stored.
 
 Codeberg serves any branch named exactly `pages` automatically; the
 `deploy-page.sh` snapshot is force-pushed (no history kept on that
