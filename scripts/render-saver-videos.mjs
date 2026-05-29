@@ -97,34 +97,45 @@ async function renderPreset(browser, preset, idx) {
   mkdirSync(CACHE_DIR, { recursive: true });
   const webm = join(CACHE_DIR, `kuro-${preset}.webm`);
 
-  // Reuse a cached raw capture if present (lets a bitrate change re-encode in
-  // seconds instead of re-capturing for ~8 min). FORCE_CAPTURE bypasses it.
-  if (!FORCE_CAPTURE && existsSync(webm)) {
-    console.log(`\n▶ ${preset} (scene ${scene}) — re-encoding from cached capture …`);
-  } else {
-    const url = `${BASE_URL}?preset=${preset}&scene=${scene}&storyScale=${STORY_SCALE}`;
-    const capDir = join(OUT_DIR, `cap-${preset}`);
-    rmSync(capDir, { recursive: true, force: true });
-    mkdirSync(capDir, { recursive: true });
-    console.log(`\n▶ ${preset} (scene ${scene}) — capturing ${CAPTURE_SECONDS}s …`);
-    const ctx = await browser.newContext({
-      viewport: { width: WIDTH, height: HEIGHT },
-      deviceScaleFactor: 1,
-      recordVideo: { dir: capDir, size: { width: WIDTH, height: HEIGHT } },
-    });
-    const page = await ctx.newPage();
-    await page.goto(url, { waitUntil: 'load' });
-    await page.waitForTimeout(CAPTURE_SECONDS * 1000);
-    const video = page.video();
-    await ctx.close();           // flushes the WebM
-    copyFileSync(await video.path(), webm);
-    rmSync(capDir, { recursive: true, force: true });
-  }
+  // We need ≥2 diegetic crashes to cut a seamless loop, but the story is
+  // RNG-paced — sometimes only 1 lands inside the capture window. Reuse a good
+  // cached capture; otherwise capture, and re-capture (fresh RNG) until we get
+  // 2 crashes. FORCE_CAPTURE always starts fresh.
+  let crashes = [];
+  const MAX_ATTEMPTS = 4;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const canReuse = !FORCE_CAPTURE && attempt === 1 && existsSync(webm);
+    if (canReuse) {
+      console.log(`\n▶ ${preset} (scene ${scene}) — checking cached capture …`);
+    } else {
+      const url = `${BASE_URL}?preset=${preset}&scene=${scene}&storyScale=${STORY_SCALE}`;
+      const capDir = join(OUT_DIR, `cap-${preset}`);
+      rmSync(capDir, { recursive: true, force: true });
+      mkdirSync(capDir, { recursive: true });
+      console.log(`\n▶ ${preset} (scene ${scene}) — capturing ${CAPTURE_SECONDS}s … (attempt ${attempt})`);
+      const ctx = await browser.newContext({
+        viewport: { width: WIDTH, height: HEIGHT },
+        deviceScaleFactor: 1,
+        recordVideo: { dir: capDir, size: { width: WIDTH, height: HEIGHT } },
+      });
+      const page = await ctx.newPage();
+      await page.goto(url, { waitUntil: 'load' });
+      await page.waitForTimeout(CAPTURE_SECONDS * 1000);
+      const video = page.video();
+      await ctx.close();           // flushes the WebM
+      copyFileSync(await video.path(), webm);
+      rmSync(capDir, { recursive: true, force: true });
+    }
 
-  // Find the crash blackouts; loop segment is mid-black[0] → mid-black[1].
-  const crashes = findCrashBlacks(webm);
-  console.log(`  crashes detected: ${crashes.length} at ${crashes.map((c) => c.mid.toFixed(1) + 's').join(', ')}`);
-  if (crashes.length < 2) throw new Error(`${preset}: need 2 crashes, found ${crashes.length} — raise CAPTURE_SECONDS`);
+    crashes = findCrashBlacks(webm);
+    console.log(`  crashes detected: ${crashes.length} at ${crashes.map((c) => c.mid.toFixed(1) + 's').join(', ')}`);
+    if (crashes.length >= 2) break;
+    console.log(`  <2 crashes — dropping this capture and recapturing`);
+    rmSync(webm, { force: true });   // bad capture, don't let it linger in the cache
+  }
+  if (crashes.length < 2) throw new Error(`${preset}: <2 crashes after ${MAX_ATTEMPTS} attempts`);
+
+  // Loop segment is mid-black[0] → mid-black[1].
   const t0 = crashes[0].mid, t1 = crashes[1].mid;
   const loopDur = t1 - t0;
   console.log(`  loop segment: ${t0.toFixed(1)}s → ${t1.toFixed(1)}s  (${loopDur.toFixed(1)}s)`);
