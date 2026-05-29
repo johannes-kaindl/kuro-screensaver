@@ -82,6 +82,39 @@ targets:
       - sdk: WebKit.framework
       - sdk: Cocoa.framework
 
+  # Video .saver — the SHIPPING macOS screensaver. Plays a pre-rendered loop of
+  # the engine via AVPlayer, which (unlike WebGL) composites fine in the
+  # screensaver process. scripts/build-video-savers.sh builds this once as a
+  # template, then clones it per preset with a different loop.mov + name + id.
+  KuroVideoSaver:
+    type: bundle
+    platform: macOS
+    sources:
+      - path: KuroVideoSaver
+        excludes:
+          - "Info.plist"
+          - "loop.mov"
+      - path: KuroVideoSaver/loop.mov
+        optional: true
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_NAME: KuroVideoSaver
+        PRODUCT_BUNDLE_IDENTIFIER: com.kuro.screensaver.video
+        WRAPPER_EXTENSION: saver
+        INFOPLIST_FILE: KuroVideoSaver/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        SWIFT_VERSION: "5.0"
+        MACOSX_DEPLOYMENT_TARGET: "11.0"
+        SKIP_INSTALL: YES
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: YES
+    dependencies:
+      - sdk: ScreenSaver.framework
+      - sdk: AVFoundation.framework
+      - sdk: Cocoa.framework
+
 # Explicit shared scheme so `xcodebuild -scheme KuroScreensaverApp` is
 # deterministic (don't rely on xcodebuild auto-creating schemes).
 schemes:
@@ -89,6 +122,14 @@ schemes:
     build:
       targets:
         KuroScreensaverApp: all
+    run:
+      config: Release
+    archive:
+      config: Release
+  KuroVideoSaver:
+    build:
+      targets:
+        KuroVideoSaver: all
     run:
       config: Release
     archive:
