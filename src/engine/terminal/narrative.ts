@@ -47,6 +47,14 @@ export interface NarrativeRunnerDeps {
   promptInputEl: HTMLElement;
   /** Span holding the operator handle prefix (e.g. "OFC-3041@SCT-7.4-R3:~"). */
   promptHandleEl: HTMLElement;
+  /**
+   * Optional shift-end transition. When provided, the SILENCE→ROUTINE reset
+   * plays this instead of a silent blank — the CRT crash sequence. The
+   * narrative calls it with a `clearScreen` callback to invoke at the blackout
+   * peak (so the shift change happens behind black), and the returned promise
+   * resolves once the reboot flicker is done.
+   */
+  onShiftEnd?: (clearScreen: () => void) => Promise<void>;
 }
 
 export class NarrativeRunner {
@@ -141,13 +149,30 @@ export class NarrativeRunner {
    * IS the transition — no narrator-style "shift change" text needed.
    */
   private silentReset(then: () => void) {
-    const out = this.d.hud.termOut;
-    while (out.firstChild) out.removeChild(out.firstChild);
-    this.d.promptInputEl.textContent = '';
-    this.d.promptHandleEl.textContent = '';                 // hide handle during blank
-    // Reset per-shift state
-    this.ghostlinkOpen = false;
-    this.usedExchanges.clear();
+    const clearScreen = () => {
+      const out = this.d.hud.termOut;
+      while (out.firstChild) out.removeChild(out.firstChild);
+      this.d.promptInputEl.textContent = '';
+      this.d.promptHandleEl.textContent = '';               // hide handle during blank
+      // Reset per-shift state
+      this.ghostlinkOpen = false;
+      this.usedExchanges.clear();
+    };
+
+    // With a shift-end transition (CRT crash), the screen is cleared behind
+    // the blackout and the new shift begins once power flickers back.
+    if (this.d.onShiftEnd) {
+      void this.d.onShiftEnd(clearScreen).then(() => {
+        if (!this.alive) return;
+        this.timers.push(window.setTimeout(() => {
+          if (this.alive) then();
+        }, 500 + Math.random() * 500));
+      });
+      return;
+    }
+
+    // Fallback: silent blank moment IS the transition.
+    clearScreen();
     this.timers.push(window.setTimeout(() => {
       if (!this.alive) return;
       then();

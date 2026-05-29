@@ -62,3 +62,10 @@ controller.close = async () => {
 };
 
 void controller.open({ scene });
+
+// DEV-only: expose the controller so the crash-preview render script can
+// trigger playCrash() directly instead of waiting for a full ~8-min shift.
+// Stripped from production builds (import.meta.env.DEV is false there).
+if (import.meta.env.DEV) {
+  (window as unknown as { __kuro?: unknown }).__kuro = controller;
+}

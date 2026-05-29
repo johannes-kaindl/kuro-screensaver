@@ -31,6 +31,12 @@ export class CrtSim {
   // Track active artifact timeouts so we can clear them on dispose.
   private timeouts: number[] = [];
 
+  // Crash sequence (the diegetic loop seam): while true, the ambient tick
+  // loop holds off so random artifacts don't fight the choreographed crash.
+  private crashing = false;
+  private crashOverlay: HTMLDivElement | null = null;
+  private collapseEl: HTMLDivElement | null = null;
+
   // Saved baselines so we can restore cleanly when an artifact ends.
   private baseChromaOffset = 0;
 
@@ -67,6 +73,11 @@ export class CrtSim {
     this.bandEl = null;
     this.humBarEl?.remove();
     this.humBarEl = null;
+    this.crashing = false;
+    this.crashOverlay?.remove();
+    this.crashOverlay = null;
+    this.collapseEl?.remove();
+    this.collapseEl = null;
     // Reset any lingering canvas styles
     this.canvas.style.transform = '';
     this.canvas.style.filter = '';
@@ -89,6 +100,7 @@ export class CrtSim {
 
   private tick = (now: number) => {
     this.rafId = requestAnimationFrame(this.tick);
+    if (this.crashing) return;
     if (!this.settings.crtSim.on) return;
     if (now < this.nextTickAt) return;
 
@@ -329,5 +341,99 @@ export class CrtSim {
       'mix-blend-mode:screen;opacity:0.55;background-size:cover');
     this.overlayHost.appendChild(overlay);
     this.after(40 + Math.random() * 50, () => overlay.remove());
+  }
+
+  // ── Crash sequence — the diegetic loop seam ────────────────────────────
+  //
+  // A deliberate, choreographed "system crash": signal failure escalates,
+  // the picture collapses to a CRT power-off line, the screen goes black
+  // (caller swaps terminal content here via onBlackout), then power flickers
+  // back for a fresh shift. Plays regardless of crtSim.on — it is a narrative
+  // beat, not ambient simulation. Resolves once the reboot flicker is done.
+  async playCrash(onBlackout?: () => void): Promise<void> {
+    if (this.crashing) return;
+    this.crashing = true;
+    const i = 1;
+
+    // Phase A — escalating signal failure, bursts getting denser + faster.
+    for (let k = 0; k < 7; k++) {
+      this.fireHTear(i);
+      if (k % 2 === 0) this.fireChromaSpike(i);
+      if (k % 3 === 0) this.fireStaticBurst(i);
+      this.fireScanlinePulse(i);
+      if (k >= 4) this.fireInterlaceFlicker(i);
+      await this.delay(Math.max(45, 130 - k * 14));
+    }
+    this.fireStaticBurst(i);
+
+    // Phase B — collapse to black (CRT power-off), then blank the terminal
+    // behind the black so the shift change is unseen.
+    await this.collapseToBlack();
+    onBlackout?.();
+    await this.delay(260);
+
+    // Phase C — power returns in an unstable flicker, revealing the new shift.
+    await this.rebootFlicker();
+
+    this.crashing = false;
+  }
+
+  /** Promise-friendly delay that registers with the dispose-tracked timeouts. */
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => this.after(ms, resolve));
+  }
+
+  private makeCrashLayer(extra: string): HTMLDivElement {
+    const el = document.createElement('div');
+    el.setAttribute('style', 'position:absolute;pointer-events:none;' + extra);
+    this.overlayHost.appendChild(el);
+    return el;
+  }
+
+  /** White flash → black, then a horizontal scanline collapses to a dot. */
+  private async collapseToBlack(): Promise<void> {
+    const flash = this.makeCrashLayer('inset:0;z-index:61;background:#fff;opacity:0;transition:opacity 40ms linear');
+    requestAnimationFrame(() => { flash.style.opacity = '0.85'; });
+    await this.delay(55);
+    flash.style.opacity = '0';
+
+    this.crashOverlay = this.makeCrashLayer('inset:0;z-index:60;background:#000;opacity:0;transition:opacity 70ms linear');
+    const ov = this.crashOverlay;
+    requestAnimationFrame(() => { ov.style.opacity = '1'; });
+    await this.delay(90);
+    flash.remove();
+
+    // Bright line across the middle that squeezes horizontally to a point.
+    this.collapseEl = this.makeCrashLayer(
+      'z-index:62;top:50%;left:0;right:0;height:3px;margin-top:-1.5px;' +
+      'background:#dffbe9;box-shadow:0 0 14px 2px #8fe6b4;opacity:1;' +
+      'transform:scaleX(1);transition:transform 210ms ease-in');
+    const line = this.collapseEl;
+    requestAnimationFrame(() => { line.style.transform = 'scaleX(0.004)'; });
+    await this.delay(220);
+    line.style.transition = 'opacity 240ms ease-out, height 240ms ease-out';
+    line.style.height = '1px';
+    line.style.opacity = '0';
+  }
+
+  /** Unstable power-on flicker that fades the black overlay away. */
+  private async rebootFlicker(): Promise<void> {
+    this.collapseEl?.remove();
+    this.collapseEl = null;
+    const ov = this.crashOverlay;
+    if (!ov) return;
+    ov.style.transition = 'opacity 45ms linear';
+    const seq = [0.45, 1, 0.12, 0.8, 0.05, 0];
+    for (const o of seq) {
+      ov.style.opacity = String(o);
+      if (o > 0.5) this.fireScanlinePulse(1);
+      await this.delay(60 + Math.random() * 55);
+    }
+    ov.remove();
+    this.crashOverlay = null;
+    // Clear any canvas styles a Phase-A artifact may have left mid-flight.
+    this.canvas.style.transform = '';
+    this.canvas.style.filter = '';
+    this.canvas.style.opacity = '';
   }
 }

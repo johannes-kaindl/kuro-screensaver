@@ -257,6 +257,9 @@ export class ScreensaverController {
         hud: this.hud,
         promptInputEl: this.hud.promptInputEl,
         promptHandleEl: this.hud.promptHandleEl,
+        // End of shift → diegetic CRT crash, then reboot into a fresh shift.
+        onShiftEnd: (clearScreen) =>
+          this.crt?.playCrash(clearScreen) ?? Promise.resolve(),
       }, mkRng(freshSeed()));
       this.narrative.start();
     }
