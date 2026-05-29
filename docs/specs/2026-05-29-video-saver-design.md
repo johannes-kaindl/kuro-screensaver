@@ -1,7 +1,8 @@
 # Video-`.saver` — pre-rendered per-preset macOS screensavers
 
 **Date:** 2026-05-29
-**Status:** Design accepted, Phase 0 (render-proof) in progress
+**Status:** All phases implemented (Phases 0–5). Videos rendered locally; .saver
+build runs in CI. Remaining: upload video assets, tag a release, visual test.
 
 ## Problem
 
@@ -61,6 +62,27 @@ Then `ffmpeg` → H.265 `.mov`, trimmed to loop exactly at the crash seam.
 | 3 | **Render pipeline** `scripts/render-saver-videos.mjs` — one ~2-3 min loop clip per preset → H.265 | Medium |
 | 4 | **Video `.saver`** `native/macos/KuroVideoSaver/` — slim `AVPlayerLayer` ScreenSaverView, one build per preset | Medium |
 | 5 | **CI/release** — render + multi-`.saver` build in GitHub Action | Low |
+
+## Implementation notes (learned while building)
+
+- **Capture must be headless.** A headful Chromium window gets backgrounded/
+  occluded by macOS within ~1-2 min and the renderer is suspended mid-capture
+  ("Target page … closed"). Diagnosed as NOT a memory leak (JS heap stable at
+  ~10MB). `headless: true` (headless=new) renders WebGL fine via ANGLE/Metal and
+  runs indefinitely. Anti-backgrounding launch flags added too.
+- **recordVideo, not CDP screencast.** recordVideo gives a stable 25fps full
+  composite; CDP `Page.startScreencast` only managed ~9fps at 1440p and was
+  fragile. Kept the container at native 25fps (a 25→60 resample judders on the
+  non-integer ratio).
+- **Loop seam = blackdetect, cut mid-black→mid-black.** `blackdetect=d=0.2`
+  (not 0.4) — the crash's solid-black block is only ~0.3-0.5s (the reboot
+  flicker breaks it with bright spikes), so 0.4 missed it sporadically
+  (circuit/spectre failed with "found 1 crash" until lowered).
+- **Bitrate:** `-b:v 6M` is a target, not a cap — bright glow-heavy presets
+  (toxic-haze, phosphor) run to ~185-207MB; most land ~110-120MB.
+- **Render is non-deterministic + idempotent.** RNG cycle length varies
+  (~115-178s), so CAPTURE_SECONDS=480 for headroom; the script skips presets
+  whose .mov already exists (FORCE=1 to redo) so re-runs only fill gaps.
 
 ## Out of scope / open
 
