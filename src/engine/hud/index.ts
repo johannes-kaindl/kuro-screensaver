@@ -304,6 +304,12 @@ export class Hud {
     root.style.setProperty('--ks-p', c.css);
     root.style.setProperty('--ks-dim', c.dim);
     root.style.setProperty('--ks-faint', c.faint);
+    // The overlay carries an inline `color` (set in controller.open). Inline
+    // style beats the `#…overlay { color: var(--ks-p) }` rule, so elements that
+    // *inherit* color (HUD labels, vault kanji, crosshair, scene-label slab)
+    // would stay stuck on the initial color on a palette change. Keep the
+    // inline color in sync so the whole HUD recolors monochrome.
+    root.style.color = c.css;
 
     // v1.2 — Live-Test 2026-05-13 (Mobile color-propagation fix):
     //   Old behaviour: style tag was created once and reused. CSS variables
