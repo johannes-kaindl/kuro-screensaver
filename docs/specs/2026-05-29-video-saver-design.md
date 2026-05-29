@@ -65,6 +65,23 @@ Then `ffmpeg` → H.265 `.mov`, trimmed to loop exactly at the crash seam.
 
 ## Implementation notes (learned while building)
 
+- **Bitrate matters more than expected.** 6 Mbit smeared the fine moving
+  wireframe lines (the capture is sharp at ~40 Mbit VP8 — the loss was the final
+  encode). Settled on **13 Mbit** (~235-257 MB/preset, ~3.1 GB for 13). The
+  content looks information-sparse but isn't: the constant camera move through
+  fine lines destroys temporal redundancy, the worst case for block codecs.
+- **The crash must recur — idle-drift bug.** The 5-min idle-drift mode called
+  `narrative.pause()`. A screensaver is idle by definition, so it fired every
+  time at ~5 min and paused the shift loop *permanently* (no input ever resumes
+  it) — so the diegetic crash stopped recurring and captures past 300s found
+  only 1 crash (≈50% of presets failed "need 2 crashes"). Fixed: idle-drift
+  keeps its visual cue but no longer pauses the narrative. Was a real live-app
+  bug (terminal story froze after 5 min). The render pipeline surfaced it.
+- **Render is RNG-paced + idempotent.** Capture is cached (webm-cache/) so a
+  bitrate change re-encodes in seconds; auto-recapture (≤4 tries) covers any
+  remaining <2-crash capture. With the idle-drift fix, the final batch hit 13/13
+  on the first attempt.
+
 - **Capture must be headless.** A headful Chromium window gets backgrounded/
   occluded by macOS within ~1-2 min and the renderer is suspended mid-capture
   ("Target page … closed"). Diagnosed as NOT a memory leak (JS heap stable at
