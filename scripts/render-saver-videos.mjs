@@ -21,7 +21,7 @@
 
 import { chromium } from 'playwright';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, rmSync, statSync, existsSync } from 'node:fs';
+import { mkdirSync, rmSync, statSync, existsSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // ── Config ────────────────────────────────────────────────────────────────
@@ -29,15 +29,21 @@ const WIDTH = 2560, HEIGHT = 1440;     // 1440p
 // recordVideo captures a constant 25fps; keep the container native (25→60
 // doesn't divide evenly and would judder via uneven frame duplication).
 const FPS = 25;
-const BITRATE = process.env.BITRATE ?? '6M';   // ~125 MB per 2.5min preset
+// 13 Mbit: fine moving wireframe lines need it — 6M smears them (the source
+// capture is sharp at ~40M, so the loss was here, not in capture). ~250MB/2.5min.
+const BITRATE = process.env.BITRATE ?? '13M';
 const STORY_SCALE = Number(process.env.STORY_SCALE ?? 0.3);   // ~2.5 min shift cycle
 // ~2 cycles + buffer → 2 crashes. Max cycle ≈178s, so the 2nd crash can land
 // near ~356s; 480s leaves headroom for the worst-case RNG draw.
 const CAPTURE_SECONDS = Number(process.env.CAPTURE_SECONDS ?? 480);
-const FORCE = process.env.FORCE === '1';      // re-render even if the .mov exists
+const FORCE = process.env.FORCE === '1';              // re-encode even if the .mov exists
+const FORCE_CAPTURE = process.env.FORCE_CAPTURE === '1'; // re-capture even if a cached webm exists
 const BASE_URL = 'http://localhost:5173/screensaver.html';
 const OUT_DIR = 'render-out';
 const VIDEO_DIR = join(OUT_DIR, 'videos');
+// Raw captures are cached so a bitrate change is a quick re-encode, not a
+// ~90-min re-render. ~40 Mbit VP8 → ~2.4 GB for 13 (gitignored under render-out).
+const CACHE_DIR = join(OUT_DIR, 'webm-cache');
 const SCENES = ['terrain', 'city', 'rift', 'tunnel', 'void'];
 
 // All 13 presets (keys from src/engine/data/presets.ts).
@@ -88,23 +94,32 @@ async function renderPreset(browser, preset, idx) {
     return { preset, out, mb: (statSync(out).size / 1e6).toFixed(1), skipped: true };
   }
   const scene = sceneFor(idx);
-  const url = `${BASE_URL}?preset=${preset}&scene=${scene}&storyScale=${STORY_SCALE}`;
-  const capDir = join(OUT_DIR, `cap-${preset}`);
-  rmSync(capDir, { recursive: true, force: true });
-  mkdirSync(capDir, { recursive: true });
+  mkdirSync(CACHE_DIR, { recursive: true });
+  const webm = join(CACHE_DIR, `kuro-${preset}.webm`);
 
-  console.log(`\n▶ ${preset} (scene ${scene}) — capturing ${CAPTURE_SECONDS}s …`);
-  const ctx = await browser.newContext({
-    viewport: { width: WIDTH, height: HEIGHT },
-    deviceScaleFactor: 1,
-    recordVideo: { dir: capDir, size: { width: WIDTH, height: HEIGHT } },
-  });
-  const page = await ctx.newPage();
-  await page.goto(url, { waitUntil: 'load' });
-  await page.waitForTimeout(CAPTURE_SECONDS * 1000);
-  const video = page.video();
-  await ctx.close();           // flushes the WebM
-  const webm = await video.path();
+  // Reuse a cached raw capture if present (lets a bitrate change re-encode in
+  // seconds instead of re-capturing for ~8 min). FORCE_CAPTURE bypasses it.
+  if (!FORCE_CAPTURE && existsSync(webm)) {
+    console.log(`\n▶ ${preset} (scene ${scene}) — re-encoding from cached capture …`);
+  } else {
+    const url = `${BASE_URL}?preset=${preset}&scene=${scene}&storyScale=${STORY_SCALE}`;
+    const capDir = join(OUT_DIR, `cap-${preset}`);
+    rmSync(capDir, { recursive: true, force: true });
+    mkdirSync(capDir, { recursive: true });
+    console.log(`\n▶ ${preset} (scene ${scene}) — capturing ${CAPTURE_SECONDS}s …`);
+    const ctx = await browser.newContext({
+      viewport: { width: WIDTH, height: HEIGHT },
+      deviceScaleFactor: 1,
+      recordVideo: { dir: capDir, size: { width: WIDTH, height: HEIGHT } },
+    });
+    const page = await ctx.newPage();
+    await page.goto(url, { waitUntil: 'load' });
+    await page.waitForTimeout(CAPTURE_SECONDS * 1000);
+    const video = page.video();
+    await ctx.close();           // flushes the WebM
+    copyFileSync(await video.path(), webm);
+    rmSync(capDir, { recursive: true, force: true });
+  }
 
   // Find the crash blackouts; loop segment is mid-black[0] → mid-black[1].
   const crashes = findCrashBlacks(webm);
@@ -125,7 +140,6 @@ async function renderPreset(browser, preset, idx) {
   const mb = (statSync(out).size / 1e6).toFixed(1);
   console.log(`  ✓ ${out}  (${mb} MB, ${loopDur.toFixed(1)}s loop)`);
 
-  rmSync(capDir, { recursive: true, force: true }); // reclaim disk
   return { preset, out, mb, loopDur };
 }
 
