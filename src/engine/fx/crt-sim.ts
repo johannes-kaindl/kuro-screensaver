@@ -354,33 +354,43 @@ export class CrtSim {
     if (this.crashing) return;
     this.crashing = true;
     const i = 1;
+    // try/finally: a throw anywhere in here must NOT leave `crashing` stuck true
+    // — that would silently swallow every future crash (the shift loop only ever
+    // crashes once, then never again).
+    try {
+      // Phase A — escalating signal failure, bursts getting denser + faster.
+      for (let k = 0; k < 7; k++) {
+        this.fireHTear(i);
+        if (k % 2 === 0) this.fireChromaSpike(i);
+        if (k % 3 === 0) this.fireStaticBurst(i);
+        this.fireScanlinePulse(i);
+        if (k >= 4) this.fireInterlaceFlicker(i);
+        await this.delay(Math.max(45, 130 - k * 14));
+      }
+      this.fireStaticBurst(i);
 
-    // Phase A — escalating signal failure, bursts getting denser + faster.
-    for (let k = 0; k < 7; k++) {
-      this.fireHTear(i);
-      if (k % 2 === 0) this.fireChromaSpike(i);
-      if (k % 3 === 0) this.fireStaticBurst(i);
-      this.fireScanlinePulse(i);
-      if (k >= 4) this.fireInterlaceFlicker(i);
-      await this.delay(Math.max(45, 130 - k * 14));
+      // Phase B — collapse to black (CRT power-off), then blank the terminal
+      // behind the black so the shift change is unseen. Hold all-black ~450ms:
+      // long enough that the render pipeline's blackdetect reliably sees it
+      // (the collapse line is bright, so only this hold is a fully black frame).
+      await this.collapseToBlack();
+      onBlackout?.();
+      await this.delay(450);
+
+      // Phase C — power returns in an unstable flicker, revealing the new shift.
+      await this.rebootFlicker();
+    } finally {
+      this.crashing = false;
     }
-    this.fireStaticBurst(i);
-
-    // Phase B — collapse to black (CRT power-off), then blank the terminal
-    // behind the black so the shift change is unseen.
-    await this.collapseToBlack();
-    onBlackout?.();
-    await this.delay(260);
-
-    // Phase C — power returns in an unstable flicker, revealing the new shift.
-    await this.rebootFlicker();
-
-    this.crashing = false;
   }
 
-  /** Promise-friendly delay that registers with the dispose-tracked timeouts. */
+  /**
+   * Promise-friendly delay. Deliberately NOT registered with the dispose-tracked
+   * timeouts: if stop()/dispose() cleared it mid-crash the await would hang
+   * forever, wedging both `crashing` and the narrative's shift-end promise.
+   */
   private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => this.after(ms, resolve));
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
   }
 
   private makeCrashLayer(extra: string): HTMLDivElement {

@@ -357,14 +357,17 @@ export class ScreensaverController {
         if (fog) fog.density = preDriftFog * 1.45;
         if (this.audio?.master) this.audio.master.gain.value = Math.min(1.0, this.s.sound.volume * 1.3);
         this.audio?.pauseSoundscape?.();
-        this.narrative?.pause();
+        // NOTE: deliberately do NOT pause the narrative here. A screensaver is
+        // idle by definition, so this branch always fires after 5 min and would
+        // pause the shift loop forever (no input ever arrives to resume it) —
+        // which also stopped the diegetic crash from recurring. The visual drift
+        // (bloom/fog/ambient) is enough of a "settling" cue on its own.
       } else if (!shouldDrift && inDrift) {
         inDrift = false;
         this.engine.bloomPass.strength = preDriftBloom;
         if (fog) fog.density = preDriftFog;
         if (this.audio?.master) this.audio.master.gain.value = this.s.sound.volume;
         this.audio?.resumeSoundscape?.();
-        this.narrative?.resume();
       }
     }, 5_000);
 
