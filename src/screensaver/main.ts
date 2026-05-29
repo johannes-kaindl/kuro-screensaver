@@ -35,6 +35,10 @@ const host = new WebHost({
     colorPreset: 'toxic-haze',
     defaultScene: scene,
     liveHotkeysEnabled: false,
+    // The standalone app runs on capable hardware and the user explicitly
+    // toggles effects — don't let perfAdapt silently kill them (it was
+    // disabling AFTER:BURN/TRAIL a few seconds after the user enabled it).
+    perfAdapt: false,
   },
 });
 

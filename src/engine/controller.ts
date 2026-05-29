@@ -49,6 +49,9 @@ export class ScreensaverController {
   private idleTimer = 0;
   private lastActivity = 0;
   private dayNightT0 = 0;
+  /** The active scene's own fog density, captured on load — the base the
+   *  day/night cycle and fogMode work relative to. */
+  private baseFogDensity = 0.01;
   private openedAt = 0;
   private statsSaveDebounce = 0;
 
@@ -223,6 +226,7 @@ export class ScreensaverController {
 
     // Init scene
     this.engine.loadScene(scene);
+    this.baseFogDensity = (this.engine.scene.fog as any)?.density ?? 0.01;
     const labels = DICT.MODE_LABELS[scene];
     this.hud.setMode(labels[0]);
     this.hud.setTri(this.engine.getSceneObj()?.triCount || '----');
@@ -361,20 +365,38 @@ export class ScreensaverController {
       }
     }, 5_000);
 
-    // Day/night cycle: subtle modulation of bloom strength + fog density
+    // Day/night cycle: subtle modulation of bloom strength + (in fogMode
+    // 'auto' only) fog density. fogMode 'clear'/'dense' set a fixed density
+    // that this loop leaves alone.
     if (s.dayNightCycle.on) {
       const periodMs = s.dayNightCycle.periodMin * 60_000;
       const baseBloom = this.engine!.bloomPass.strength;
-      const fog = this.engine!.scene.fog as any;
-      const baseFog = fog?.density ?? 0.01;
       (this as any)._dayNightInterval = window.setInterval(() => {
         const phase = ((Date.now() - this.dayNightT0) % periodMs) / periodMs;
         const cycleVal = Math.sin(phase * Math.PI * 2);
         if (this.engine) {
           this.engine.bloomPass.strength = baseBloom * (1 + cycleVal * 0.35);
-          if (this.engine.scene.fog) (this.engine.scene.fog as any).density = baseFog * (1 + cycleVal * 0.4);
+          if (this.s.fogMode === 'auto' && this.engine.scene.fog) {
+            (this.engine.scene.fog as any).density = this.baseFogDensity * (1 + cycleVal * 0.4);
+          }
         }
       }, 250);
+    }
+
+    // Apply the chosen fog mode (clear/dense set a fixed density now; auto
+    // hands fog back to the day/night loop above).
+    this.applyFogMode();
+  }
+
+  /** Fog / view-distance control — see ScreensaverSettings.fogMode. */
+  private applyFogMode() {
+    const fog = this.engine?.scene.fog as any;
+    if (!fog) return;
+    switch (this.s.fogMode) {
+      case 'clear': fog.density = this.baseFogDensity * 0.45; break;
+      case 'dense': fog.density = this.baseFogDensity * 2.2;  break;
+      case 'auto':
+      default:      fog.density = this.baseFogDensity;        break;
     }
   }
 
@@ -525,6 +547,16 @@ export class ScreensaverController {
       this.rebuildBar();
     }, 'After-image / motion-blur stages: off · mild trails · heavy burn-in');
 
+    // FOG — 3-stage cycler: auto (day/night breathing) → clear → dense → auto
+    btn(`FOG:${this.s.fogMode.toUpperCase()}`, this.s.fogMode !== 'auto', () => {
+      this.s.fogMode = this.s.fogMode === 'auto' ? 'clear'
+                     : this.s.fogMode === 'clear' ? 'dense'
+                     : 'auto';
+      this.applyFogMode();
+      this.saveSettingsDebounced();
+      this.rebuildBar();
+    }, 'Fog / view distance: auto (day-night) · clear (far) · dense (moody)');
+
     // FX advanced — remaining toggles that don't overlap with anything else
     sep(); lbl('FX+');
     (['vignette', 'radarPing', 'noiseBursts'] as const).forEach(fx => {
@@ -661,6 +693,8 @@ export class ScreensaverController {
     window.setTimeout(() => {
       if (!this.engine || !this.hud) return;
       this.engine.loadScene(id);
+      this.baseFogDensity = (this.engine.scene.fog as any)?.density ?? 0.01;
+      this.applyFogMode();
       const labels = DICT.MODE_LABELS[id];
       this.hud.setMode(labels[0]);
       this.hud.setTri(this.engine.getSceneObj()?.triCount || '----');

@@ -30,8 +30,8 @@ Windows, and a fullscreen app on macOS:
 
 | Platform | Download | Run |
 |---|---|---|
-| **Windows** (`.scr` screen saver) | **[↓ KuroScreensaver-windows.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/download/v0.1.5/KuroScreensaver-windows.zip)** | Unzip, right-click `KuroScreensaver.scr` → **Install**. Needs the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (preinstalled on current Win10/11). |
-| **macOS** (fullscreen `.app`) | **[↓ KuroScreensaver-macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/download/v0.1.5/KuroScreensaver-macos.zip)** | Unzip, then (unsigned → clear the download quarantine once): `xattr -dr com.apple.quarantine KuroScreensaver.app` and double-click it. Move the mouse to reveal the cursor + on-screen controls (switch scene / toggle effects); **Esc** or **⌘Q** exits. |
+| **Windows** (`.scr` screen saver) | **[↓ KuroScreensaver-windows.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/download/v0.1.6/KuroScreensaver-windows.zip)** | Unzip, right-click `KuroScreensaver.scr` → **Install**. Needs the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (preinstalled on current Win10/11). |
+| **macOS** (fullscreen `.app`) | **[↓ KuroScreensaver-macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/download/v0.1.6/KuroScreensaver-macos.zip)** | Unzip, then (unsigned → clear the download quarantine once): `xattr -dr com.apple.quarantine KuroScreensaver.app` and double-click it. Move the mouse to reveal the cursor + on-screen controls (switch scene / toggle effects); **Esc** or **⌘Q** exits. |
 
 All versions: **[releases page](https://codeberg.org/jkaindl/kuro-screensaver/releases)**.
 

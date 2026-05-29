@@ -107,6 +107,13 @@ export interface ScreensaverSettings {
   terminalLayout: 'bottom-strip' | 'center-window';
 
   dayNightCycle: { on: boolean; periodMin: number };
+  /**
+   * Fog / view-distance control (control-bar FOG button):
+   *   'auto'  — day/night cycle breathes the fog density (default)
+   *   'clear' — fixed low density → maximum view distance, no dark phases
+   *   'dense' — fixed high density → moody, short view distance
+   */
+  fogMode: 'auto' | 'clear' | 'dense';
   weather: 'light-fog' | 'heavy-fog' | 'storm' | 'dust' | 'clear';
 
   perfAdapt: boolean;
@@ -185,6 +192,7 @@ export const DEFAULT_SCREENSAVER: ScreensaverSettings = {
   terminalLayout: 'bottom-strip',
 
   dayNightCycle: { on: true, periodMin: 4 },
+  fogMode: 'auto',
   weather: 'light-fog',
 
   perfAdapt: true,
