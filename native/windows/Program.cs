@@ -158,6 +158,9 @@ internal sealed class SaverForm : Form
         core.Settings.IsStatusBarEnabled = false;
         core.Settings.AreBrowserAcceleratorKeysEnabled = false;
 
+        // Web → native: the engine's close button (×) posts a message → exit.
+        core.WebMessageReceived += (_, _) => ExitSaver();
+
         _web.Source = new Uri($"https://kuro.local/screensaver.html{Options.QueryString()}");
     }
 

@@ -27,7 +27,7 @@ final class ExitWebView: WKWebView {
 /// WebGL composites. Multiple independent exit paths (Esc via responder, Esc /
 /// Cmd-Q via a local event monitor, and a Cmd-Q menu item) so the fullscreen
 /// window can never trap the user.
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler {
     private var window: NSWindow?
     private var webView: ExitWebView?
     private var keyMonitor: Any?
@@ -44,6 +44,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // No user gesture exists at launch — allow audio to start if enabled.
         config.mediaTypesRequiringUserActionForPlayback = []
+
+        // The web engine's close button (×) posts "kuroExit" — quit the app so
+        // it doesn't leave a black window with no way out.
+        let userContent = WKUserContentController()
+        userContent.add(self, name: "kuroExit")
+        config.userContentController = userContent
 
         let wv = ExitWebView(frame: frame, configuration: config)
         wv.onExit = { NSApplication.shared.terminate(nil) }
@@ -112,5 +118,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
+    }
+
+    // Web → native: the engine's close button quits the app.
+    func userContentController(_ userContentController: WKUserContentController,
+                               didReceive message: WKScriptMessage) {
+        if message.name == "kuroExit" {
+            NSApplication.shared.terminate(nil)
+        }
     }
 }

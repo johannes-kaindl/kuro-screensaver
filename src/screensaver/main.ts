@@ -44,4 +44,17 @@ const host = new WebHost({
 host.getSettings().sound.master = audioOn;
 
 const controller = new ScreensaverController(makePluginShim(host));
+
+// In a native host (macOS .app / Windows .scr), the engine's close button (×)
+// must quit the whole app. Otherwise close() only tears down the overlay and
+// leaves a black window with no way out. Bridge close() to the native host;
+// in a plain browser both message channels are absent, so this is a no-op.
+const origClose = controller.close.bind(controller);
+controller.close = async () => {
+  const w = window as any;
+  w.webkit?.messageHandlers?.kuroExit?.postMessage?.('exit'); // macOS WKWebView
+  w.chrome?.webview?.postMessage?.('exit');                   // Windows WebView2
+  await origClose();
+};
+
 void controller.open({ scene });
