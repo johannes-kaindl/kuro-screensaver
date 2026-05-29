@@ -84,12 +84,16 @@ done
 
 rm -f "$MACOS/KuroVideoSaver/loop.mov"
 
-# Zip all bundles into one distributable (preserves .saver bundle structure).
-mkdir -p "$ROOT/$DIST"
-ZIP="$ROOT/$DIST/KuroScreensaver-savers-macos.zip"
-rm -f "$ZIP"
-( cd "$OUT" && zip -rqy "$ZIP" ./*.saver )
+# Zip each .saver SEPARATELY — one ~240MB asset per preset stays under the
+# release-asset size limit and lets users grab only the presets they want. A
+# single combined zip is ~3GB and fails to upload as a release asset.
+SAVERS_DIST="$ROOT/$DIST/savers"
+rm -rf "$SAVERS_DIST"; mkdir -p "$SAVERS_DIST"
+for saver in "$OUT"/*.saver; do
+  base=$(basename "$saver")
+  ( cd "$OUT" && zip -rqy "$SAVERS_DIST/${base}.zip" "$base" )
+done
 
 echo ""
-echo "Done: ${#videos[@]} .saver bundle(s) → $DIST/KuroScreensaver-savers-macos.zip"
+echo "Done: ${#videos[@]} .saver bundle(s) → $DIST/savers/*.saver.zip"
 echo "Test: cp -R \"$OUT/\"*.saver ~/Library/Screen\\ Savers/  then open System Settings ▸ Screen Saver"

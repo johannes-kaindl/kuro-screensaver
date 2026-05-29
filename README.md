@@ -83,7 +83,7 @@ The same engine ships natively for both platforms:
 | Platform | Download | Run |
 |---|---|---|
 | **Windows** (`.scr` screen saver) | **[↓ windows.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** | Unzip, right-click `KuroScreensaver.scr` → **Install**. Needs the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (preinstalled on current Win10/11). |
-| **macOS** (`.saver`, one per preset) | **[↓ savers-macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** | Unzip, copy the `.saver` bundles into `~/Library/Screen Savers/`, then pick one in **System Settings ▸ Screen Saver**. Pre-rendered video loops — a real screensaver. |
+| **macOS** (`.saver`, one per preset) | **[↓ pick a preset](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** (`Kuro <Preset>.saver.zip`) | Download the preset(s) you want, unzip, copy the `.saver` into `~/Library/Screen Savers/`, then pick it in **System Settings ▸ Screen Saver**. Pre-rendered video loops — a real screensaver. |
 | **macOS** (live `.app`) | **[↓ macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** | The live WebGL engine in a fullscreen window (full procedural variation). Unsigned → clear quarantine once: `xattr -dr com.apple.quarantine KuroScreensaver.app`. **Esc**/**⌘Q** exits. |
 
 All versions: **[releases page](https://codeberg.org/jkaindl/kuro-screensaver/releases)**.

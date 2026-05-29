@@ -62,7 +62,7 @@ jobs:
           if-no-files-found: ignore
           path: |
             dist-native/KuroScreensaver-macos.zip
-            dist-native/KuroScreensaver-savers-macos.zip
+            dist-native/savers/*.saver.zip
 
   windows:
     runs-on: ubuntu-latest
@@ -113,8 +113,8 @@ jobs:
 
           for f in \
             artifacts/dist-macos/KuroScreensaver-macos.zip \
-            artifacts/dist-macos/KuroScreensaver-savers-macos.zip \
-            artifacts/dist-windows/KuroScreensaver-windows.zip
+            artifacts/dist-windows/KuroScreensaver-windows.zip \
+            artifacts/dist-macos/savers/*.saver.zip
           do
             [ -f "$f" ] || { echo "missing $f"; continue; }
             name=$(basename "$f")
