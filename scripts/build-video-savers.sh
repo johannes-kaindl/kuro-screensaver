@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Build one macOS .saver per rendered preset video.
 #
-# Strategy: build the KuroVideoSaver target ONCE as a template, then clone it
-# per preset — swap in that preset's loop.mov, give it a unique name + bundle
-# id, and re-sign. Avoids 13 slow xcodebuilds.
+# Strategy: rebuild the KuroVideoSaver target once PER preset, each with a unique
+# Objective-C class name (KuroVideoSaver_<key>) — necessary so each .saver loads
+# its OWN video (see the long note at the build loop). After each build, copy in
+# that preset's loop.mov, set a unique name / bundle id / principal class, sign.
 #
 # Prereqs: render-out/videos/kuro-<preset>.mov exist (scripts/render-saver-videos.mjs),
 #          xcodegen + Xcode installed.
@@ -82,6 +83,9 @@ for v in "${videos[@]}"; do
 
   saver="$OUT/Kuro $label.saver"
   rm -rf "$saver"; cp -R "$built" "$saver"
+  # The built bundle has no Resources dir (loop.mov is no longer a target
+  # resource), so create it before copying this preset's video in.
+  mkdir -p "$saver/Contents/Resources"
   cp "$v" "$saver/Contents/Resources/loop.mov"   # embed this preset's video
   plist="$saver/Contents/Info.plist"
   /usr/libexec/PlistBuddy -c "Set :CFBundleName Kuro $label" "$plist"
