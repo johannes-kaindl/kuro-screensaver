@@ -83,8 +83,8 @@ The same engine ships natively for both platforms:
 | Platform | Download | Run |
 |---|---|---|
 | **Windows** (`.scr` screen saver) | **[↓ windows.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** | Unzip, right-click `KuroScreensaver.scr` → **Install**. Needs the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (preinstalled on current Win10/11). |
-| **macOS** (`.saver`, one per preset) | **[↓ pick a preset](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** (`Kuro <Preset>.saver.zip`) | Download the preset(s) you want, unzip, copy the `.saver` into `~/Library/Screen Savers/`, then pick it in **System Settings ▸ Screen Saver**. Pre-rendered video loops — a real screensaver. |
-| **macOS** (live `.app`) | **[↓ macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** | The live WebGL engine in a fullscreen window (full procedural variation). Unsigned → clear quarantine once: `xattr -dr com.apple.quarantine KuroScreensaver.app`. **Esc**/**⌘Q** exits. |
+| **macOS** (`.saver`, one per preset) | **[↓ pick a preset](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** (`Kuro <Preset>.saver.zip`) | Unzip, double-click → Install, then pick it in **System Settings ▸ Screen Saver**. Pre-rendered video loops — a real screensaver. See the **first-run note below**. |
+| **macOS** (live `.app`) | **[↓ macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** | The live WebGL engine in a fullscreen window (full procedural variation). **Esc**/**⌘Q** exits. See the **first-run note below**. |
 
 All versions: **[releases page](https://codeberg.org/jkaindl/kuro-screensaver/releases)**.
 
@@ -95,8 +95,19 @@ All versions: **[releases page](https://codeberg.org/jkaindl/kuro-screensaver/re
 > starts on idle. The `.app` keeps the live, fully procedural engine for when
 > you want it.
 
-Builds are **unsigned** — macOS Gatekeeper / Windows SmartScreen will ask you
-to confirm on first run.
+> ### ⚠️ First run — unsigned builds
+> Every download is **unsigned** (hobby project, no paid Apple notarization), so
+> on first use macOS **Gatekeeper** ("cannot verify…") or Windows **SmartScreen**
+> warns you. It's expected and clears in ~1 minute — you do it once per file.
+>
+> **→ Full step-by-step: [docs/MACOS-INSTALL.md](docs/MACOS-INSTALL.md)**
+>
+> Quick version for the macOS `.saver` (the prompt is easy to miss otherwise):
+> ```bash
+> xattr -dr com.apple.quarantine "Kuro <Preset>.saver"
+> ```
+> then double-click → Install. For the `.app`: launch → **Done** → System
+> Settings → Privacy & Security → **"Open Anyway"**.
 
 ---
 
