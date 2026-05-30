@@ -1,8 +1,9 @@
 # Video-`.saver` — pre-rendered per-preset macOS screensavers
 
 **Date:** 2026-05-29
-**Status:** All phases implemented (Phases 0–5). Videos rendered locally; .saver
-build runs in CI. Remaining: upload video assets, tag a release, visual test.
+**Status:** Shipped as v0.2.5 (merged to main), on-device verified — each preset
+plays its own video. Two post-release bugs found + fixed (idle-drift freeze,
+shared Obj-C class). See "On-device bugs found after release" below.
 
 ## Problem
 
@@ -100,6 +101,23 @@ Then `ffmpeg` → H.265 `.mov`, trimmed to loop exactly at the crash seam.
 - **Render is non-deterministic + idempotent.** RNG cycle length varies
   (~115-178s), so CAPTURE_SECONDS=480 for headroom; the script skips presets
   whose .mov already exists (FORCE=1 to redo) so re-runs only fill gaps.
+
+## On-device bugs found after release (both fixed)
+
+Two bugs surfaced only with the real screensaver + multiple presets installed:
+
+- **Idle-drift froze the narrative** (above) — fixed in v0.2.2.
+- **Shared Obj-C class → wrong video (v0.2.5).** All 13 `.saver` shipped the
+  same principal class `KuroVideoSaverView`. The Obj-C runtime registers a class
+  name only ONCE per process, so once macOS loaded a second Kuro `.saver` (e.g.
+  previewing presets), `Bundle(for: KuroVideoSaverView.self)` resolved to the
+  *first-loaded* bundle — every preset then played that bundle's `loop.mov`
+  (ember showed biolink). Bundle ids were already unique; the class name was the
+  collision. Fix: `build-video-savers.sh` renames the class per preset
+  (`KuroVideoSaver_<key>`, via sed) and rebuilds each binary (13 builds, not a
+  template+clone), patching `NSPrincipalClass` to match. `loop.mov` is no longer
+  a target resource — it's copied into each bundle after the build. Verified
+  on-device: ember and biolink each play their own video.
 
 ## Out of scope / open
 
