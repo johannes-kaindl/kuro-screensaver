@@ -51,38 +51,49 @@ if [ ${#videos[@]} -eq 0 ]; then
 fi
 echo "Found ${#videos[@]} preset video(s)."
 
-# 1. Generate the Xcode project (idempotent).
+# Generate the Xcode project (idempotent).
 ( cd "$MACOS" && xcodegen generate >/dev/null )
 
-# 2. Build the template once, using the first video as a placeholder loop.mov.
-cp "${videos[0]}" "$MACOS/KuroVideoSaver/loop.mov"
-echo "Building KuroVideoSaver template …"
-xcodebuild -project "$MACOS/KuroScreensaver.xcodeproj" -scheme KuroVideoSaver \
-  -configuration Release -derivedDataPath "$DERIVED" \
-  build >/dev/null
-TEMPLATE="$DERIVED/Build/Products/Release/KuroVideoSaver.saver"
-[ -d "$TEMPLATE" ] || { echo "✗ template build not found at $TEMPLATE" >&2; exit 1; }
+# Each .saver needs a UNIQUE Objective-C principal class. The Obj-C runtime
+# registers a class name only once per process, so if every bundle shipped the
+# same `KuroVideoSaverView`, `Bundle(for: KuroVideoSaverView.self)` would resolve
+# to whichever bundle loaded *first* — and every preset would play that bundle's
+# video. So we rename the class per preset (`KuroVideoSaver_<key>`) and rebuild.
+rm -f "$MACOS/KuroVideoSaver/loop.mov"   # video is copied in AFTER each build, not embedded
+SRC="$MACOS/KuroVideoSaver/KuroVideoSaverView.swift"
+SRC_ORIG="$(cat "$SRC")"
+restore_src() { printf '%s' "$SRC_ORIG" > "$SRC"; }
+trap restore_src EXIT   # leave the working tree's source untouched after the run
 
-# 3. Clone per preset.
 rm -rf "$OUT"; mkdir -p "$OUT"
 for v in "${videos[@]}"; do
   key=$(basename "$v" .mov); key=${key#kuro-}
   label=$(labels "$key")
+  cls="KuroVideoSaver_${key//-/_}"          # e.g. KuroVideoSaver_ghost_protocol
+
+  # Rebuild the binary with this preset's unique class name.
+  printf '%s' "$SRC_ORIG" | sed "s/KuroVideoSaverView/$cls/g" > "$SRC"
+  rm -rf "$DERIVED"                          # clean build so no stale class lingers
+  echo "Building $label (class $cls) …"
+  xcodebuild -project "$MACOS/KuroScreensaver.xcodeproj" -scheme KuroVideoSaver \
+    -configuration Release -derivedDataPath "$DERIVED" build >/dev/null
+  built="$DERIVED/Build/Products/Release/KuroVideoSaver.saver"
+  [ -d "$built" ] || { echo "✗ build failed for $key" >&2; exit 1; }
+
   saver="$OUT/Kuro $label.saver"
-  cp -R "$TEMPLATE" "$saver"
-  cp "$v" "$saver/Contents/Resources/loop.mov"
+  rm -rf "$saver"; cp -R "$built" "$saver"
+  cp "$v" "$saver/Contents/Resources/loop.mov"   # embed this preset's video
   plist="$saver/Contents/Info.plist"
   /usr/libexec/PlistBuddy -c "Set :CFBundleName Kuro $label" "$plist"
   /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.kuro.screensaver.video.$key" "$plist"
-  # Re-sign ad-hoc after swapping resources (resource seal must match).
+  /usr/libexec/PlistBuddy -c "Set :NSPrincipalClass $cls" "$plist"   # must match the binary
   codesign --remove-signature "$saver" 2>/dev/null || true
   codesign --force --deep --sign - "$saver"
   codesign --verify --deep --strict "$saver"
   mb=$(( $(stat -f%z "$v") / 1000000 ))
   echo "  ✓ Kuro $label.saver  (${mb} MB)"
 done
-
-rm -f "$MACOS/KuroVideoSaver/loop.mov"
+restore_src; trap - EXIT
 
 # Zip each .saver SEPARATELY — one ~240MB asset per preset stays under the
 # release-asset size limit and lets users grab only the presets they want. A

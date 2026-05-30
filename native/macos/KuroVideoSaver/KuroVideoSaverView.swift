@@ -12,6 +12,14 @@ import AVFoundation
 ///
 /// `@objc(KuroVideoSaverView)` fixes the Objective-C runtime name referenced by
 /// `NSPrincipalClass` in Info.plist.
+///
+/// IMPORTANT: scripts/build-video-savers.sh renames this class **per preset**
+/// (`KuroVideoSaver_<key>`) before each build. The Obj-C runtime registers a
+/// class name only once per process, so if all 13 `.saver` shipped the same
+/// class, `Bundle(for:)` would resolve to whichever bundle loaded first and
+/// every preset would play that one's video. The per-preset rename is what keeps
+/// each `.saver` loading its own `loop.mov`. This file keeps the generic name so
+/// it builds/parses standalone.
 @objc(KuroVideoSaverView)
 final class KuroVideoSaverView: ScreenSaverView {
     private var player: AVQueuePlayer?
