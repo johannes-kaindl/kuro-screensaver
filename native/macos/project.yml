@@ -84,8 +84,10 @@ targets:
 
   # Video .saver — the SHIPPING macOS screensaver. Plays a pre-rendered loop of
   # the engine via AVPlayer, which (unlike WebGL) composites fine in the
-  # screensaver process. scripts/build-video-savers.sh builds this once as a
-  # template, then clones it per preset with a different loop.mov + name + id.
+  # screensaver process. scripts/build-video-savers.sh builds this once per
+  # preset (unique class name) and copies that preset's loop.mov into the bundle
+  # AFTER the build — so loop.mov is intentionally NOT a target resource here
+  # (a missing one would fail CpResource at build time).
   KuroVideoSaver:
     type: bundle
     platform: macOS
@@ -94,9 +96,6 @@ targets:
         excludes:
           - "Info.plist"
           - "loop.mov"
-      - path: KuroVideoSaver/loop.mov
-        optional: true
-        buildPhase: resources
     settings:
       base:
         PRODUCT_NAME: KuroVideoSaver
