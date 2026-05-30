@@ -90,8 +90,11 @@ rm -f "$MACOS/KuroVideoSaver/loop.mov"
 SAVERS_DIST="$ROOT/$DIST/savers"
 rm -rf "$SAVERS_DIST"; mkdir -p "$SAVERS_DIST"
 for saver in "$OUT"/*.saver; do
-  base=$(basename "$saver")
-  ( cd "$OUT" && zip -rqy "$SAVERS_DIST/${base}.zip" "$base" )
+  base=$(basename "$saver")        # "Kuro Crimson.saver" — bundle keeps its space
+  zipname="${base// /-}"           # "Kuro-Crimson.saver" — NO space in the asset name
+  # (a space breaks the release-upload URL ?name=…; the bundle inside keeps its
+  #  display name for System Settings.)
+  ( cd "$OUT" && zip -rqy "$SAVERS_DIST/${zipname}.zip" "$base" )
 done
 
 echo ""
