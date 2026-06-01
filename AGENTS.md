@@ -8,6 +8,12 @@ Standalone Retro-CRT 3D Screensaver engine — extracted from the
 `kuro-companion` Obsidian plugin (source lives in `kuro-theme-settings`).
 Vite/TypeScript project, runs in any modern browser.
 
+**Standalone repo since 2026-06-01** — moved out of the `kuro/` monorepo
+subtree (was `/Users/Shared/code/kuro/animation/`) to its own top-level
+project at `/Users/Shared/code/kuro-screensaver/`. Git remotes, the GitHub
+release CI, and the `sync-to-plugin.sh` DST path were unaffected by the move
+(they use absolute paths / the unchanged `kuro-screensaver` repo name).
+
 After the 2026-05-27 rollback (see
 `docs/specs/2026-05-27-companion-rollback.md`), the engine is **Plugin-
 shaped**: `controller.ts` expects a host object with a settings tree and
@@ -35,7 +41,7 @@ instance — no shim needed there.
 ## Memory + logs
 
 - **Memory** (cross-session, outside the repo):
-  `~/.claude/projects/-Users-Shared-code-kuro-animation/memory/`
+  `~/.claude/projects/-Users-Shared-code-kuro-screensaver/memory/`
   — index in `MEMORY.md`. See `animation-project.md`,
   `kuro-projekte-uebersicht.md`, `code-parent-projekte.md`,
   `user-style.md`.
@@ -98,9 +104,14 @@ attaches them to the Codeberg release. Cut one with
 `git tag vX && git push origin vX && git push github vX` (tag both remotes).
 See `docs/specs/2026-05-28-screensaver-native-port-*.md`.
 
-## Sibling repos
+## Related repos
 
-- `kuro-theme-settings/` — the Obsidian plugin (v1 + v2 unified via
-  build defines `__HAS_ASPECTS__`, `__STYLE_TAG_ID__`, `__BODY_CLASS__`).
+No longer siblings — these stayed in the `kuro/` subtree when this project
+moved out to its own top-level dir (2026-06-01):
+
+- `/Users/Shared/code/kuro/kuro-theme-settings/` — the Obsidian plugin (v1 +
+  v2 unified via build defines `__HAS_ASPECTS__`, `__STYLE_TAG_ID__`,
+  `__BODY_CLASS__`). The `sync-to-plugin.sh` DST already points at this
+  absolute path.
 - `kuro-gamification` (symlink → `/Users/Shared/20_Claude/.../40_src/`) —
   separate Obsidian plugin, deployed in vault X1_v6t2b9.
