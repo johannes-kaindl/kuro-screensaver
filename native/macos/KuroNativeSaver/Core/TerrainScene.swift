@@ -26,7 +26,7 @@ func terrainHeight(_ x: Float, _ z: Float) -> Float {
 }
 
 final class TerrainScene: Scene {
-    private(set) var camera = Camera()
+    var camera = Camera()
     private(set) var items: [DrawItem] = []
     let fogDensity: Float = 0.012
 
@@ -108,7 +108,7 @@ final class TerrainScene: Scene {
         }
         let stars = DrawItem(positions: TerrainScene.buffer(device, starV), indices: nil,
                              count: 1000, vertexCount: 1000, primitive: .point,
-                             opacity: 0.9, isPoint: true, pointSizeWorld: 0.13)
+                             opacity: 1.0, isPoint: true, pointSizeWorld: 0.13)
 
         var dustV = [Float](); dustV.reserveCapacity(500 * 3)
         for _ in 0..<500 {
@@ -118,7 +118,7 @@ final class TerrainScene: Scene {
         }
         dust = DrawItem(positions: TerrainScene.buffer(device, dustV), indices: nil,
                         count: 500, vertexCount: 500, primitive: .point,
-                        opacity: 0.6, isPoint: true, pointSizeWorld: 0.06)
+                        opacity: 1.0, isPoint: true, pointSizeWorld: 0.06)
 
         items = [chunkA, chunkB, stars, dust]
     }

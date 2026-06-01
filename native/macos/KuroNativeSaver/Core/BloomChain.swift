@@ -9,12 +9,13 @@ import MetalPerformanceShaders
 final class BloomChain {
     let device: MTLDevice
     private let thresholdPipe: MTLRenderPipelineState
+    private let blur: MPSImageGaussianBlur     // cached once (sigma is fixed)
     private var src: MTLTexture?   // threshold output (half-res)
     private var dst: MTLTexture?   // blurred (half-res)
     private var bw = 0, bh = 0
 
     var threshold: Float = 0.05
-    var sigma: Float                // blur radius (half-res pixels)
+    let sigma: Float                // blur radius (half-res pixels)
 
     init(device: MTLDevice, library: MTLLibrary, sigma: Float) {
         self.device = device
@@ -24,6 +25,9 @@ final class BloomChain {
         pd.fragmentFunction = library.makeFunction(name: "threshold_f")
         pd.colorAttachments[0].pixelFormat = Renderer.hdrFormat
         thresholdPipe = try! device.makeRenderPipelineState(descriptor: pd)
+        let b = MPSImageGaussianBlur(device: device, sigma: sigma)
+        b.edgeMode = .clamp
+        blur = b
     }
 
     private func ensure(_ w: Int, _ h: Int) {
@@ -59,8 +63,6 @@ final class BloomChain {
         enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         enc.endEncoding()
 
-        let blur = MPSImageGaussianBlur(device: device, sigma: sigma)
-        blur.edgeMode = .clamp
         blur.encode(commandBuffer: cb, sourceTexture: src, destinationTexture: dst)
         return dst
     }

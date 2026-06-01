@@ -17,12 +17,21 @@ final class KuroNativeSaverView: ScreenSaverView {
     private var displayLink: CVDisplayLink?
     private var lastTime: CFTimeInterval = 0
 
+    // Resize handoff: main-thread callbacks stash the desired drawable size; the
+    // display-link thread applies it right before nextDrawable(), so all
+    // CAMetalLayer.drawableSize mutation + drawable acquisition happen on one
+    // thread (no data race).
+    private let sizeLock = NSLock()
+    private var pendingDrawableSize: CGSize?
+
     override init?(frame: NSRect, isPreview: Bool) {
         super.init(frame: frame, isPreview: isPreview)
         animationTimeInterval = 1.0 / 60.0
         wantsLayer = true
         layer?.backgroundColor = NSColor.black.cgColor
         setupMetal()
+        // No Metal device / failed setup → decline so AppKit falls back gracefully.
+        guard metalLayer != nil, renderer != nil else { return nil }
     }
 
     @available(*, unavailable)
@@ -48,13 +57,15 @@ final class KuroNativeSaverView: ScreenSaverView {
         updateDrawableSize()
     }
 
+    /// Main thread: set layer geometry and stash the desired drawable pixel size.
+    /// The actual `drawableSize` write happens on the render thread (renderFrame).
     private func updateDrawableSize() {
         guard let ml = metalLayer else { return }
         let scale = window?.backingScaleFactor ?? 2.0
         ml.frame = bounds
         ml.contentsScale = scale
         let w = max(1, bounds.width * scale), h = max(1, bounds.height * scale)
-        ml.drawableSize = CGSize(width: w, height: h)
+        sizeLock.lock(); pendingDrawableSize = CGSize(width: w, height: h); sizeLock.unlock()
     }
 
     override func viewDidMoveToWindow() {
@@ -71,7 +82,7 @@ final class KuroNativeSaverView: ScreenSaverView {
 
     override func startAnimation() {
         super.startAnimation()
-        lastTime = CACurrentMediaTime()
+        lastTime = 0   // reset before the link starts; renderFrame seeds it on tick 1
         startDisplayLink()
     }
 
@@ -81,7 +92,7 @@ final class KuroNativeSaverView: ScreenSaverView {
     }
 
     private func startDisplayLink() {
-        guard displayLink == nil else { return }
+        guard displayLink == nil, renderer != nil, metalLayer != nil else { return }
         var dl: CVDisplayLink?
         CVDisplayLinkCreateWithActiveCGDisplays(&dl)
         guard let dl else { return }
@@ -100,11 +111,19 @@ final class KuroNativeSaverView: ScreenSaverView {
         displayLink = nil
     }
 
-    /// Called on the display-link thread. Touches only Metal objects (no NSView
-    /// state), so it is safe off the main thread.
+    /// Called on the display-link thread. `lastTime` and the CAMetalLayer's
+    /// drawableSize are only ever touched here (the resize handoff is via
+    /// `pendingDrawableSize` under `sizeLock`), so there is no cross-thread race.
     private func renderFrame() {
+        guard isAnimating else { return }   // bail on late callbacks after stop
         guard let ml = metalLayer, let renderer else { return }
+
+        sizeLock.lock()
+        if let ps = pendingDrawableSize { ml.drawableSize = ps; pendingDrawableSize = nil }
+        sizeLock.unlock()
+
         let now = CACurrentMediaTime()
+        if lastTime == 0 { lastTime = now }
         let dt = min(0.05, max(0, now - lastTime))
         lastTime = now
         renderer.advance(dt: dt)

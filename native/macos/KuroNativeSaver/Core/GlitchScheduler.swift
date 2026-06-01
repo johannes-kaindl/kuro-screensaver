@@ -63,7 +63,7 @@ final class GlitchScheduler {
             dur = 0.06 + rng.next() * 0.09
         } else if r < 60 {               // chroma spike
             kind = .chroma
-            chromaBump = 0.003 + Float(rng.next()) * 0.006 * i
+            chromaBump = (0.003 + Float(rng.next()) * 0.006) * i   // web grouping (crt-sim.ts:220)
             dur = 0.08 + rng.next() * 0.12
         } else {                         // scanline pulse
             kind = .scanPulse

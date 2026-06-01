@@ -64,7 +64,7 @@ struct SceneContext {
 }
 
 protocol Scene: AnyObject {
-    var camera: Camera { get }
+    var camera: Camera { get set }   // settable: the renderer applies aspect-aware FOV
     var items: [DrawItem] { get }
     var fogDensity: Float { get }
     func update(t: Double, dt: Double)

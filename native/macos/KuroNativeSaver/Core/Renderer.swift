@@ -111,11 +111,14 @@ final class Renderer {
         enc.setDepthStencilState(depthState)
 
         let aspect = Float(width) / Float(height)
+        // Apply the web's aspect-aware vertical FOV (core.ts onResize parity).
+        scene.camera.fovDegrees = Camera.defaultFovDeg(width: width, height: height)
         let cam = scene.camera
         let view = cam.view()
         let viewProj = cam.projection(aspect: aspect) * view
-        let fovy = cam.fovDegrees * .pi / 180
-        let pointScale = Float(height) / (2 * tan(fovy / 2))
+        // three.js PointsMaterial sizeAttenuation: gl_PointSize = size * height/2 / -z
+        // (no FOV term) — match it so ported star/dust sizes look right.
+        let pointScale = Float(height) * 0.5
         let accent = preset.accentRGB
 
         for item in scene.items {
@@ -152,8 +155,11 @@ final class Renderer {
         enc2.setFragmentTexture(sceneHDR, index: 0)
         enc2.setFragmentTexture(bloomTex, index: 1)
         let vignetteInner = 0.52 - 0.30 * preset.vignetteStrength
+        // three.js ACESFilmic scales color by exposure/0.6 before the curve
+        // (toneMappingExposure 1.15) — match the effective exposure.
+        let exposure: Float = 1.15 / 0.6
         var pu = PostUniforms(
-            p0: SIMD4(1.15, preset.bloomStrength,
+            p0: SIMD4(exposure, preset.bloomStrength,
                       0.0015 + glitch.chromaOffsetBump, preset.scanOpacity),
             p1: SIMD4(scanDriftY, vignetteInner, preset.vignetteStrength, Float(t)),
             p2: glitch.uniforms())

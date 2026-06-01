@@ -40,8 +40,9 @@ enum KuroDefaults {
         // Slice ships only terrain; "random" collapses to it for now.
         s.scene = (scene == "random") ? "terrain" : scene
         s.presetID = colorPreset
-        let ci = crtIntensity
-        s.crtIntensity = ci > 0 ? min(1, ci) : 0.35
+        // registerDefaults() supplies 0.35 when unset, so honor an explicit 0
+        // (slider "off") instead of coercing it back to the default.
+        s.crtIntensity = min(1, max(0, crtIntensity))
         return s
     }
 }

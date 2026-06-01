@@ -13,6 +13,8 @@ final class ConfigureSheetController {
     private var intensitySlider: NSSlider?
 
     func makeWindow() -> NSWindow {
+        window?.close()   // tear down a prior sheet (singleton would otherwise leak it)
+        window = nil
         let win = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 380, height: 200),
             styleMask: [.titled], backing: .buffered, defer: false)
@@ -80,5 +82,7 @@ final class ConfigureSheetController {
     private func close() {
         guard let win = window else { return }
         if let parent = win.sheetParent { parent.endSheet(win) } else { win.close() }
+        window = nil
+        scenePopup = nil; presetPopup = nil; intensitySlider = nil
     }
 }
