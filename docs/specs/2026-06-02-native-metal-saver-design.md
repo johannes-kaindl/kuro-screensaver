@@ -293,6 +293,29 @@ where WebGL did not — but this is the assumption under test.)
 5. **ProMotion 120 Hz** — drive all motion from the clamped seconds-delta so
    speed matches across refresh rates (the web engine drifts here).
 
+## Post-implementation review (2026-06-02)
+
+An adversarial multi-dimension review (Metal lifecycle, host threading, web
+fidelity, perf) ran after the slice was built; 12 confirmed findings were fixed
+(see the `fix(native): address adversarial review findings` commit). Three were
+**deliberately deferred** and remain open:
+
+- **Frame pipelining** — the live path uses `cb.waitUntilCompleted()` (correct,
+  and required by the headless harness for readback). Replacing it with a
+  semaphore-bounded `cb.present(drawable)` pipeline would raise throughput toward
+  120 Hz, but it also requires double-buffering the per-frame-mutated terrain
+  position buffers (CPU/GPU aliasing on wrap). Both are forward-looking perf work
+  that needs on-device timing to tune safely — out of scope for proving the
+  slice. The synchronous path renders the (lightweight wireframe+bloom) scene
+  smoothly at 60 Hz.
+- **Per-scene `hashId` RNG offset** — the web seeds scenes as
+  `mkRng(seed + hashId(id))`. The native LCG value stream is bit-for-bit
+  identical and seeded directly; since the native uses a fresh seed per
+  activation (no web-seed-sharing contract), the layout offset is never
+  observable. Not a slice goal.
+- **Render-pass-descriptor caching** — three are allocated per frame; idiomatic
+  Metal and negligible against the frame budget.
+
 ## Success criteria (DoD)
 
 An installable `.saver` that, on real screensaver activation:
