@@ -14,9 +14,17 @@ struct SceneUniforms {
     var params: SIMD4<Float>     // fogDensity, pointSizeWorld, pointScale, isPoint
 }
 
-/// Mirrors `PostUniforms`.
+/// Mirrors `PostUniforms` in Shaders.swift.
 struct PostUniforms {
-    var p0: SIMD4<Float>         // x = exposure
+    var p0: SIMD4<Float>   // exposure, bloomStrength, chromaOffset, scanOpacity
+    var p1: SIMD4<Float>   // scanDriftY(px), vignetteInner, vignetteStrength, time
+    var p2: SIMD4<Float>   // hTearAmount, hTearBandY, brightness, scanPulse (glitch)
+
+    init(p0: SIMD4<Float>,
+         p1: SIMD4<Float> = .zero,
+         p2: SIMD4<Float> = SIMD4(0, 0, 1, 0)) {
+        self.p0 = p0; self.p1 = p1; self.p2 = p2
+    }
 }
 
 /// One draw call: a position buffer (packed float3), optional line index buffer,

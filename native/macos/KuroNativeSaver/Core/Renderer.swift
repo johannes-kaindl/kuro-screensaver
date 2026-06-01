@@ -144,7 +144,11 @@ final class Renderer {
         enc2.setRenderPipelineState(compositePipe)
         enc2.setFragmentTexture(sceneHDR, index: 0)
         enc2.setFragmentTexture(bloomTex, index: 1)
-        var pu = PostUniforms(p0: SIMD4(1.15, preset.bloomStrength, 0, 0))
+        let vignetteInner = 0.52 - 0.30 * preset.vignetteStrength
+        var pu = PostUniforms(
+            p0: SIMD4(1.15, preset.bloomStrength, 0.0015, preset.scanOpacity),
+            p1: SIMD4(scanDriftY, vignetteInner, preset.vignetteStrength, Float(t)),
+            p2: SIMD4(0, 0, 1, 0))   // glitch uniforms (Task 9)
         enc2.setFragmentBytes(&pu, length: MemoryLayout<PostUniforms>.stride, index: 0)
         enc2.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         enc2.endEncoding()

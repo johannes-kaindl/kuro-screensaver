@@ -19,7 +19,9 @@ enum Shaders {
         float4 params;    // x=fogDensity, y=pointSizeWorld, z=pointScale, w=isPoint
     };
     struct PostUniforms {
-        float4 p0;        // x = exposure
+        float4 p0;        // exposure, bloomStrength, chromaOffset, scanOpacity
+        float4 p1;        // scanDriftY(px), vignetteInner, vignetteStrength, time
+        float4 p2;        // hTearAmount, hTearBandY, brightness, scanPulse (glitch)
     };
 
     // ACES filmic tonemap (Narkowicz approximation).
@@ -88,17 +90,47 @@ enum Shaders {
         return float4(c * soft, 1.0);
     }
 
-    // ---- composite (sceneHDR + bloom → tonemap → target; CRT added later) --
+    // ---- composite: scene + bloom, then the CRT look ----------------------
+    // p0: exposure, bloomStrength, chromaOffset, scanOpacity
+    // p1: scanDriftY(px), vignetteInner, vignetteStrength, time
+    // p2: hTearAmount, hTearBandY, brightness, scanPulse
     fragment float4 composite_f(FSQOut in [[stage_in]],
                                 texture2d<float> sceneTex [[texture(0)]],
                                 texture2d<float> bloomTex [[texture(1)]],
                                 constant PostUniforms& u [[buffer(0)]]) {
         constexpr sampler s(filter::linear, address::clamp_to_edge);
-        float3 c = sceneTex.sample(s, in.uv).rgb;
-        float3 b = bloomTex.sample(s, in.uv).rgb;
-        c += b * u.p0.y;                        // bloom strength
-        c = aces(c * u.p0.x);                   // exposure
-        return float4(c, 1.0);
+        float bs = u.p0.y;
+        float2 uv = in.uv;
+
+        // glitch: horizontal tear on a band near hTearBandY (Task 9 drives these)
+        float tear = u.p2.x;
+        if (tear != 0.0) {
+            float band = exp(-pow((uv.y - u.p2.y) * 6.0, 2.0));   // soft y-band
+            uv.x += tear * band;
+        }
+
+        // chromatic aberration: radial RGB split about screen center
+        float off = u.p0.z;
+        float2 dr = (uv - 0.5) * off;
+        float3 col;
+        col.r = sceneTex.sample(s, uv - dr).r + bloomTex.sample(s, uv - dr).r * bs;
+        col.g = sceneTex.sample(s, uv).g       + bloomTex.sample(s, uv).g       * bs;
+        col.b = sceneTex.sample(s, uv + dr).b  + bloomTex.sample(s, uv + dr).b  * bs;
+
+        col = aces(col * u.p0.x);               // exposure + tonemap
+        col *= u.p2.z;                          // brightness flicker (default 1)
+
+        // scanlines: sinusoidal darkening, 4px period, drifting; + glitch pulse
+        float scanAmt = u.p0.w * (1.0 + u.p2.w);
+        float s2 = 0.5 + 0.5 * sin((in.pos.y + u.p1.x) * 3.14159265 / 2.0);
+        col *= (1.0 - scanAmt * s2);
+
+        // vignette: radial smoothstep darkening toward the edges
+        float r = length(uv - 0.5);
+        float vig = smoothstep(u.p1.y, 0.72, r);
+        col *= (1.0 - vig * 0.72 * u.p1.z);
+
+        return float4(col, 1.0);
     }
     """
 }
