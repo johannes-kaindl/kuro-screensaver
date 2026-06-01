@@ -100,16 +100,21 @@ td.usage = [.renderTarget, .shaderRead, .shaderWrite]
 guard let target = device.makeTexture(descriptor: td) else { die("no target texture") }
 let queue = device.makeCommandQueue()!
 
-func renderTo(_ t: Double, path: String) {
-    // Task 0: clear to black. Later tasks call Renderer.render(into:time:) here.
-    let cb = queue.makeCommandBuffer()!
-    let rpd = MTLRenderPassDescriptor()
-    rpd.colorAttachments[0].texture = target
-    rpd.colorAttachments[0].loadAction = .clear
-    rpd.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
-    rpd.colorAttachments[0].storeAction = .store
-    cb.makeRenderCommandEncoder(descriptor: rpd)!.endEncoding()
-    cb.commit(); cb.waitUntilCompleted()
+_ = queue   // (kept for potential direct use)
+
+var settings = Settings()
+settings.scene = args.scene
+settings.presetID = args.preset
+settings.seed = args.seed
+
+let ctx = SceneContext(device: device, rng: LCG(seed: args.seed),
+                       settings: settings, accent: settings.preset.accentRGB)
+let scene: Scene = TerrainScene(ctx: ctx)   // (slice: terrain only)
+let renderer = Renderer(device: device, settings: settings, scene: scene,
+                        targetFormat: target.pixelFormat)
+
+func drawFrame(path: String) {
+    renderer.draw(into: target)
     var rgba = readback(target)
     writePNG(&rgba, width: args.w, height: args.h, to: path)
     print("wrote \(path)")
@@ -117,10 +122,14 @@ func renderTo(_ t: Double, path: String) {
 
 if args.seconds > 0 {
     let n = Int(args.seconds * args.fps)
+    let stepDt = 1.0 / args.fps
     for f in 0..<n {
-        let t = Double(f) / args.fps
-        renderTo(t, path: "\(args.out)/\(args.scene)-\(args.preset)-\(String(format: "%04d", f)).png")
+        renderer.advance(dt: stepDt)
+        drawFrame(path: "\(args.out)/\(args.scene)-\(args.preset)-\(String(format: "%04d", f)).png")
     }
 } else {
-    renderTo(args.at, path: "\(args.out)/\(args.scene)-\(args.preset).png")
+    let dt = 1.0 / 60.0
+    let steps = max(1, Int(args.at * 60))
+    for _ in 0..<steps { renderer.advance(dt: dt) }
+    drawFrame(path: "\(args.out)/\(args.scene)-\(args.preset).png")
 }
