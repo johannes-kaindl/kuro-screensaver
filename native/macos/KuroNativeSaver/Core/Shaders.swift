@@ -76,13 +76,28 @@ enum Shaders {
         return o;
     }
 
-    // ---- composite (Task 6: tonemap sceneHDR → target; CRT added later) ----
-    fragment float4 composite_f(FSQOut in [[stage_in]],
+    // ---- bloom threshold (keep bright pixels; MPS blurs the result) --------
+    fragment float4 threshold_f(FSQOut in [[stage_in]],
                                 texture2d<float> sceneTex [[texture(0)]],
                                 constant PostUniforms& u [[buffer(0)]]) {
         constexpr sampler s(filter::linear, address::clamp_to_edge);
         float3 c = sceneTex.sample(s, in.uv).rgb;
-        c = aces(c * u.p0.x);
+        float luma = dot(c, float3(0.299, 0.587, 0.114));
+        float t = u.p0.x;                       // threshold
+        float soft = smoothstep(t, t + 0.15, luma);
+        return float4(c * soft, 1.0);
+    }
+
+    // ---- composite (sceneHDR + bloom → tonemap → target; CRT added later) --
+    fragment float4 composite_f(FSQOut in [[stage_in]],
+                                texture2d<float> sceneTex [[texture(0)]],
+                                texture2d<float> bloomTex [[texture(1)]],
+                                constant PostUniforms& u [[buffer(0)]]) {
+        constexpr sampler s(filter::linear, address::clamp_to_edge);
+        float3 c = sceneTex.sample(s, in.uv).rgb;
+        float3 b = bloomTex.sample(s, in.uv).rgb;
+        c += b * u.p0.y;                        // bloom strength
+        c = aces(c * u.p0.x);                   // exposure
         return float4(c, 1.0);
     }
     """

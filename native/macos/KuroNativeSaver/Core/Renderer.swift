@@ -16,6 +16,7 @@ final class Renderer {
     private let scenePipe: MTLRenderPipelineState
     private let compositePipe: MTLRenderPipelineState
     private let depthState: MTLDepthStencilState
+    private let bloom: BloomChain
 
     private var sceneHDR: MTLTexture?
     private var depthTex: MTLTexture?
@@ -56,6 +57,8 @@ final class Renderer {
         ds.depthCompareFunction = .less
         ds.isDepthWriteEnabled = true
         depthState = device.makeDepthStencilState(descriptor: ds)!
+
+        bloom = BloomChain(device: device, library: lib, sigma: 6)
     }
 
     private func ensureTextures(_ w: Int, _ h: Int) {
@@ -128,6 +131,9 @@ final class Renderer {
         }
         enc.endEncoding()
 
+        // --- bloom (threshold + blur) ---
+        let bloomTex = bloom.generate(cb, sceneHDR: sceneHDR)
+
         // --- composite pass → target ---
         let tp = MTLRenderPassDescriptor()
         tp.colorAttachments[0].texture = target
@@ -137,7 +143,8 @@ final class Renderer {
         let enc2 = cb.makeRenderCommandEncoder(descriptor: tp)!
         enc2.setRenderPipelineState(compositePipe)
         enc2.setFragmentTexture(sceneHDR, index: 0)
-        var pu = PostUniforms(p0: SIMD4(1.15, 0, 0, 0))
+        enc2.setFragmentTexture(bloomTex, index: 1)
+        var pu = PostUniforms(p0: SIMD4(1.15, preset.bloomStrength, 0, 0))
         enc2.setFragmentBytes(&pu, length: MemoryLayout<PostUniforms>.stride, index: 0)
         enc2.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         enc2.endEncoding()

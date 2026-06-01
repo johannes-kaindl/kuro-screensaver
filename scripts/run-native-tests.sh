@@ -13,7 +13,7 @@ swiftc -O \
   $(ls "$SRC"/Core/*.swift) \
   "$SRC/tests/main.swift" \
   -o "$OUT/tests" \
-  -framework Metal -framework Foundation
+  -framework Metal -framework MetalPerformanceShaders -framework Foundation
 
 echo "built $OUT/tests"
 "$OUT/tests"
