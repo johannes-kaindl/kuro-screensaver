@@ -39,6 +39,14 @@ jobs:
         run: |
           npm ci
           bash scripts/package-macos.sh
+      - name: Build native Metal .saver
+        run: |
+          # Live Metal screensaver. Built with swiftc (-Xlinker -bundle) — no
+          # xcodebuild needed, shaders compile at runtime. Output zip joins the
+          # other .savers for upload.
+          bash scripts/build-native-saver.sh
+          mkdir -p dist-native/savers
+          cp native/macos/build/KuroNativeSaver.saver.zip dist-native/savers/
       - name: Build video .savers
         run: |
           # Fetch pre-rendered preset videos from the dedicated asset release

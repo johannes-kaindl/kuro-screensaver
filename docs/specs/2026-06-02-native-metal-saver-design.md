@@ -1,7 +1,12 @@
 # Native Metal Screensaver (Vertical Slice) — Design
 
 **Date:** 2026-06-02
-**Status:** Designed (approved with user 2026-06-02). Not yet implemented.
+**Status:** **Implemented (slice), 2026-06-02.** Renderer (terrain + bloom + full
+CRT + glitch) built and verified via headless PNG snapshots; native `.saver`
+bundle builds (Xcode-free, swiftc) and loads (principal class instantiates).
+**One gate remains: on-device verification that the Metal layer composites in the
+real `legacyScreenSaver` process** (the WebGL failure mode) — needs a human at
+the screen. See the plan `2026-06-02-native-metal-saver-plan.md`.
 **Topic:** First native, live-rendered macOS `.saver` — a Metal rewrite of the
 screensaver engine, replacing the WebView/video approach. This spec covers the
 **vertical slice** (skeleton + one scene + full CRT look), not the full port.
