@@ -25,6 +25,8 @@ struct Args {
     var fps = 30.0
     var at = 8.0          // single-frame timestamp (seconds) when seconds==0
     var seed: Int32 = 1337
+    var intensity: Float = 0.35
+    var forceGlitch: String? = nil   // htear|flicker|chroma|scanpulse (debug)
 }
 
 func parseArgs() -> Args {
@@ -41,6 +43,8 @@ func parseArgs() -> Args {
         case "--fps": a.fps = Double(it.next() ?? "") ?? a.fps
         case "--at": a.at = Double(it.next() ?? "") ?? a.at
         case "--seed": a.seed = Int32(it.next() ?? "") ?? a.seed
+        case "--intensity": a.intensity = Float(it.next() ?? "") ?? a.intensity
+        case "--force-glitch": a.forceGlitch = it.next()
         default: FileHandle.standardError.write("unknown arg \(k)\n".data(using: .utf8)!)
         }
     }
@@ -106,12 +110,14 @@ var settings = Settings()
 settings.scene = args.scene
 settings.presetID = args.preset
 settings.seed = args.seed
+settings.crtIntensity = args.intensity
 
 let ctx = SceneContext(device: device, rng: LCG(seed: args.seed),
                        settings: settings, accent: settings.preset.accentRGB)
 let scene: Scene = TerrainScene(ctx: ctx)   // (slice: terrain only)
 let renderer = Renderer(device: device, settings: settings, scene: scene,
                         targetFormat: target.pixelFormat)
+if let g = args.forceGlitch { renderer.debugForceGlitch(g) }
 
 func drawFrame(path: String) {
     renderer.draw(into: target)

@@ -17,6 +17,7 @@ final class Renderer {
     private let compositePipe: MTLRenderPipelineState
     private let depthState: MTLDepthStencilState
     private let bloom: BloomChain
+    private let glitch: GlitchScheduler
 
     private var sceneHDR: MTLTexture?
     private var depthTex: MTLTexture?
@@ -59,7 +60,12 @@ final class Renderer {
         depthState = device.makeDepthStencilState(descriptor: ds)!
 
         bloom = BloomChain(device: device, library: lib, sigma: 6)
+        glitch = GlitchScheduler(intensity: settings.crtIntensity,
+                                 seed: (settings.seed ?? freshSeed()) &+ 777)
     }
+
+    /// Debug: hold one glitch artifact active (single-frame verification).
+    func debugForceGlitch(_ name: String) { glitch.forceHold(name) }
 
     private func ensureTextures(_ w: Int, _ h: Int) {
         guard w != width || h != height || sceneHDR == nil else { return }
@@ -80,6 +86,7 @@ final class Renderer {
     func advance(dt: Double) {
         t += dt
         scene.update(t: t, dt: dt)
+        glitch.update(t: t)
         scanDriftY = (scanDriftY + 36 * Float(dt)).truncatingRemainder(dividingBy: 4)
     }
 
@@ -146,9 +153,10 @@ final class Renderer {
         enc2.setFragmentTexture(bloomTex, index: 1)
         let vignetteInner = 0.52 - 0.30 * preset.vignetteStrength
         var pu = PostUniforms(
-            p0: SIMD4(1.15, preset.bloomStrength, 0.0015, preset.scanOpacity),
+            p0: SIMD4(1.15, preset.bloomStrength,
+                      0.0015 + glitch.chromaOffsetBump, preset.scanOpacity),
             p1: SIMD4(scanDriftY, vignetteInner, preset.vignetteStrength, Float(t)),
-            p2: SIMD4(0, 0, 1, 0))   // glitch uniforms (Task 9)
+            p2: glitch.uniforms())
         enc2.setFragmentBytes(&pu, length: MemoryLayout<PostUniforms>.stride, index: 0)
         enc2.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         enc2.endEncoding()
