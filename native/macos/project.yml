@@ -114,6 +114,40 @@ targets:
       - sdk: AVFoundation.framework
       - sdk: Cocoa.framework
 
+  # Native Metal .saver — the live, procedurally-rendered screensaver (no
+  # WebView, no video). Renders terrain + the CRT look directly in Metal, which
+  # (unlike WebGL) is expected to composite in the legacyScreenSaver process —
+  # the gate to verify on-device. Shaders compile at runtime (no .metallib).
+  # Single configurable bundle with a unique principal class (no class
+  # collision). Xcode-free local build: scripts/build-native-saver.sh.
+  KuroNativeSaver:
+    type: bundle
+    platform: macOS
+    sources:
+      - path: KuroNativeSaver/Core
+      - path: KuroNativeSaver/Host
+        excludes:
+          - "Info.plist"
+    settings:
+      base:
+        PRODUCT_NAME: KuroNativeSaver
+        PRODUCT_BUNDLE_IDENTIFIER: com.kuro.screensaver.native
+        WRAPPER_EXTENSION: saver
+        INFOPLIST_FILE: KuroNativeSaver/Host/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        SWIFT_VERSION: "5.0"
+        MACOSX_DEPLOYMENT_TARGET: "11.0"
+        SKIP_INSTALL: YES
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: YES
+    dependencies:
+      - sdk: ScreenSaver.framework
+      - sdk: Metal.framework
+      - sdk: MetalPerformanceShaders.framework
+      - sdk: QuartzCore.framework
+      - sdk: Cocoa.framework
+
 # Explicit shared scheme so `xcodebuild -scheme KuroScreensaverApp` is
 # deterministic (don't rely on xcodebuild auto-creating schemes).
 schemes:
@@ -129,6 +163,14 @@ schemes:
     build:
       targets:
         KuroVideoSaver: all
+    run:
+      config: Release
+    archive:
+      config: Release
+  KuroNativeSaver:
+    build:
+      targets:
+        KuroNativeSaver: all
     run:
       config: Release
     archive:
