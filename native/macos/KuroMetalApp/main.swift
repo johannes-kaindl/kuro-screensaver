@@ -1,50 +1,81 @@
-// KuroMetalApp — standalone fullscreen Metal screensaver app. The robust macOS-26
-// path: borderless windows per display at screen-saver window level hosting the
-// shared Core renderer, dismissed on input. No legacyScreenSaver host → no
-// instance stacking, no missing stopAnimation, no picker/notarization needed,
-// and a real live preview in the config window (not Apple's blue tile).
+// KuroMetalApp — standalone Metal screensaver app. The robust macOS-26 path:
+// borderless windows per display at screen-saver level hosting the shared Core
+// renderer, dismissed on input. No legacyScreenSaver host → no instance stacking,
+// no missing stopAnimation, real live preview, working selection.
 //
-//   (no args)       → config window (settings + live preview)
-//   --screensaver   → fullscreen now, using saved settings; any input quits
+//   (no args)     → config window (settings + live preview)
+//   --agent       → background idle watcher (menu-bar); auto-activates on idle
+//   --screensaver → fullscreen now from saved settings; any input quits
 //   --scene/--preset/--intensity → fullscreen override (testing)
 
 import AppKit
 import Metal
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let screensaverMode: Bool
+    enum Mode { case config, agent, oneShot }
+    private let mode: Mode
     private let override: (settings: Settings, autoCycle: Bool)?
 
     private var config: ConfigWindowController?
+    private var statusItem: NSStatusItem?
+    private var idleTimer: Timer?
     private var saverWindows: [NSWindow] = []
     private var saverViews: [MetalHostView] = []
     private var monitors: [Any] = []
     private var startTime = CACurrentMediaTime()
-    private var returnToConfig = false
     private var active = false
 
-    init(screensaverMode: Bool, override: (Settings, Bool)?) {
-        self.screensaverMode = screensaverMode
+    init(mode: Mode, override: (Settings, Bool)?) {
+        self.mode = mode
         self.override = override
     }
 
     func applicationDidFinishLaunching(_ note: Notification) {
-        if screensaverMode {
-            startScreensaver(returnToConfig: false)
-        } else {
-            let c = ConfigWindowController()
-            config = c
-            c.showWindow(nil)
-            NSApp.activate(ignoringOtherApps: true)
+        switch mode {
+        case .oneShot:
+            startScreensaver()
+        case .config:
+            let c = ConfigWindowController(); config = c
+            c.showWindow(nil); NSApp.activate(ignoringOtherApps: true)
+        case .agent:
+            setupStatusItem()
+            idleTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.tickIdle() }
         }
     }
 
-    func startScreensaver(returnToConfig: Bool) {
+    // MARK: - agent idle watching
+
+    private func setupStatusItem() {
+        let item = NSStatusItem.local()
+        item.button?.title = "▦"
+        let menu = NSMenu()
+        menu.addItem(NSMenuItem(title: "Jetzt starten", action: #selector(menuStart), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Einstellungen…", action: #selector(menuConfig), keyEquivalent: ""))
+        menu.addItem(.separator())
+        menu.addItem(NSMenuItem(title: "Kuro Screensaver beenden", action: #selector(menuQuit), keyEquivalent: ""))
+        menu.items.forEach { $0.target = self }
+        item.menu = menu
+        statusItem = item
+    }
+
+    private func tickIdle() {
+        guard !active else { return }
+        if systemIdleSeconds() >= AppSettings.idleMinutes * 60 { startScreensaver() }
+    }
+
+    @objc private func menuStart() { startScreensaver() }
+    @objc private func menuConfig() {
+        if config == nil { config = ConfigWindowController() }
+        config?.showWindow(nil); NSApp.activate(ignoringOtherApps: true)
+    }
+    @objc private func menuQuit() { NSApp.terminate(nil) }
+
+    // MARK: - fullscreen show / dismiss
+
+    func startScreensaver(returnToConfig: Bool = false) {
         guard !active else { return }
         active = true
-        self.returnToConfig = returnToConfig
-        config?.pausePreview()
-        config?.window?.orderOut(nil)
+        if returnToConfig { config?.pausePreview(); config?.window?.orderOut(nil) }
 
         let (s, cycle) = override ?? AppSettings.make()
         for screen in NSScreen.screens {
@@ -65,24 +96,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSCursor.hide()
         startTime = CACurrentMediaTime()
         installInputMonitors()
+        if returnToConfig { dismissTarget = .config }
+        else if mode == .oneShot { dismissTarget = .terminate }
+        else { dismissTarget = .resume }
     }
+
+    private enum DismissTarget { case config, resume, terminate }
+    private var dismissTarget: DismissTarget = .resume
 
     private func dismissScreensaver() {
         guard active else { return }
         active = false
-        monitors.forEach { NSEvent.removeMonitor($0) }
-        monitors.removeAll()
-        saverViews.forEach { $0.stop() }
-        saverViews.removeAll()
-        saverWindows.forEach { $0.orderOut(nil) }
-        saverWindows.removeAll()
+        monitors.forEach { NSEvent.removeMonitor($0) }; monitors.removeAll()
+        saverViews.forEach { $0.stop() }; saverViews.removeAll()
+        saverWindows.forEach { $0.orderOut(nil) }; saverWindows.removeAll()
         NSCursor.unhide()
-        if returnToConfig {
+        switch dismissTarget {
+        case .terminate: NSApp.terminate(nil)
+        case .config:
             config?.resumePreview()
-            config?.window?.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-        } else {
-            NSApp.terminate(nil)
+            config?.window?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
+        case .resume:
+            break   // agent keeps watching; idle has reset due to the input
         }
     }
 
@@ -98,6 +133,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if e.type == .mouseMoved { moved(e) } else { down(e) }
         } as Any)
     }
+}
+
+private extension NSStatusItem {
+    static func local() -> NSStatusItem { NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength) }
 }
 
 // ---- arg parsing ----
@@ -121,9 +160,11 @@ func parseOverride() -> (Settings, Bool)? {
 }
 
 let override = parseOverride()
-let screensaver = CommandLine.arguments.contains("--screensaver") || override != nil
+let mode: AppDelegate.Mode =
+    CommandLine.arguments.contains("--agent") ? .agent :
+    (CommandLine.arguments.contains("--screensaver") || override != nil) ? .oneShot : .config
 let app = NSApplication.shared
-let delegate = AppDelegate(screensaverMode: screensaver, override: override)
+let delegate = AppDelegate(mode: mode, override: override)
 app.delegate = delegate
-app.setActivationPolicy(screensaver ? .accessory : .regular)
+app.setActivationPolicy(mode == .config ? .regular : .accessory)
 app.run()

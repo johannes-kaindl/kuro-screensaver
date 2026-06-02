@@ -23,6 +23,11 @@ enum AppSettings {
         get { store.object(forKey: "CycleMin") != nil ? store.double(forKey: "CycleMin") : 0.3 }
         set { store.set(newValue, forKey: "CycleMin") }
     }
+    /// Idle minutes before the agent auto-activates the screensaver.
+    static var idleMinutes: Double {
+        get { store.object(forKey: "IdleMin") != nil ? store.double(forKey: "IdleMin") : 5 }
+        set { store.set(newValue, forKey: "IdleMin") }
+    }
 
     /// Build a renderer Settings + whether to auto-cycle (scene == "random").
     static func make() -> (settings: Settings, autoCycle: Bool) {
