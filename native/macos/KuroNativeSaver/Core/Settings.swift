@@ -36,6 +36,7 @@ struct Settings {
     var ntsc: Float = 0             // NTSC/composite shimmer (0 = off)
     var halation: Float = 0.15      // warm glow bleed around bright areas
     var dayNight = false            // slow brightness/bloom day-night cycle
+    var matrix = false              // matrix-rain background
     enum Weather: String, CaseIterable { case clear, storm, dust }
     var weather: Weather = .clear
     var crtIntensity: Float = 0.35     // 0..1, drives the glitch scheduler cadence

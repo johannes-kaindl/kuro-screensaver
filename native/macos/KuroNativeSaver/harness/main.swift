@@ -35,6 +35,7 @@ struct Args {
     var term: Float = -1
     var ntsc: Float = -1
     var halation: Float = -1
+    var matrix = false
 }
 
 func parseArgs() -> Args {
@@ -61,6 +62,7 @@ func parseArgs() -> Args {
         case "--term": a.term = Float(it.next() ?? "") ?? a.term
         case "--ntsc": a.ntsc = Float(it.next() ?? "") ?? a.ntsc
         case "--halation": a.halation = Float(it.next() ?? "") ?? a.halation
+        case "--matrix": a.matrix = true
         default: FileHandle.standardError.write("unknown arg \(k)\n".data(using: .utf8)!)
         }
     }
@@ -145,6 +147,7 @@ if args.trails >= 0 { settings.trails = args.trails }
 if args.term >= 0 { settings.terminalScale = args.term }
 if args.ntsc >= 0 { settings.ntsc = args.ntsc }
 if args.halation >= 0 { settings.halation = args.halation }
+if args.matrix { settings.matrix = true }
 
 let ctx = SceneContext(device: device, rng: LCG(seed: args.seed),
                        settings: settings, accent: settings.preset.accentRGB)

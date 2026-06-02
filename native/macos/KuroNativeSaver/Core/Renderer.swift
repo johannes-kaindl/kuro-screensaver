@@ -197,11 +197,12 @@ final class Renderer {
         txtPass.colorAttachments[0].loadAction = .load
         txtPass.colorAttachments[0].storeAction = .store
         let tenc = cb.makeRenderCommandEncoder(descriptor: txtPass)!
-        if settings.showHud {
+        if settings.showHud || settings.matrix {
             text.begin(width: width, height: height)
             hud.render(text, width: width, height: height, accent: preset.accentRGB,
                        kanji: preset.kanji, t: t, scene: SceneRegistry.ids[sceneIndex],
-                       terminalScale: settings.terminalScale)
+                       terminalScale: settings.terminalScale,
+                       matrix: settings.matrix, showPanels: settings.showHud)
             text.flush(tenc)
         }
         tenc.endEncoding()

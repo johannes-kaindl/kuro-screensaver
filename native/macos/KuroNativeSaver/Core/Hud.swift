@@ -23,11 +23,16 @@ final class Hud {
     func setFps(_ f: Double) { fps = f }
 
     func render(_ tr: TextRenderer, width: Int, height: Int, accent: SIMD3<Float>,
-                kanji: String, t: Double, scene: String, terminalScale: Float = 1) {
+                kanji: String, t: Double, scene: String, terminalScale: Float = 1,
+                matrix: Bool = false, showPanels: Bool = true) {
         let dim = accent * 0.72
         let s = Float(height) / 64                         // base cell height (px)
         let pad = s * 1.5
         let W = Float(width), H = Float(height)
+
+        // matrix rain behind everything (drawn first → other text composites over)
+        if matrix { MatrixRain.render(tr, width: width, height: height, accent: accent, t: t, opacity: 0.4) }
+        guard showPanels else { return }
         let mode = (SceneMeta.modes[scene]?.first) ?? scene.uppercased()
         let elapsed = t
 
@@ -66,20 +71,21 @@ final class Hud {
         let lw = tr.width(label, pxHeight: s * 2)
         tr.add(label, xPx: (W - lw) / 2, yPx: pad, pxHeight: s * 2, color: accent, opacity: 0.55)
 
-        // --- terminal scrollback (bottom-left strip, fading upward) ---
+        // --- terminal scrollback (bottom-left, fading upward) ---
+        // Keep clear of the curved glass edge: extra left/bottom margin, and cap
+        // the line count to what fits so big text isn't clipped at the bottom.
         let ts = s * terminalScale                   // terminal cell height (user-scalable)
-        let lines = terminal.visibleLines(max: 8)
         let lh = ts * 1.3
-        let baseY = H - pad - lh
-        let fade: [Float] = [1.0, 0.72, 0.5, 0.32, 0.18, 0.09, 0.05, 0.03]
+        let leftPad = W * 0.03 + s
+        let promptY = H - (H * 0.07 + ts * 1.6)      // bottom margin below the prompt
+        let maxLines = max(2, min(10, Int((promptY - H * 0.06) / lh)))
+        let lines = terminal.visibleLines(max: maxLines)
         for (i, ln) in lines.reversed().enumerated() {
-            let op = i < fade.count ? fade[i] : 0.03
+            let op = max(0.05, pow(0.72, Float(i)))
             let col = ln.category == .quotes ? accent : dim
-            tr.add(ln.text, xPx: pad, yPx: baseY - Float(i) * lh, pxHeight: ts * 0.9, color: col, opacity: op)
+            tr.add(ln.text, xPx: leftPad, yPx: promptY - Float(i + 1) * lh, pxHeight: ts * 0.9, color: col, opacity: op)
         }
-        // live prompt line (handle + current typed + cursor)
-        let p = terminal.promptLine(t: t)
-        tr.add(p, xPx: pad, yPx: baseY + lh, pxHeight: ts * 0.9, color: accent, opacity: 0.95)
+        tr.add(terminal.promptLine(t: t), xPx: leftPad, yPx: promptY, pxHeight: ts * 0.9, color: accent, opacity: 0.95)
     }
 
     private func clock() -> String {
