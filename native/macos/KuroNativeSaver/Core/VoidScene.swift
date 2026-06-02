@@ -29,7 +29,7 @@ final class VoidScene: Scene {
         let device = ctx.device
         spdMul = ctx.settings.speed.multiplier
         fly = CameraFly(seed: (ctx.settings.seed ?? freshSeed()) &+ 6262,
-                        latAmp: 6, vertAmp: 3, vertBase: 0, pitchBase: 0)
+                        latAmp: 6, vertAmp: 3, vertBase: 0, pitchBase: 0, bankScale: ctx.settings.bankStrength)
         var r = ctx.rng
 
         camera.position = SIMD3(0, 0, 0)

@@ -32,7 +32,7 @@ final class CityScene: Scene {
         altTarget = ctx.settings.cityAltitude.value
         // banking weave down the corridor (latAmp keeps it between the buildings ~±30)
         fly = CameraFly(seed: (ctx.settings.seed ?? freshSeed()) &+ 5151,
-                        latAmp: 8, vertAmp: 1.6, vertBase: altTarget, pitchBase: -0.08)
+                        latAmp: 8, vertAmp: 1.6, vertBase: altTarget, pitchBase: -0.08, bankScale: ctx.settings.bankStrength)
 
         camera.position = SIMD3(0, altTarget, 0)
         camera.rotation = SIMD3(-0.08, 0, 0)

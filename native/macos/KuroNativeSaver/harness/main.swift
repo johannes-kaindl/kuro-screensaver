@@ -40,6 +40,7 @@ struct Args {
     var termWindow = false
     var termDark = false
     var termBand: Float = -1
+    var bank: Float = -1
 }
 
 func parseArgs() -> Args {
@@ -72,6 +73,7 @@ func parseArgs() -> Args {
         case "--termwin": a.termWindow = true // Lisa center-window terminal layout
         case "--termdark": a.termDark = true  // full-width bottom band
         case "--termband": a.termBand = Float(it.next() ?? "") ?? a.termBand
+        case "--bank": a.bank = Float(it.next() ?? "") ?? a.bank
         default: FileHandle.standardError.write("unknown arg \(k)\n".data(using: .utf8)!)
         }
     }
@@ -160,6 +162,7 @@ if args.matrix { settings.matrix = true }
 if args.termWindow { settings.terminalLayout = .window }
 if args.termDark { settings.terminalLayout = .stripDark }
 if args.termBand >= 0 { settings.terminalBandHeight = args.termBand }
+if args.bank >= 0 { settings.bankStrength = args.bank }
 
 let ctx = SceneContext(device: device, rng: LCG(seed: args.seed),
                        settings: settings, accent: settings.preset.accentRGB)

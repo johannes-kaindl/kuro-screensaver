@@ -6,7 +6,7 @@ import AppKit
 final class ConfigWindowController: NSWindowController {
     private var lookPopup, scenePopup, presetPopup, speedPopup, altPopup, fogPopup, weatherPopup, cyclePopup, idlePopup, terminalPopup: NSPopUpButton!
     private var hudCheck, dayNightCheck, soundCheck, cycleCheck, autostartCheck: NSButton!
-    private var intensitySlider, curvSlider, maskSlider, bloomSlider, trailsSlider, ntscSlider, halSlider, termSlider, bandSlider: NSSlider!
+    private var intensitySlider, curvSlider, maskSlider, bloomSlider, trailsSlider, ntscSlider, halSlider, termSlider, bandSlider, bankSlider: NSSlider!
     private var previewContainer: NSView!
     private var previewView: MetalHostView?
 
@@ -101,6 +101,8 @@ final class ConfigWindowController: NSWindowController {
         cv.addSubview(lbl("Terminal:", 340, 190)); cv.addSubview(terminalPopup)
         bandSlider = slider(445, 156, Double(AppSettings.terminalBandHeight), 0.5, 0.12, 155)
         cv.addSubview(lbl("Leisten-Höhe:", 340, 158)); cv.addSubview(bandSlider)
+        bankSlider = slider(445, 122, Double(AppSettings.bankStrength), 2.0, 0, 155)
+        cv.addSubview(lbl("Flug-Bank:", 340, 124)); cv.addSubview(bankSlider)
 
         let startBtn = NSButton(title: "Vollbild starten", target: self, action: #selector(startFullscreen))
         startBtn.frame = NSRect(x: 340, y: 234, width: 260, height: 36); startBtn.bezelStyle = .rounded; startBtn.keyEquivalent = "\r"
@@ -161,6 +163,7 @@ final class ConfigWindowController: NSWindowController {
         AppSettings.showHud = hudCheck.state == .on
         AppSettings.terminalLayout = termLayouts[max(0, terminalPopup.indexOfSelectedItem)].1
         AppSettings.terminalBandHeight = Float(bandSlider.doubleValue)
+        AppSettings.bankStrength = Float(bankSlider.doubleValue)
         AppSettings.dayNight = dayNightCheck.state == .on
         AppSettings.sound = soundCheck.state == .on
         AppSettings.autoCycle = cycleCheck.state == .on

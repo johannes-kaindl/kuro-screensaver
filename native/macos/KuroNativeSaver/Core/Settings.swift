@@ -42,6 +42,7 @@ struct Settings {
     var matrix = false              // matrix-rain background
     enum Weather: String, CaseIterable { case clear, storm, dust }
     var weather: Weather = .clear
+    var bankStrength: Float = 1        // flight banking intensity (0 = level flight, 2 = aggressive)
     var crtIntensity: Float = 0.35     // 0..1, drives the glitch scheduler cadence
     var tunnelAutoBoost: Bool = true   // tunnel: speed surge on straight sections
     var seed: Int32? = nil             // nil → fresh per activation
