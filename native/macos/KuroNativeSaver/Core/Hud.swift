@@ -74,13 +74,6 @@ final class Hud {
         let cw = tr.width(cross, pxHeight: s)
         tr.add(cross, xPx: (W - cw) / 2, yPx: H / 2 - s / 2, pxHeight: s, color: dim, opacity: 0.4)
 
-        // --- vault kanji (large, faint, full-width square glyph; lower-right, pulled
-        // in from the dark vignette corner so it stays a readable sigil) ---
-        let kSize = s * 6
-        if let kc = kanji.first {
-            tr.drawKanji(kc, xPx: W * 0.74, yPx: H * 0.62, pxHeight: kSize, color: accent, opacity: 0.22)
-        }
-
         // --- scene-label slab (upper-center) ---
         let label = SceneMeta.label[scene] ?? scene.uppercased()
         let lw = tr.width(label, pxHeight: s * 2)
@@ -99,20 +92,21 @@ final class Hud {
         let promptY = H - (H * 0.07 + ts * 1.6)
         let maxLines = max(2, min(10, Int((promptY - H * 0.06) / lh)))
         let lines = terminal.visibleLines(max: maxLines)
-        // optional per-line dark backing (drawn first so text composites over it)
-        func backing(_ text: String, _ y: Float, _ op: Float) {
-            guard darken, op > 0.06 else { return }
-            let w = tr.width(text, pxHeight: cell)
-            tr.fillRect(xPx: leftPad - cell * 0.35, yPx: y - lh * 0.12, wPx: w + cell * 0.7, hPx: lh,
-                        color: SIMD3(0, 0, 0), opacity: min(0.5, op * 0.62))
+        // optional dark panel behind the whole text block (drawn first → text over it)
+        if darken, !lines.isEmpty {
+            var maxW = tr.width(terminal.promptLine(t: t), pxHeight: cell)
+            for ln in lines { maxW = max(maxW, tr.width(ln.text, pxHeight: cell)) }
+            let topY = promptY - Float(lines.count) * lh
+            let px = leftPad - cell * 0.6, py = topY - lh * 0.25
+            let pw = maxW + cell * 1.2, ph = (promptY - topY) + lh * 1.25
+            tr.fillRect(xPx: px, yPx: py, wPx: pw, hPx: ph, color: SIMD3(0, 0, 0), opacity: 0.62)
+            // faint accent edges so the panel reads even over dark areas
+            let b = max(1, H * 0.0013), eop: Float = 0.16
+            tr.fillRect(xPx: px, yPx: py, wPx: pw, hPx: b, color: accent, opacity: eop)
+            tr.fillRect(xPx: px, yPx: py + ph - b, wPx: pw, hPx: b, color: accent, opacity: eop)
+            tr.fillRect(xPx: px, yPx: py, wPx: b, hPx: ph, color: accent, opacity: eop)
+            tr.fillRect(xPx: px + pw - b, yPx: py, wPx: b, hPx: ph, color: accent, opacity: eop)
         }
-        for (i, ln) in lines.reversed().enumerated() {
-            let op = max(0.05, pow(0.72, Float(i)))
-            let y = promptY - Float(i + 1) * lh
-            backing(ln.text, y, op)
-        }
-        backing(terminal.promptLine(t: t), promptY, 0.95)
-        // then the text on top
         for (i, ln) in lines.reversed().enumerated() {
             let op = max(0.05, pow(0.72, Float(i)))
             let col = ln.category == .quotes ? accent : dim
