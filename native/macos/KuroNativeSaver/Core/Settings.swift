@@ -29,6 +29,8 @@ struct Settings {
     var showHud = true              // HUD + terminal overlay
     var bloomScale: Float = 1       // multiplier on the per-preset bloom strength (0 = off)
     var fog: Fog = .auto
+    var curvature: Float = 0.12     // CRT screen barrel curvature (0 = flat)
+    var apertureMask: Float = 0.22  // RGB phosphor grille strength (0 = off)
     var crtIntensity: Float = 0.35     // 0..1, drives the glitch scheduler cadence
     var tunnelAutoBoost: Bool = true   // tunnel: speed surge on straight sections
     var seed: Int32? = nil             // nil → fresh per activation

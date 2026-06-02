@@ -1,15 +1,12 @@
 // ConfigWindowController — full settings UI with a LIVE preview (our own rendered
-// thumbnail). Scene/color/speed/altitude/fog/glitch/HUD/bloom/sound/auto-cycle/
-// idle/autostart — all persist and take effect on the next activation.
+// thumbnail). Everything persists and takes effect on the next activation.
 
 import AppKit
 
 final class ConfigWindowController: NSWindowController {
-    // value popups (display title ↔ raw value)
     private var scenePopup, presetPopup, speedPopup, altPopup, fogPopup, cyclePopup, idlePopup: NSPopUpButton!
     private var hudCheck, soundCheck, cycleCheck, autostartCheck: NSButton!
-    private var intensitySlider: NSSlider!
-    private var bloomSlider: NSSlider!
+    private var intensitySlider, bloomSlider, curvSlider, maskSlider: NSSlider!
     private var previewContainer: NSView!
     private var previewView: MetalHostView?
 
@@ -20,7 +17,7 @@ final class ConfigWindowController: NSWindowController {
     private let idleMins: [Double] = [1, 2, 5, 10, 15]
 
     convenience init() {
-        let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 672),
+        let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 752),
                            styleMask: [.titled, .closable, .miniaturizable],
                            backing: .buffered, defer: false)
         win.title = "Kuro Screensaver"
@@ -30,75 +27,74 @@ final class ConfigWindowController: NSWindowController {
         rebuildPreview()
     }
 
-    private func label(_ s: String, _ x: CGFloat, _ y: CGFloat) -> NSTextField {
-        let l = NSTextField(labelWithString: s); l.frame = NSRect(x: x, y: y, width: 95, height: 20); return l
+    private func lbl(_ s: String, _ x: CGFloat, _ y: CGFloat) -> NSTextField {
+        let l = NSTextField(labelWithString: s); l.frame = NSRect(x: x, y: y, width: 100, height: 18); return l
     }
     private func popup(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat = 185) -> NSPopUpButton {
-        let p = NSPopUpButton(frame: NSRect(x: x, y: y, width: w, height: 26))
-        p.target = self; p.action = #selector(changed); return p
+        let p = NSPopUpButton(frame: NSRect(x: x, y: y, width: w, height: 26)); p.target = self; p.action = #selector(changed); return p
     }
-    private func check(_ title: String, _ x: CGFloat, _ y: CGFloat, _ on: Bool) -> NSButton {
-        let b = NSButton(checkboxWithTitle: title, target: self, action: #selector(changed))
-        b.frame = NSRect(x: x, y: y, width: 230, height: 22); b.state = on ? .on : .off; return b
+    private func slider(_ x: CGFloat, _ y: CGFloat, _ value: Double, _ maxV: Double, _ w: CGFloat = 185) -> NSSlider {
+        let s = NSSlider(value: value, minValue: 0, maxValue: maxV, target: self, action: #selector(changed))
+        s.frame = NSRect(x: x, y: y, width: w, height: 22); return s
+    }
+    private func chk(_ t: String, _ x: CGFloat, _ y: CGFloat, _ on: Bool, _ act: Selector) -> NSButton {
+        let b = NSButton(checkboxWithTitle: t, target: self, action: act)
+        b.frame = NSRect(x: x, y: y, width: 250, height: 22); b.state = on ? .on : .off; return b
     }
 
     private func buildUI(_ cv: NSView) {
-        previewContainer = NSView(frame: NSRect(x: 20, y: 338, width: 580, height: 318))
+        previewContainer = NSView(frame: NSRect(x: 20, y: 418, width: 580, height: 314))
         previewContainer.wantsLayer = true
         previewContainer.layer?.backgroundColor = NSColor.black.cgColor
         previewContainer.layer?.cornerRadius = 6; previewContainer.layer?.masksToBounds = true
         cv.addSubview(previewContainer)
 
-        // --- left column ---
-        scenePopup = popup(125, 296); scenePopup.addItems(withTitles: ["random"] + SceneRegistry.ids)
+        // --- left column: scene + look ---
+        scenePopup = popup(125, 378); scenePopup.addItems(withTitles: ["random"] + SceneRegistry.ids)
         scenePopup.selectItem(withTitle: AppSettings.scene)
-        presetPopup = popup(125, 262); presetPopup.addItems(withTitles: Palette.presets.map { $0.label })
+        presetPopup = popup(125, 344); presetPopup.addItems(withTitles: Palette.presets.map { $0.label })
         if let i = Palette.presets.firstIndex(where: { $0.id == AppSettings.preset }) { presetPopup.selectItem(at: i) }
-        speedPopup = popup(125, 228); speedPopup.addItems(withTitles: speeds.map { $0.0 })
+        speedPopup = popup(125, 310); speedPopup.addItems(withTitles: speeds.map { $0.0 })
         speedPopup.selectItem(at: speeds.firstIndex { $0.1 == AppSettings.speed } ?? 1)
-        altPopup = popup(125, 194); altPopup.addItems(withTitles: alts.map { $0.0 })
+        altPopup = popup(125, 276); altPopup.addItems(withTitles: alts.map { $0.0 })
         altPopup.selectItem(at: alts.firstIndex { $0.1 == AppSettings.cityAltitude } ?? 0)
-        fogPopup = popup(125, 160); fogPopup.addItems(withTitles: fogs.map { $0.0 })
+        fogPopup = popup(125, 242); fogPopup.addItems(withTitles: fogs.map { $0.0 })
         fogPopup.selectItem(at: fogs.firstIndex { $0.1 == AppSettings.fog } ?? 1)
-        intensitySlider = NSSlider(value: Double(AppSettings.intensity), minValue: 0, maxValue: 1,
-                                   target: self, action: #selector(changed))
-        intensitySlider.frame = NSRect(x: 125, y: 126, width: 185, height: 24)
+        intensitySlider = slider(125, 210, Double(AppSettings.intensity), 1)
+        curvSlider = slider(125, 178, Double(AppSettings.curvature), 0.32)
+        maskSlider = slider(125, 146, Double(AppSettings.apertureMask), 0.6)
+        bloomSlider = slider(125, 114, Double(AppSettings.bloomScale), 2.5)
 
-        [label("Szene:", 20, 298), label("Farbe:", 20, 264), label("Tempo:", 20, 230),
-         label("Stadt-Höhe:", 20, 196), label("Nebel:", 20, 162), label("CRT-Glitch:", 20, 128)].forEach { cv.addSubview($0) }
+        [lbl("Szene:", 20, 380), lbl("Farbe:", 20, 346), lbl("Tempo:", 20, 312), lbl("Stadt-Höhe:", 20, 278),
+         lbl("Nebel:", 20, 244), lbl("CRT-Glitch:", 20, 210), lbl("Krümmung:", 20, 178),
+         lbl("Lochmaske:", 20, 146), lbl("Bloom:", 20, 114)].forEach { cv.addSubview($0) }
         [scenePopup!, presetPopup!, speedPopup!, altPopup!, fogPopup!].forEach { cv.addSubview($0) }
-        cv.addSubview(intensitySlider)
+        [intensitySlider!, curvSlider!, maskSlider!, bloomSlider!].forEach { cv.addSubview($0) }
 
-        // --- right column ---
-        hudCheck = check("HUD + Terminal", 335, 298, AppSettings.showHud)
-        bloomSlider = NSSlider(value: Double(AppSettings.bloomScale), minValue: 0, maxValue: 2.5,
-                               target: self, action: #selector(changed))
-        bloomSlider.frame = NSRect(x: 420, y: 270, width: 180, height: 24)
-        soundCheck = check("Ton (Atmosphäre)", 335, 246, AppSettings.sound)
-        cycleCheck = check("Szenen automatisch wechseln", 335, 220, AppSettings.autoCycle)
-        cyclePopup = popup(440, 184, 160); cyclePopup.addItems(withTitles: ["30 Sek", "1 Min", "2 Min", "5 Min"])
+        // --- right column: toggles + timing ---
+        hudCheck = chk("HUD + Terminal", 335, 380, AppSettings.showHud, #selector(changed))
+        soundCheck = chk("Ton (Atmosphäre)", 335, 354, AppSettings.sound, #selector(changed))
+        cycleCheck = chk("Szenen automatisch wechseln", 335, 328, AppSettings.autoCycle, #selector(changed))
+        cyclePopup = popup(440, 294, 160); cyclePopup.addItems(withTitles: ["30 Sek", "1 Min", "2 Min", "5 Min"])
         cyclePopup.selectItem(at: cycleMins.firstIndex(of: AppSettings.cycleMinutes) ?? 0)
-        idlePopup = popup(440, 150, 160); idlePopup.addItems(withTitles: idleMins.map { "\(Int($0)) Min" })
+        idlePopup = popup(440, 260, 160); idlePopup.addItems(withTitles: idleMins.map { "\(Int($0)) Min" })
         idlePopup.selectItem(at: idleMins.firstIndex(of: AppSettings.idleMinutes) ?? 2)
-        autostartCheck = NSButton(checkboxWithTitle: "Bei Inaktivität automatisch starten (Login)",
-                                  target: self, action: #selector(toggleAutostart))
-        autostartCheck.frame = NSRect(x: 335, y: 116, width: 280, height: 22)
-        autostartCheck.state = LoginItem.isEnabled ? .on : .off
+        autostartCheck = chk("Bei Inaktivität automatisch starten (Login)", 335, 226, LoginItem.isEnabled, #selector(toggleAutostart))
+        autostartCheck.frame.size.width = 280
 
         [hudCheck!, soundCheck!, cycleCheck!, autostartCheck!].forEach { cv.addSubview($0) }
-        cv.addSubview(label("Bloom:", 335, 272)); cv.addSubview(bloomSlider)
-        cv.addSubview(label("Wechsel:", 335, 186)); cv.addSubview(cyclePopup)
-        cv.addSubview(label("Leerlauf:", 335, 152)); cv.addSubview(idlePopup)
+        cv.addSubview(lbl("Wechsel:", 335, 296)); cv.addSubview(cyclePopup)
+        cv.addSubview(lbl("Leerlauf:", 335, 262)); cv.addSubview(idlePopup)
 
         let startBtn = NSButton(title: "Vollbild starten", target: self, action: #selector(startFullscreen))
-        startBtn.frame = NSRect(x: 335, y: 74, width: 265, height: 34)
+        startBtn.frame = NSRect(x: 335, y: 150, width: 265, height: 36)
         startBtn.bezelStyle = .rounded; startBtn.keyEquivalent = "\r"
         cv.addSubview(startBtn)
 
-        let hint = NSTextField(labelWithString: "Vorschau läuft live. Im Vollbild beendet jede Eingabe den Screensaver.")
-        hint.frame = NSRect(x: 20, y: 24, width: 580, height: 36)
+        let hint = NSTextField(labelWithString: "Vorschau läuft live. Im Vollbild beendet jede Eingabe den Screensaver. Krümmung + Lochmaske geben den echten CRT-Look.")
+        hint.frame = NSRect(x: 20, y: 22, width: 580, height: 60)
         hint.textColor = .secondaryLabelColor; hint.font = .systemFont(ofSize: 11)
-        hint.maximumNumberOfLines = 2; hint.lineBreakMode = .byWordWrapping
+        hint.maximumNumberOfLines = 3; hint.lineBreakMode = .byWordWrapping
         cv.addSubview(hint)
     }
 
@@ -110,8 +106,10 @@ final class ConfigWindowController: NSWindowController {
         AppSettings.cityAltitude = alts[max(0, altPopup.indexOfSelectedItem)].1
         AppSettings.fog = fogs[max(0, fogPopup.indexOfSelectedItem)].1
         AppSettings.intensity = Float(intensitySlider.doubleValue)
-        AppSettings.showHud = hudCheck.state == .on
+        AppSettings.curvature = Float(curvSlider.doubleValue)
+        AppSettings.apertureMask = Float(maskSlider.doubleValue)
         AppSettings.bloomScale = Float(bloomSlider.doubleValue)
+        AppSettings.showHud = hudCheck.state == .on
         AppSettings.sound = soundCheck.state == .on
         AppSettings.autoCycle = cycleCheck.state == .on
         if cyclePopup.indexOfSelectedItem >= 0 { AppSettings.cycleMinutes = cycleMins[cyclePopup.indexOfSelectedItem] }

@@ -209,7 +209,8 @@ final class Renderer {
             p1: SIMD4(scanDriftY, vignetteInner, preset.vignetteStrength, Float(t)),
             p2: glitch.uniforms(),
             p3: glitch.uniforms3(),
-            p4: crash.uniforms())
+            p4: SIMD4(crash.uniforms().x, crash.uniforms().y, settings.curvature, 1.0),
+            p5: SIMD4(settings.apertureMask, 6, 0.02, 0.012))
         enc2.setFragmentBytes(&pu, length: MemoryLayout<PostUniforms>.stride, index: 0)
         enc2.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         enc2.endEncoding()

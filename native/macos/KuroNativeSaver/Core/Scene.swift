@@ -20,14 +20,16 @@ struct PostUniforms {
     var p1: SIMD4<Float>   // scanDriftY(px), vignetteInner, vignetteStrength, time
     var p2: SIMD4<Float>   // hTearAmount, hTearBandY, brightness, scanPulse (glitch)
     var p3: SIMD4<Float>   // vRoll, blackFrame, skewX, staticAmt (glitch)
-    var p4: SIMD4<Float>   // collapse, flash, accentR?unused, unused (crash)
+    var p4: SIMD4<Float>   // collapse, flash, curvature, bezelSharpness
+    var p5: SIMD4<Float>   // maskStrength, maskCellPx, grain, flicker
 
     init(p0: SIMD4<Float>,
          p1: SIMD4<Float> = .zero,
          p2: SIMD4<Float> = SIMD4(0, 0, 1, 0),
          p3: SIMD4<Float> = .zero,
-         p4: SIMD4<Float> = .zero) {
-        self.p0 = p0; self.p1 = p1; self.p2 = p2; self.p3 = p3; self.p4 = p4
+         p4: SIMD4<Float> = .zero,
+         p5: SIMD4<Float> = .zero) {
+        self.p0 = p0; self.p1 = p1; self.p2 = p2; self.p3 = p3; self.p4 = p4; self.p5 = p5
     }
 }
 

@@ -23,7 +23,8 @@ enum Shaders {
         float4 p1;        // scanDriftY(px), vignetteInner, vignetteStrength, time
         float4 p2;        // hTearAmount, hTearBandY, brightness, scanPulse (glitch)
         float4 p3;        // vRoll, blackFrame, skewX, staticAmt (glitch)
-        float4 p4;        // collapse, flash, _, _ (crash)
+        float4 p4;        // collapse, flash, curvature, bezelSharpness
+        float4 p5;        // maskStrength, maskCellPx, grain, flicker
     };
 
     inline float hash21(float2 p) {
@@ -109,6 +110,22 @@ enum Shaders {
         float2 uv = in.uv;
         float sy = in.uv.y;                      // original screen y (for line/scan)
 
+        // CRT screen curvature (radial barrel): warps the SAMPLING uv only;
+        // scanlines/vignette/static stay screen-space (they use in.pos/in.uv).
+        float bezel = 1.0; bool offGlass = false;
+        float curv = u.p4.z;
+        if (curv > 0.0001) {
+            float aspect = float(sceneTex.get_width()) / float(sceneTex.get_height());
+            float2 cc = uv * 2.0 - 1.0; cc.x *= aspect;
+            float2 warp = cc * (1.0 + curv * dot(cc, cc));
+            warp.x /= aspect;
+            uv = warp * 0.5 + 0.5;
+            float bp = max(0.4, u.p4.w);
+            float2 fw = smoothstep(0.0, 0.02 * bp, uv) * smoothstep(0.0, 0.02 * bp, 1.0 - uv);
+            bezel = fw.x * fw.y;
+            offGlass = (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0);
+        }
+
         // geometry glitches: h-tear band, v-roll, wave skew
         float tear = u.p2.x;
         if (tear != 0.0) { uv.x += tear * exp(-pow((uv.y - u.p2.y) * 6.0, 2.0)); }
@@ -158,7 +175,27 @@ enum Shaders {
             col += float3(0.78, 0.95, 0.84) * line;   // CRT phosphor-white pinch
         }
 
-        // black-frame drop
+        // aperture grille (energy-preserving cos lobes) — RGB phosphor stripes
+        float maskStr = u.p5.x;
+        if (maskStr > 0.001) {
+            float cell = max(2.0, u.p5.y);
+            float tx = fract(in.pos.x / cell);
+            float3 m = float3(0.5 + 0.5 * cos(6.2831853 * tx),
+                              0.5 + 0.5 * cos(6.2831853 * (tx - 0.33333)),
+                              0.5 + 0.5 * cos(6.2831853 * (tx - 0.66667))) * 2.0; // mean ~1
+            col *= mix(float3(1.0), m, maskStr);
+        }
+        // constant analog grain + gentle brightness shimmer
+        float grain = u.p5.z;
+        if (grain > 0.0) { col += (hash21(in.pos.xy + floor(u.p1.w * 60.0)) - 0.5) * grain; }
+        float flick = u.p5.w;
+        if (flick > 0.0) { col *= 1.0 - flick * (0.5 + 0.5 * sin(u.p1.w * 38.0)); }
+
+        // CRT glass edge (curvature bezel + outside-glass black)
+        col *= bezel;
+        if (offGlass) col = float3(0.0);
+
+        // black-frame drop (wins over everything)
         if (u.p3.y > 0.5) col = float3(0.0);
 
         return float4(col, 1.0);
