@@ -187,7 +187,7 @@ final class Renderer {
         tenc.endEncoding()
 
         // --- bloom (threshold + blur) ---
-        let bloomTex = settings.bloom ? bloom.generate(cb, sceneHDR: sceneHDR) : sceneHDR
+        let bloomTex = settings.bloomScale > 0.001 ? bloom.generate(cb, sceneHDR: sceneHDR) : sceneHDR
 
         // --- composite pass → target ---
         let tp = MTLRenderPassDescriptor()
@@ -204,7 +204,7 @@ final class Renderer {
         // (toneMappingExposure 1.15) — match the effective exposure.
         let exposure: Float = 1.15 / 0.6
         var pu = PostUniforms(
-            p0: SIMD4(exposure, settings.bloom ? preset.bloomStrength : 0,
+            p0: SIMD4(exposure, preset.bloomStrength * settings.bloomScale,
                       0.0015 + glitch.chromaOffsetBump, preset.scanOpacity),
             p1: SIMD4(scanDriftY, vignetteInner, preset.vignetteStrength, Float(t)),
             p2: glitch.uniforms(),

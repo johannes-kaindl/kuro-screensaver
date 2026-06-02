@@ -7,8 +7,9 @@ import AppKit
 final class ConfigWindowController: NSWindowController {
     // value popups (display title ↔ raw value)
     private var scenePopup, presetPopup, speedPopup, altPopup, fogPopup, cyclePopup, idlePopup: NSPopUpButton!
-    private var hudCheck, bloomCheck, soundCheck, cycleCheck, autostartCheck: NSButton!
+    private var hudCheck, soundCheck, cycleCheck, autostartCheck: NSButton!
     private var intensitySlider: NSSlider!
+    private var bloomSlider: NSSlider!
     private var previewContainer: NSView!
     private var previewView: MetalHostView?
 
@@ -70,7 +71,9 @@ final class ConfigWindowController: NSWindowController {
 
         // --- right column ---
         hudCheck = check("HUD + Terminal", 335, 298, AppSettings.showHud)
-        bloomCheck = check("Bloom-Glühen", 335, 272, AppSettings.bloom)
+        bloomSlider = NSSlider(value: Double(AppSettings.bloomScale), minValue: 0, maxValue: 2.5,
+                               target: self, action: #selector(changed))
+        bloomSlider.frame = NSRect(x: 420, y: 270, width: 180, height: 24)
         soundCheck = check("Ton (Atmosphäre)", 335, 246, AppSettings.sound)
         cycleCheck = check("Szenen automatisch wechseln", 335, 220, AppSettings.autoCycle)
         cyclePopup = popup(440, 184, 160); cyclePopup.addItems(withTitles: ["30 Sek", "1 Min", "2 Min", "5 Min"])
@@ -82,7 +85,8 @@ final class ConfigWindowController: NSWindowController {
         autostartCheck.frame = NSRect(x: 335, y: 116, width: 280, height: 22)
         autostartCheck.state = LoginItem.isEnabled ? .on : .off
 
-        [hudCheck!, bloomCheck!, soundCheck!, cycleCheck!, autostartCheck!].forEach { cv.addSubview($0) }
+        [hudCheck!, soundCheck!, cycleCheck!, autostartCheck!].forEach { cv.addSubview($0) }
+        cv.addSubview(label("Bloom:", 335, 272)); cv.addSubview(bloomSlider)
         cv.addSubview(label("Wechsel:", 335, 186)); cv.addSubview(cyclePopup)
         cv.addSubview(label("Leerlauf:", 335, 152)); cv.addSubview(idlePopup)
 
@@ -107,7 +111,7 @@ final class ConfigWindowController: NSWindowController {
         AppSettings.fog = fogs[max(0, fogPopup.indexOfSelectedItem)].1
         AppSettings.intensity = Float(intensitySlider.doubleValue)
         AppSettings.showHud = hudCheck.state == .on
-        AppSettings.bloom = bloomCheck.state == .on
+        AppSettings.bloomScale = Float(bloomSlider.doubleValue)
         AppSettings.sound = soundCheck.state == .on
         AppSettings.autoCycle = cycleCheck.state == .on
         if cyclePopup.indexOfSelectedItem >= 0 { AppSettings.cycleMinutes = cycleMins[cyclePopup.indexOfSelectedItem] }

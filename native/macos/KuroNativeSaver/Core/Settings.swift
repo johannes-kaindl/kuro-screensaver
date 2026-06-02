@@ -27,7 +27,7 @@ struct Settings {
     var speed: Speed = .norm
     var cityAltitude: Altitude = .low
     var showHud = true              // HUD + terminal overlay
-    var bloom = true                // neon bloom glow
+    var bloomScale: Float = 1       // multiplier on the per-preset bloom strength (0 = off)
     var fog: Fog = .auto
     var crtIntensity: Float = 0.35     // 0..1, drives the glitch scheduler cadence
     var tunnelAutoBoost: Bool = true   // tunnel: speed surge on straight sections
