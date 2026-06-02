@@ -22,6 +22,10 @@ final class Renderer {
     private let depthState: MTLDepthStencilState
     private let bloom: BloomChain
     private let glitch: GlitchScheduler
+    private let atlas: FontAtlas
+    private let text: TextRenderer
+    let hud = Hud()
+    private var fps: Double = 60
 
     private var sceneHDR: MTLTexture?
     private var depthTex: MTLTexture?
@@ -67,6 +71,8 @@ final class Renderer {
         bloom = BloomChain(device: device, library: lib, sigma: 3)   // quarter-res → sigma 3 ≈ half-res 6
         glitch = GlitchScheduler(intensity: settings.crtIntensity,
                                  seed: (settings.seed ?? freshSeed()) &+ 777)
+        atlas = FontAtlas(device: device)
+        text = TextRenderer(device: device, library: lib, atlas: atlas, format: Renderer.hdrFormat)
     }
 
     /// Debug: hold one glitch artifact active (single-frame verification).
@@ -104,6 +110,9 @@ final class Renderer {
         scene.camera.fovDegrees = Camera.defaultFovDeg(width: width, height: height)
         scene.update(t: t, dt: dt)
         glitch.update(t: t)
+        if dt > 0 { fps = fps * 0.9 + (1.0 / dt) * 0.1 }
+        hud.setFps(fps)
+        hud.terminal.update(t: t)
         scanDriftY = (scanDriftY + 36 * Float(dt)).truncatingRemainder(dividingBy: 4)
 
         // scene auto-cycle via the crash→reboot transition
@@ -162,6 +171,18 @@ final class Renderer {
             }
         }
         enc.endEncoding()
+
+        // --- HUD + terminal text into the HDR scene (so CRT post treats it) ---
+        let txtPass = MTLRenderPassDescriptor()
+        txtPass.colorAttachments[0].texture = sceneHDR
+        txtPass.colorAttachments[0].loadAction = .load
+        txtPass.colorAttachments[0].storeAction = .store
+        let tenc = cb.makeRenderCommandEncoder(descriptor: txtPass)!
+        text.begin(width: width, height: height)
+        hud.render(text, width: width, height: height, accent: preset.accentRGB,
+                   kanji: preset.kanji, t: t, scene: SceneRegistry.ids[sceneIndex])
+        text.flush(tenc)
+        tenc.endEncoding()
 
         // --- bloom (threshold + blur) ---
         let bloomTex = bloom.generate(cb, sceneHDR: sceneHDR)

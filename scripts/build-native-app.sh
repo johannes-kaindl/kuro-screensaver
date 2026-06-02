@@ -23,7 +23,7 @@ swiftc -O \
   $(ls "$SRC"/Core/*.swift) $(ls "$APPSRC"/*.swift) \
   -o "$APP/Contents/MacOS/KuroMetalApp" \
   -framework Metal -framework MetalPerformanceShaders -framework QuartzCore \
-  -framework AppKit -framework Foundation
+  -framework AppKit -framework CoreText -framework Foundation
 
 cp "$APPSRC/Info.plist" "$APP/Contents/Info.plist"
 

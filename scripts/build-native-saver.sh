@@ -27,7 +27,7 @@ swiftc -O -emit-library -Xlinker -bundle \
   $(ls "$SRC"/Core/*.swift) $(ls "$SRC"/Host/*.swift) \
   -module-name KuroNativeSaver \
   -framework ScreenSaver -framework Metal -framework MetalPerformanceShaders \
-  -framework QuartzCore -framework AppKit -framework Foundation
+  -framework QuartzCore -framework AppKit -framework CoreText -framework Foundation
 
 cp "$SRC/Host/Info.plist" "$SAVER/Contents/Info.plist"
 
@@ -70,7 +70,7 @@ fi
 
 echo "smoke test (load bundle + instantiate principal class)…"
 swiftc "$SRC/tools/load-check.swift" -o "$BUILD/load-check" \
-  -framework ScreenSaver -framework AppKit -framework Foundation 2>/dev/null
+  -framework ScreenSaver -framework AppKit -framework CoreText -framework Foundation 2>/dev/null
 # Non-fatal: needs a Metal device (instantiation builds the renderer). A headless
 # CI runner without one shouldn't fail the build — the .saver is already valid.
 "$BUILD/load-check" "$SAVER" || echo "::warning:: smoke test skipped/failed (no Metal device?)"

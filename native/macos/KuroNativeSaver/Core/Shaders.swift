@@ -163,5 +163,22 @@ enum Shaders {
 
         return float4(col, 1.0);
     }
+
+    // ---- text overlay (font-atlas coverage tinted by accent) ----------------
+    // Vertex buffer is flat floats, 8 per vertex: posX, posY (clip), u, v, r,g,b,a.
+    struct TextVOut { float4 pos [[position]]; float2 uv; float4 color; };
+    vertex TextVOut text_v(uint vid [[vertex_id]], device const float* verts [[buffer(0)]]) {
+        uint b = vid * 8;
+        TextVOut o;
+        o.pos = float4(verts[b], verts[b + 1], 0, 1);
+        o.uv = float2(verts[b + 2], verts[b + 3]);
+        o.color = float4(verts[b + 4], verts[b + 5], verts[b + 6], verts[b + 7]);
+        return o;
+    }
+    fragment float4 text_f(TextVOut in [[stage_in]], texture2d<float> atlas [[texture(0)]]) {
+        constexpr sampler s(filter::linear, address::clamp_to_edge);
+        float cov = atlas.sample(s, in.uv).r;
+        return float4(in.color.rgb, in.color.a * cov);
+    }
     """
 }

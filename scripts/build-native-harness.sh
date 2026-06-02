@@ -17,7 +17,7 @@ swiftc -O \
   "$SRC/harness/main.swift" \
   -o "$OUT/harness" \
   -framework Metal -framework MetalPerformanceShaders -framework Foundation \
-  -framework CoreGraphics -framework ImageIO -framework UniformTypeIdentifiers
+  -framework CoreGraphics -framework CoreText -framework ImageIO -framework UniformTypeIdentifiers
 
 echo "built $OUT/harness"
 "$OUT/harness" "$@"
