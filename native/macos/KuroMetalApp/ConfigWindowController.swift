@@ -93,7 +93,7 @@ final class ConfigWindowController: NSWindowController {
 
         [hudCheck!, dayNightCheck!, matrixCheck!, soundCheck!, cycleCheck!, autostartCheck!].forEach { cv.addSubview($0) }
         cv.addSubview(lbl("Wechsel:", 340, 398)); cv.addSubview(cyclePopup)
-        cv.addSubview(lbl("Leerlauf:", 340, 364)); cv.addSubview(idlePopup)
+        cv.addSubview(lbl("Auto-Start:", 340, 364)); cv.addSubview(idlePopup)
         cv.addSubview(lbl("Terminal-Größe:", 340, 332)); cv.addSubview(termSlider)
 
         terminalPopup = popup(425, 188, 175)
