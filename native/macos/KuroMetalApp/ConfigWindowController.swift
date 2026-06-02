@@ -6,7 +6,7 @@ import AppKit
 final class ConfigWindowController: NSWindowController {
     private var scenePopup, presetPopup, speedPopup, altPopup, fogPopup, cyclePopup, idlePopup: NSPopUpButton!
     private var hudCheck, soundCheck, cycleCheck, autostartCheck: NSButton!
-    private var intensitySlider, bloomSlider, curvSlider, maskSlider: NSSlider!
+    private var intensitySlider, bloomSlider, curvSlider, maskSlider, trailsSlider: NSSlider!
     private var previewContainer: NSView!
     private var previewView: MetalHostView?
 
@@ -83,6 +83,8 @@ final class ConfigWindowController: NSWindowController {
         autostartCheck.frame.size.width = 280
 
         [hudCheck!, soundCheck!, cycleCheck!, autostartCheck!].forEach { cv.addSubview($0) }
+        trailsSlider = slider(440, 192, Double(AppSettings.trails), 0.92, 160)
+        cv.addSubview(lbl("Nachleuchten:", 335, 192)); cv.addSubview(trailsSlider)
         cv.addSubview(lbl("Wechsel:", 335, 296)); cv.addSubview(cyclePopup)
         cv.addSubview(lbl("Leerlauf:", 335, 262)); cv.addSubview(idlePopup)
 
@@ -109,6 +111,7 @@ final class ConfigWindowController: NSWindowController {
         AppSettings.curvature = Float(curvSlider.doubleValue)
         AppSettings.apertureMask = Float(maskSlider.doubleValue)
         AppSettings.bloomScale = Float(bloomSlider.doubleValue)
+        AppSettings.trails = Float(trailsSlider.doubleValue)
         AppSettings.showHud = hudCheck.state == .on
         AppSettings.sound = soundCheck.state == .on
         AppSettings.autoCycle = cycleCheck.state == .on

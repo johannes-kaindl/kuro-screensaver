@@ -85,6 +85,17 @@ enum Shaders {
         return o;
     }
 
+    // ---- phosphor trails (feedback: max of scene vs decayed previous frame) --
+    fragment float4 trails_f(FSQOut in [[stage_in]],
+                             texture2d<float> sceneTex [[texture(0)]],
+                             texture2d<float> persistTex [[texture(1)]],
+                             constant float& decay [[buffer(0)]]) {
+        constexpr sampler s(filter::linear, address::clamp_to_edge);
+        float3 sc = sceneTex.sample(s, in.uv).rgb;
+        float3 pr = persistTex.sample(s, in.uv).rgb;
+        return float4(max(sc, pr * decay), 1.0);
+    }
+
     // ---- bloom threshold (keep bright pixels; MPS blurs the result) --------
     fragment float4 threshold_f(FSQOut in [[stage_in]],
                                 texture2d<float> sceneTex [[texture(0)]],

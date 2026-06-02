@@ -21,6 +21,7 @@ final class Renderer {
     private let compositePipe: MTLRenderPipelineState
     private let depthState: MTLDepthStencilState
     private let bloom: BloomChain
+    private let trails: TrailsChain
     private let glitch: GlitchScheduler
     private let atlas: FontAtlas
     private let text: TextRenderer
@@ -69,6 +70,7 @@ final class Renderer {
         depthState = device.makeDepthStencilState(descriptor: ds)!
 
         bloom = BloomChain(device: device, library: lib, sigma: 3)   // quarter-res → sigma 3 ≈ half-res 6
+        trails = TrailsChain(device: device, library: lib)
         glitch = GlitchScheduler(intensity: settings.crtIntensity,
                                  seed: (settings.seed ?? freshSeed()) &+ 777)
         atlas = FontAtlas(device: device)
@@ -186,8 +188,12 @@ final class Renderer {
         }
         tenc.endEncoding()
 
+        // --- phosphor trails (feedback of the lit scene) ---
+        trails.decay = settings.trails
+        let litTex = settings.trails > 0.001 ? trails.generate(cb, sceneHDR: sceneHDR, queue: queue) : sceneHDR
+
         // --- bloom (threshold + blur) ---
-        let bloomTex = settings.bloomScale > 0.001 ? bloom.generate(cb, sceneHDR: sceneHDR) : sceneHDR
+        let bloomTex = settings.bloomScale > 0.001 ? bloom.generate(cb, sceneHDR: litTex) : litTex
 
         // --- composite pass → target ---
         let tp = MTLRenderPassDescriptor()
@@ -197,7 +203,7 @@ final class Renderer {
         tp.colorAttachments[0].storeAction = .store
         let enc2 = cb.makeRenderCommandEncoder(descriptor: tp)!
         enc2.setRenderPipelineState(compositePipe)
-        enc2.setFragmentTexture(sceneHDR, index: 0)
+        enc2.setFragmentTexture(litTex, index: 0)
         enc2.setFragmentTexture(bloomTex, index: 1)
         let vignetteInner = 0.52 - 0.30 * preset.vignetteStrength
         // three.js ACESFilmic scales color by exposure/0.6 before the curve
