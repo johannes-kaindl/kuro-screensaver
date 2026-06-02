@@ -26,6 +26,12 @@ final class Terminal {
     private var actionStart: Double = -1
     private var restUntil: Double = 0
 
+    /// Open with a BIOS boot log already on screen, so a fresh power-on reads as
+    /// "the machine just came up" before the operator's narrative starts on top.
+    init() {
+        for b in Script.boot.prefix(7) { lines.append(Line(text: prefix(.status) + b, category: .status)) }
+    }
+
     // MARK: - public (read by Hud)
 
     func update(t: Double) {

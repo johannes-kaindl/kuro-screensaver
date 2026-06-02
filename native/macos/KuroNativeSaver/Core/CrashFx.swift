@@ -20,6 +20,12 @@ struct CrashFx {
         active = true; phase = 0; time = 0; collapse = 0; flash = 0; swapped = false; debug = false
     }
 
+    /// CRT power-on: start straight in the reboot phase (image expands out of a
+    /// bright line + flickers to stable). No scene swap. Used at fresh activation.
+    mutating func powerOn() {
+        active = true; phase = 2; time = 0; collapse = 1; flash = 0; swapped = true; debug = false
+    }
+
     /// Advance the sequence; returns true exactly once, at the black point, so
     /// the caller can swap the scene behind the blackout.
     mutating func update(dt: Double) -> Bool {

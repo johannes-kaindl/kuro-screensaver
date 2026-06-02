@@ -13,6 +13,7 @@ enum AppSettings {
     private static func dbl(_ k: String, _ d: Double) -> Double { store.object(forKey: k) == nil ? d : store.double(forKey: k) }
 
     static var scene: String { get { str("Scene", "random") } set { setStr("Scene", newValue) } }
+    static var look: String { get { str("Look", "custom") } set { setStr("Look", newValue) } }   // selected one-click Look (display only)
     static var preset: String { get { str("Preset", "toxic-haze") } set { setStr("Preset", newValue) } }
     static var speed: String { get { str("Speed", "norm") } set { setStr("Speed", newValue) } }
     static var cityAltitude: String { get { str("CityAlt", "low") } set { setStr("CityAlt", newValue) } }

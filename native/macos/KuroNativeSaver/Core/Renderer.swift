@@ -36,6 +36,12 @@ final class Renderer {
     private(set) var t: Double = 0
     private var scanDriftY: Float = 0
 
+    // Adaptive quality: on a GPU that can't hold the frame budget, progressively
+    // drop the heaviest effects (matrix → trails → bloom). Stays at 0 on capable
+    // hardware (e.g. the dev M5 Pro renders 5K all-on in ~7ms → never trips).
+    private var gpuMsSmoothed: Double = 0
+    private(set) var qualityTier = 0   // 0 full · 1 no matrix · 2 +no trails · 3 +no bloom
+
     static let hdrFormat: MTLPixelFormat = .rgba16Float
 
     init(device: MTLDevice, settings: Settings, scene: Scene,
@@ -75,6 +81,7 @@ final class Renderer {
                                  seed: (settings.seed ?? freshSeed()) &+ 777)
         atlas = FontAtlas(device: device)
         text = TextRenderer(device: device, library: lib, atlas: atlas, format: Renderer.hdrFormat)
+        crash.powerOn()   // diegetic CRT power-on (image expands out of a line + flickers)
     }
 
     /// Debug: hold one glitch artifact active (single-frame verification).
@@ -197,22 +204,23 @@ final class Renderer {
         txtPass.colorAttachments[0].loadAction = .load
         txtPass.colorAttachments[0].storeAction = .store
         let tenc = cb.makeRenderCommandEncoder(descriptor: txtPass)!
-        if settings.showHud || settings.matrix {
+        let wantMatrix = settings.matrix && qualityTier < 1
+        if settings.showHud || wantMatrix {
             text.begin(width: width, height: height)
             hud.render(text, width: width, height: height, accent: preset.accentRGB,
                        kanji: preset.kanji, t: t, scene: SceneRegistry.ids[sceneIndex],
                        terminalScale: settings.terminalScale,
-                       matrix: settings.matrix, showPanels: settings.showHud)
+                       matrix: wantMatrix, showPanels: settings.showHud)
             text.flush(tenc)
         }
         tenc.endEncoding()
 
         // --- phosphor trails (feedback of the lit scene) ---
         trails.decay = settings.trails
-        let litTex = settings.trails > 0.001 ? trails.generate(cb, sceneHDR: sceneHDR, queue: queue) : sceneHDR
+        let litTex = (settings.trails > 0.001 && qualityTier < 2) ? trails.generate(cb, sceneHDR: sceneHDR, queue: queue) : sceneHDR
 
         // --- bloom (threshold + blur) ---
-        let bloomTex = bloomMul > 0.001 ? bloom.generate(cb, sceneHDR: litTex) : litTex
+        let bloomTex = (bloomMul > 0.001 && qualityTier < 3) ? bloom.generate(cb, sceneHDR: litTex) : litTex
 
         // --- composite pass → target ---
         let tp = MTLRenderPassDescriptor()
@@ -240,5 +248,16 @@ final class Renderer {
 
         cb.commit()
         cb.waitUntilCompleted()
+        updateQuality(gpuMs: (cb.gpuEndTime - cb.gpuStartTime) * 1000)
+    }
+
+    /// Hysteretic quality controller: step down a tier when the GPU sustains
+    /// >13ms (can't hold 60fps with headroom), step back up below 7ms. Wide band
+    /// avoids flapping; a 0/invalid sample (timestamps unsupported) is ignored.
+    private func updateQuality(gpuMs: Double) {
+        guard gpuMs > 0 else { return }
+        gpuMsSmoothed = gpuMsSmoothed > 0 ? gpuMsSmoothed * 0.9 + gpuMs * 0.1 : gpuMs
+        if gpuMsSmoothed > 13, qualityTier < 3 { qualityTier += 1; gpuMsSmoothed = 0 }
+        else if gpuMsSmoothed < 7, qualityTier > 0 { qualityTier -= 1; gpuMsSmoothed = 0 }
     }
 }

@@ -13,6 +13,7 @@ final class MetalHostView: NSView {
     private var renderer: Renderer?
     private var displayLink: CVDisplayLink?
     private var lastTime: CFTimeInterval = 0
+    private let minFrameInterval: CFTimeInterval = 1.0 / 61.0   // ~60fps cap (battery/thermals on 120Hz displays)
     private let settings: Settings
     private let autoCycleSec: Double
 
@@ -85,10 +86,14 @@ final class MetalHostView: NSView {
     private func renderFrame() {
         autoreleasepool {   // CVDisplayLink thread has no ambient pool — required
             guard let ml = metalLayer, let renderer else { return }
+            let now = CACurrentMediaTime()
+            // 60fps cap: on a 120Hz display the link fires twice per target frame;
+            // skip the in-between callbacks. dt stays correct (measured from the
+            // last *rendered* frame, so skipped time accumulates).
+            if lastTime != 0, now - lastTime < minFrameInterval { return }
             sizeLock.lock()
             if let ps = pendingDrawableSize { ml.drawableSize = ps; pendingDrawableSize = nil }
             sizeLock.unlock()
-            let now = CACurrentMediaTime()
             if lastTime == 0 { lastTime = now }
             let dt = min(0.05, max(0, now - lastTime))
             lastTime = now

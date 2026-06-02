@@ -4,7 +4,7 @@
 import AppKit
 
 final class ConfigWindowController: NSWindowController {
-    private var scenePopup, presetPopup, speedPopup, altPopup, fogPopup, weatherPopup, cyclePopup, idlePopup: NSPopUpButton!
+    private var lookPopup, scenePopup, presetPopup, speedPopup, altPopup, fogPopup, weatherPopup, cyclePopup, idlePopup: NSPopUpButton!
     private var hudCheck, dayNightCheck, matrixCheck, soundCheck, cycleCheck, autostartCheck: NSButton!
     private var intensitySlider, curvSlider, maskSlider, bloomSlider, trailsSlider, ntscSlider, halSlider, termSlider: NSSlider!
     private var previewContainer: NSView!
@@ -42,11 +42,18 @@ final class ConfigWindowController: NSWindowController {
     }
 
     private func buildUI(_ cv: NSView) {
-        previewContainer = NSView(frame: NSRect(x: 20, y: 548, width: 580, height: 314))
+        previewContainer = NSView(frame: NSRect(x: 20, y: 580, width: 580, height: 282))
         previewContainer.wantsLayer = true
         previewContainer.layer?.backgroundColor = NSColor.black.cgColor
         previewContainer.layer?.cornerRadius = 6; previewContainer.layer?.masksToBounds = true
         cv.addSubview(previewContainer)
+
+        // === Look bar (full width, just below the preview): one-click vibe presets ===
+        lookPopup = popup(132, 550, 458)
+        lookPopup.action = #selector(lookChanged)
+        lookPopup.addItems(withTitles: ["Eigene"] + Looks.all.map { $0.label })
+        lookPopup.selectItem(at: (Looks.all.firstIndex { $0.id == AppSettings.look }).map { $0 + 1 } ?? 0)
+        cv.addSubview(lbl("Look:", 20, 552)); cv.addSubview(lookPopup)
 
         // === left column ===
         scenePopup = popup(132, 506); scenePopup.addItems(withTitles: ["random"] + SceneRegistry.ids); scenePopup.selectItem(withTitle: AppSettings.scene)
@@ -99,7 +106,37 @@ final class ConfigWindowController: NSWindowController {
         cv.addSubview(hint)
     }
 
+    /// A manual tweak of any slider/checkbox → the combo no longer matches a
+    /// named Look, so flag it "Eigene" and persist.
     @objc private func changed() {
+        persist()
+        AppSettings.look = "custom"
+        lookPopup.selectItem(at: 0)
+        rebuildPreview()
+    }
+
+    /// Picking a Look sets every effect control at once (color + the CRT knobs).
+    /// Scene, speed, fog, weather, terminal size etc. stay as the user left them.
+    @objc private func lookChanged() {
+        let i = lookPopup.indexOfSelectedItem
+        guard i >= 1, i - 1 < Looks.all.count else { AppSettings.look = "custom"; return }
+        let look = Looks.all[i - 1]
+        if let pi = Palette.presets.firstIndex(where: { $0.id == look.preset }) { presetPopup.selectItem(at: pi) }
+        curvSlider.doubleValue = Double(look.curvature)
+        maskSlider.doubleValue = Double(look.apertureMask)
+        trailsSlider.doubleValue = Double(look.trails)
+        ntscSlider.doubleValue = Double(look.ntsc)
+        halSlider.doubleValue = Double(look.halation)
+        bloomSlider.doubleValue = Double(look.bloomScale)
+        intensitySlider.doubleValue = Double(look.intensity)
+        matrixCheck.state = look.matrix ? .on : .off
+        persist()
+        AppSettings.look = look.id   // keep the popup on this Look (persist() doesn't touch it)
+        rebuildPreview()
+    }
+
+    /// Write every control's current value into AppSettings (no Look bookkeeping).
+    private func persist() {
         if let t = scenePopup.titleOfSelectedItem { AppSettings.scene = t }
         let pi = presetPopup.indexOfSelectedItem
         if pi >= 0, pi < Palette.presets.count { AppSettings.preset = Palette.presets[pi].id }
@@ -122,7 +159,6 @@ final class ConfigWindowController: NSWindowController {
         AppSettings.autoCycle = cycleCheck.state == .on
         if cyclePopup.indexOfSelectedItem >= 0 { AppSettings.cycleMinutes = cycleMins[cyclePopup.indexOfSelectedItem] }
         if idlePopup.indexOfSelectedItem >= 0 { AppSettings.idleMinutes = idleMins[idlePopup.indexOfSelectedItem] }
-        rebuildPreview()
     }
 
     @objc private func toggleAutostart() {
