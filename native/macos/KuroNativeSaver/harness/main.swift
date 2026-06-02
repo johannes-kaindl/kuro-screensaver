@@ -36,6 +36,7 @@ struct Args {
     var ntsc: Float = -1
     var halation: Float = -1
     var matrix = false
+    var matrixOnly = false
 }
 
 func parseArgs() -> Args {
@@ -63,6 +64,7 @@ func parseArgs() -> Args {
         case "--ntsc": a.ntsc = Float(it.next() ?? "") ?? a.ntsc
         case "--halation": a.halation = Float(it.next() ?? "") ?? a.halation
         case "--matrix": a.matrix = true
+        case "--matrix-only": a.matrix = true; a.matrixOnly = true; a.noHud = true
         default: FileHandle.standardError.write("unknown arg \(k)\n".data(using: .utf8)!)
         }
     }
@@ -156,6 +158,7 @@ let renderer = Renderer(device: device, settings: settings, scene: scene,
                         targetFormat: target.pixelFormat)
 if let g = args.forceGlitch { renderer.debugForceGlitch(g) }
 if args.crash >= 0 { renderer.debugForceCrash(args.crash) }
+if args.matrixOnly { renderer.debugBlackScene = true }
 
 func drawFrame(path: String) {
     renderer.draw(into: target)

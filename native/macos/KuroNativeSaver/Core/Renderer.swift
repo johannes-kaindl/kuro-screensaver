@@ -84,6 +84,8 @@ final class Renderer {
         crash.powerOn()   // diegetic CRT power-on (image expands out of a line + flickers)
     }
 
+    /// Debug: render a black scene (skip geometry) to verify text/overlays alone.
+    var debugBlackScene = false
     /// Debug: hold one glitch artifact active (single-frame verification).
     func debugForceGlitch(_ name: String) { glitch.forceHold(name) }
     /// Debug: freeze a crash-collapse amount for single-frame verification.
@@ -178,7 +180,7 @@ final class Renderer {
         case .clear: break
         }
 
-        for item in scene.items {
+        for item in (debugBlackScene ? [] : scene.items) {
             var u = SceneUniforms(
                 mvp: viewProj * item.model,
                 modelView: view * item.model,
