@@ -24,6 +24,10 @@ enum AppSettings {
     static var apertureMask: Float { get { store.object(forKey: "Aperture") != nil ? store.float(forKey: "Aperture") : 0.22 } set { store.set(newValue, forKey: "Aperture") } }
     static var trails: Float { get { store.object(forKey: "Trails") != nil ? store.float(forKey: "Trails") : 0.35 } set { store.set(newValue, forKey: "Trails") } }
     static var terminalScale: Float { get { store.object(forKey: "TermScale") != nil ? store.float(forKey: "TermScale") : 1 } set { store.set(newValue, forKey: "TermScale") } }
+    static var ntsc: Float { get { store.float(forKey: "NTSC") } set { store.set(newValue, forKey: "NTSC") } }
+    static var halation: Float { get { store.object(forKey: "Halation") != nil ? store.float(forKey: "Halation") : 0.15 } set { store.set(newValue, forKey: "Halation") } }
+    static var dayNight: Bool { get { bool("DayNight", false) } set { store.set(newValue, forKey: "DayNight") } }
+    static var weather: String { get { str("Weather", "clear") } set { setStr("Weather", newValue) } }
     static var sound: Bool { get { bool("Sound", false) } set { store.set(newValue, forKey: "Sound") } }
     static var autoCycle: Bool { get { bool("AutoCycle", true) } set { store.set(newValue, forKey: "AutoCycle") } }
     static var cycleMinutes: Double { get { dbl("CycleMin", 0.5) } set { store.set(newValue, forKey: "CycleMin") } }
@@ -46,6 +50,10 @@ enum AppSettings {
         s.apertureMask = apertureMask
         s.trails = trails
         s.terminalScale = terminalScale
+        s.ntsc = ntsc
+        s.halation = halation
+        s.dayNight = dayNight
+        s.weather = Settings.Weather(rawValue: weather) ?? .clear
         return (s, autoCycle)
     }
 }

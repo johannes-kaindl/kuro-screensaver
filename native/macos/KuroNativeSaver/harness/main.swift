@@ -33,6 +33,8 @@ struct Args {
     var curv: Float = -1             // override curvature if >= 0
     var trails: Float = -1
     var term: Float = -1
+    var ntsc: Float = -1
+    var halation: Float = -1
 }
 
 func parseArgs() -> Args {
@@ -57,6 +59,8 @@ func parseArgs() -> Args {
         case "--curv": a.curv = Float(it.next() ?? "") ?? a.curv
         case "--trails": a.trails = Float(it.next() ?? "") ?? a.trails
         case "--term": a.term = Float(it.next() ?? "") ?? a.term
+        case "--ntsc": a.ntsc = Float(it.next() ?? "") ?? a.ntsc
+        case "--halation": a.halation = Float(it.next() ?? "") ?? a.halation
         default: FileHandle.standardError.write("unknown arg \(k)\n".data(using: .utf8)!)
         }
     }
@@ -139,6 +143,8 @@ if args.noHud { settings.showHud = false }
 if args.curv >= 0 { settings.curvature = args.curv }
 if args.trails >= 0 { settings.trails = args.trails }
 if args.term >= 0 { settings.terminalScale = args.term }
+if args.ntsc >= 0 { settings.ntsc = args.ntsc }
+if args.halation >= 0 { settings.halation = args.halation }
 
 let ctx = SceneContext(device: device, rng: LCG(seed: args.seed),
                        settings: settings, accent: settings.preset.accentRGB)

@@ -25,6 +25,7 @@ enum Shaders {
         float4 p3;        // vRoll, blackFrame, skewX, staticAmt (glitch)
         float4 p4;        // collapse, flash, curvature, bezelSharpness
         float4 p5;        // maskStrength, maskCellPx, grain, flicker
+        float4 p6;        // ntsc, halation, _, _
     };
 
     inline float hash21(float2 p) {
@@ -160,6 +161,9 @@ enum Shaders {
         col.b = sceneTex.sample(s, uv + dr).b  + bloomTex.sample(s, uv + dr).b  * bs;
         if (outside) col = float3(0.0);
 
+        // halation: warm phosphor glow bleed around bright areas (extra warm bloom)
+        col += bloomTex.sample(s, uv).rgb * u.p6.y * float3(1.0, 0.55, 0.25);
+
         col = aces(col * u.p0.x);               // exposure + tonemap
         col *= u.p2.z;                          // brightness flicker (default 1)
         col *= (1.0 + u.p4.y);                  // crash reboot flash
@@ -184,6 +188,15 @@ enum Shaders {
         if (collapse > 0.0) {
             float line = exp(-pow((sy - 0.5) * 220.0, 2.0)) * collapse;
             col += float3(0.78, 0.95, 0.84) * line;   // CRT phosphor-white pinch
+        }
+
+        // NTSC composite shimmer: dot-crawl chroma wiggle + slight luma smear
+        float ntsc = u.p6.x;
+        if (ntsc > 0.0) {
+            float crawl = sin(in.pos.y * 1.7 + in.pos.x * 0.9 + u.p1.w * 18.0) * ntsc * 0.05;
+            col.r += crawl; col.b -= crawl;
+            float lum = dot(col, float3(0.299, 0.587, 0.114));
+            col = mix(col, float3(lum), ntsc * 0.12);
         }
 
         // aperture grille (energy-preserving cos lobes) — RGB phosphor stripes

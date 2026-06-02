@@ -154,12 +154,29 @@ final class Renderer {
         let pointScale = Float(height) * 0.5
         let accent = preset.accentRGB
 
+        // atmosphere: day/night cycle + weather modulate bloom / fog / exposure
+        let tf = Float(t)
+        var bloomMul = settings.bloomScale
+        var fogMul = settings.fog.mul
+        var expo: Float = 1.15 / 0.6
+        if settings.dayNight {
+            let dn = 0.5 + 0.5 * sin(tf / 240 * 2 * .pi)   // 0 night .. 1 day (4-min cycle)
+            expo *= 0.7 + 0.6 * dn; bloomMul *= 0.8 + 0.5 * dn; fogMul *= 1 + 0.5 * (1 - dn)
+        }
+        switch settings.weather {
+        case .storm:
+            let surge = max(0, sin(tf * 3)) * max(0, sin(tf * 0.7))
+            bloomMul *= 1 + surge * 1.4; fogMul *= 1.25
+        case .dust: fogMul *= 1.6; bloomMul *= 0.85
+        case .clear: break
+        }
+
         for item in scene.items {
             var u = SceneUniforms(
                 mvp: viewProj * item.model,
                 modelView: view * item.model,
                 color: SIMD4(accent, item.opacity),
-                params: SIMD4(scene.fogDensity * settings.fog.mul, item.pointSizeWorld, pointScale,
+                params: SIMD4(scene.fogDensity * fogMul, item.pointSizeWorld, pointScale,
                               item.isPoint ? 1 : 0))
             enc.setVertexBuffer(item.positions, offset: 0, index: 0)
             enc.setVertexBytes(&u, length: MemoryLayout<SceneUniforms>.stride, index: 1)
@@ -194,7 +211,7 @@ final class Renderer {
         let litTex = settings.trails > 0.001 ? trails.generate(cb, sceneHDR: sceneHDR, queue: queue) : sceneHDR
 
         // --- bloom (threshold + blur) ---
-        let bloomTex = settings.bloomScale > 0.001 ? bloom.generate(cb, sceneHDR: litTex) : litTex
+        let bloomTex = bloomMul > 0.001 ? bloom.generate(cb, sceneHDR: litTex) : litTex
 
         // --- composite pass → target ---
         let tp = MTLRenderPassDescriptor()
@@ -207,17 +224,15 @@ final class Renderer {
         enc2.setFragmentTexture(litTex, index: 0)
         enc2.setFragmentTexture(bloomTex, index: 1)
         let vignetteInner = 0.52 - 0.30 * preset.vignetteStrength
-        // three.js ACESFilmic scales color by exposure/0.6 before the curve
-        // (toneMappingExposure 1.15) — match the effective exposure.
-        let exposure: Float = 1.15 / 0.6
         var pu = PostUniforms(
-            p0: SIMD4(exposure, preset.bloomStrength * settings.bloomScale,
+            p0: SIMD4(expo, preset.bloomStrength * bloomMul,
                       0.0015 + glitch.chromaOffsetBump, preset.scanOpacity),
             p1: SIMD4(scanDriftY, vignetteInner, preset.vignetteStrength, Float(t)),
             p2: glitch.uniforms(),
             p3: glitch.uniforms3(),
             p4: SIMD4(crash.uniforms().x, crash.uniforms().y, settings.curvature, 1.0),
-            p5: SIMD4(settings.apertureMask, 6, 0.02, 0.012))
+            p5: SIMD4(settings.apertureMask, 6, 0.02, 0.012),
+            p6: SIMD4(settings.ntsc, settings.halation, 0, 0))
         enc2.setFragmentBytes(&pu, length: MemoryLayout<PostUniforms>.stride, index: 0)
         enc2.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         enc2.endEncoding()

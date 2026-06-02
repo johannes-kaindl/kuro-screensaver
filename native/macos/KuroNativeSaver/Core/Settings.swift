@@ -33,6 +33,11 @@ struct Settings {
     var apertureMask: Float = 0.22  // RGB phosphor grille strength (0 = off)
     var trails: Float = 0.35        // phosphor persistence decay (0 = off, ~0.9 = long)
     var terminalScale: Float = 1    // terminal text size multiplier
+    var ntsc: Float = 0             // NTSC/composite shimmer (0 = off)
+    var halation: Float = 0.15      // warm glow bleed around bright areas
+    var dayNight = false            // slow brightness/bloom day-night cycle
+    enum Weather: String, CaseIterable { case clear, storm, dust }
+    var weather: Weather = .clear
     var crtIntensity: Float = 0.35     // 0..1, drives the glitch scheduler cadence
     var tunnelAutoBoost: Bool = true   // tunnel: speed surge on straight sections
     var seed: Int32? = nil             // nil → fresh per activation
