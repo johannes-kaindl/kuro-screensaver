@@ -31,10 +31,40 @@ swiftc -O -emit-library -Xlinker -bundle \
 
 cp "$SRC/Host/Info.plist" "$SAVER/Contents/Info.plist"
 
-echo "signing (ad-hoc)…"
+# Developer ID + hardened runtime if the cert is present (required for the saver
+# to register with PluginKit / appear in the picker, alongside notarization);
+# otherwise ad-hoc (preview/dev only).
+SIGN_ID="${KURO_SIGN_ID:-Developer ID Application: Johannes Kaindl (U9X7M39R56)}"
 codesign --remove-signature "$SAVER" 2>/dev/null || true
-codesign --force --deep --sign - "$SAVER"
+if security find-identity -v -p codesigning 2>/dev/null | grep -q "$SIGN_ID"; then
+  echo "signing (Developer ID + hardened runtime)…"
+  codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$SAVER"
+else
+  echo "signing (ad-hoc — no Developer ID; preview only)…"
+  codesign --force --deep --sign - "$SAVER"
+fi
 codesign --verify --deep --strict "$SAVER"
+
+# Notarize if a credential profile exists (set up once via
+# `xcrun notarytool store-credentials kuro-notary …`). Without notarization the
+# saver is Gatekeeper-rejected and PluginKit won't register it on macOS 14+/26.
+NOTARY_PROFILE="${KURO_NOTARY_PROFILE:-kuro-notary}"
+if xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
+  echo "notarizing (profile $NOTARY_PROFILE)…"
+  ZIP="$BUILD/KuroNativeSaver-notarize.zip"
+  ditto -c -k --keepParent "$SAVER" "$ZIP"
+  xcrun notarytool submit "$ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
+  # NOTE: a .saver bundle can't be stapled directly; ship inside a notarized .pkg
+  # for distribution. For local use the online Gatekeeper check + registration
+  # below suffices once the submission is Accepted.
+  rm -f "$ZIP"
+  echo "registering with PluginKit…"
+  pluginkit -a "$SAVER" || true
+  pluginkit -m 2>/dev/null | grep -i kuro && echo "registered ✓" || echo "not yet registered (may need killall pkd/WallpaperAgent + relogin)"
+else
+  echo "::note:: no notarytool profile '$NOTARY_PROFILE' — skipping notarization."
+  echo "         Set up once: xcrun notarytool store-credentials $NOTARY_PROFILE --apple-id <id> --team-id U9X7M39R56"
+fi
 
 ( cd "$BUILD" && rm -f KuroNativeSaver.saver.zip && zip -qry KuroNativeSaver.saver.zip KuroNativeSaver.saver )
 
