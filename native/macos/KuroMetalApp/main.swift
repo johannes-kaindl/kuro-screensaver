@@ -65,11 +65,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func menuStart() { startScreensaver() }
-    @objc private func menuConfig() {
-        if config == nil { config = ConfigWindowController() }
-        config?.showWindow(nil); NSApp.activate(ignoringOtherApps: true)
-    }
+    @objc private func menuConfig() { showConfig() }
     @objc private func menuQuit() { NSApp.terminate(nil) }
+
+    private func showConfig() {
+        if config == nil { config = ConfigWindowController() }
+        NSApp.setActivationPolicy(.regular)   // give the agent a normal window/dock while config is open
+        config?.showWindow(nil)
+        config?.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Re-opening the app (Dock click / `open`) while an instance is already
+    /// running (e.g. the idle agent) → show the config window.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !active { showConfig() }
+        return true
+    }
 
     // MARK: - fullscreen show / dismiss
 

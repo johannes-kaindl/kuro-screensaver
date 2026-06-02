@@ -5,7 +5,8 @@
 import Foundation
 
 enum AppSettings {
-    private static let store = UserDefaults(suiteName: "com.kuro.screensaver.metalapp") ?? .standard
+    // NOTE: must NOT be the app's own bundle id (that's invalid as a suite name).
+    private static let store = UserDefaults.standard
 
     static var scene: String {
         get { store.string(forKey: "Scene") ?? "random" }
