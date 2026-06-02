@@ -52,8 +52,10 @@ final class KuroNativeSaverView: ScreenSaverView {
                                rng: LCG(seed: settings.seed ?? freshSeed()),
                                settings: settings, accent: settings.preset.accentRGB)
         let scene: Scene = TerrainScene(ctx: ctx)
-        renderer = Renderer(device: device, settings: settings, scene: scene,
-                            targetFormat: .bgra8Unorm)
+        let rnd = Renderer(device: device, settings: settings, scene: scene,
+                           targetFormat: .bgra8Unorm)
+        rnd.autoCycleSec = (KuroDefaults.scene == "random") ? 18 : 0
+        renderer = rnd
         updateDrawableSize()
     }
 

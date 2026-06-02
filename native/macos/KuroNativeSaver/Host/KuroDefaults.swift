@@ -33,12 +33,15 @@ enum KuroDefaults {
         set { let d = store(); d.set(Double(newValue), forKey: "CrtIntensity"); d.synchronize() }
     }
 
-    /// Build the renderer Settings from persisted values.
+    /// Build the renderer Settings from persisted values. "random" (and any
+    /// unknown value) resolves to a random start scene; the view enables
+    /// auto-cycle when the stored value is "random".
     static func settings() -> Settings {
         registerDefaults()
         var s = Settings()
-        // Slice ships only terrain; "random" collapses to it for now.
-        s.scene = (scene == "random") ? "terrain" : scene
+        let sc = scene
+        s.scene = (sc == "random" || !SceneRegistry.ids.contains(sc))
+            ? (SceneRegistry.ids.randomElement() ?? "terrain") : sc
         s.presetID = colorPreset
         // registerDefaults() supplies 0.35 when unset, so honor an explicit 0
         // (slider "off") instead of coercing it back to the default.

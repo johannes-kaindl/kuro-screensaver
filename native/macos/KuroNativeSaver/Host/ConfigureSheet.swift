@@ -5,7 +5,7 @@ import Cocoa
 final class ConfigureSheetController {
     static let shared = ConfigureSheetController()
 
-    private let scenes = ["terrain", "random"]   // slice ships terrain only
+    private let scenes = ["random", "terrain", "city", "rift", "tunnel", "void"]
 
     private var window: NSWindow?
     private var scenePopup: NSPopUpButton?
