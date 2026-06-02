@@ -183,7 +183,8 @@ final class Renderer {
         if settings.showHud {
             text.begin(width: width, height: height)
             hud.render(text, width: width, height: height, accent: preset.accentRGB,
-                       kanji: preset.kanji, t: t, scene: SceneRegistry.ids[sceneIndex])
+                       kanji: preset.kanji, t: t, scene: SceneRegistry.ids[sceneIndex],
+                       terminalScale: settings.terminalScale)
             text.flush(tenc)
         }
         tenc.endEncoding()

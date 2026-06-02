@@ -32,6 +32,7 @@ struct Args {
     var noHud = false
     var curv: Float = -1             // override curvature if >= 0
     var trails: Float = -1
+    var term: Float = -1
 }
 
 func parseArgs() -> Args {
@@ -55,6 +56,7 @@ func parseArgs() -> Args {
         case "--no-hud": a.noHud = true
         case "--curv": a.curv = Float(it.next() ?? "") ?? a.curv
         case "--trails": a.trails = Float(it.next() ?? "") ?? a.trails
+        case "--term": a.term = Float(it.next() ?? "") ?? a.term
         default: FileHandle.standardError.write("unknown arg \(k)\n".data(using: .utf8)!)
         }
     }
@@ -136,6 +138,7 @@ settings.crtIntensity = args.intensity
 if args.noHud { settings.showHud = false }
 if args.curv >= 0 { settings.curvature = args.curv }
 if args.trails >= 0 { settings.trails = args.trails }
+if args.term >= 0 { settings.terminalScale = args.term }
 
 let ctx = SceneContext(device: device, rng: LCG(seed: args.seed),
                        settings: settings, accent: settings.preset.accentRGB)

@@ -23,6 +23,7 @@ enum AppSettings {
     static var curvature: Float { get { store.object(forKey: "Curvature") != nil ? store.float(forKey: "Curvature") : 0.12 } set { store.set(newValue, forKey: "Curvature") } }
     static var apertureMask: Float { get { store.object(forKey: "Aperture") != nil ? store.float(forKey: "Aperture") : 0.22 } set { store.set(newValue, forKey: "Aperture") } }
     static var trails: Float { get { store.object(forKey: "Trails") != nil ? store.float(forKey: "Trails") : 0.35 } set { store.set(newValue, forKey: "Trails") } }
+    static var terminalScale: Float { get { store.object(forKey: "TermScale") != nil ? store.float(forKey: "TermScale") : 1 } set { store.set(newValue, forKey: "TermScale") } }
     static var sound: Bool { get { bool("Sound", false) } set { store.set(newValue, forKey: "Sound") } }
     static var autoCycle: Bool { get { bool("AutoCycle", true) } set { store.set(newValue, forKey: "AutoCycle") } }
     static var cycleMinutes: Double { get { dbl("CycleMin", 0.5) } set { store.set(newValue, forKey: "CycleMin") } }
@@ -44,6 +45,7 @@ enum AppSettings {
         s.curvature = curvature
         s.apertureMask = apertureMask
         s.trails = trails
+        s.terminalScale = terminalScale
         return (s, autoCycle)
     }
 }

@@ -6,13 +6,14 @@ import AppKit
 final class ConfigWindowController: NSWindowController {
     private var scenePopup, presetPopup, speedPopup, altPopup, fogPopup, cyclePopup, idlePopup: NSPopUpButton!
     private var hudCheck, soundCheck, cycleCheck, autostartCheck: NSButton!
-    private var intensitySlider, bloomSlider, curvSlider, maskSlider, trailsSlider: NSSlider!
+    private var intensitySlider, bloomSlider, curvSlider, maskSlider, trailsSlider, termSlider: NSSlider!
     private var previewContainer: NSView!
     private var previewView: MetalHostView?
 
     private let speeds = [("Langsam", "slow"), ("Normal", "norm"), ("Schnell", "fast")]
     private let alts = [("Niedrig", "low"), ("Mittel", "mid"), ("Hoch", "high")]
-    private let fogs = [("Klar", "clear"), ("Auto", "auto"), ("Dicht", "dense")]
+    // "Sichtweite" (view distance): far = clear fog, short = dense fog
+    private let fogs = [("Weit", "clear"), ("Auto", "auto"), ("Kurz", "dense")]
     private let cycleMins: [Double] = [0.5, 1, 2, 5]
     private let idleMins: [Double] = [1, 2, 5, 10, 15]
 
@@ -66,7 +67,7 @@ final class ConfigWindowController: NSWindowController {
         bloomSlider = slider(125, 114, Double(AppSettings.bloomScale), 2.5)
 
         [lbl("Szene:", 20, 380), lbl("Farbe:", 20, 346), lbl("Tempo:", 20, 312), lbl("Stadt-Höhe:", 20, 278),
-         lbl("Nebel:", 20, 244), lbl("CRT-Glitch:", 20, 210), lbl("Krümmung:", 20, 178),
+         lbl("Sichtweite:", 20, 244), lbl("CRT-Glitch:", 20, 210), lbl("Krümmung:", 20, 178),
          lbl("Lochmaske:", 20, 146), lbl("Bloom:", 20, 114)].forEach { cv.addSubview($0) }
         [scenePopup!, presetPopup!, speedPopup!, altPopup!, fogPopup!].forEach { cv.addSubview($0) }
         [intensitySlider!, curvSlider!, maskSlider!, bloomSlider!].forEach { cv.addSubview($0) }
@@ -85,6 +86,9 @@ final class ConfigWindowController: NSWindowController {
         [hudCheck!, soundCheck!, cycleCheck!, autostartCheck!].forEach { cv.addSubview($0) }
         trailsSlider = slider(440, 192, Double(AppSettings.trails), 0.92, 160)
         cv.addSubview(lbl("Nachleuchten:", 335, 192)); cv.addSubview(trailsSlider)
+        termSlider = NSSlider(value: Double(AppSettings.terminalScale), minValue: 0.7, maxValue: 2.4, target: self, action: #selector(changed))
+        termSlider.frame = NSRect(x: 440, y: 110, width: 160, height: 22)
+        cv.addSubview(lbl("Terminal-Größe:", 335, 110)); cv.addSubview(termSlider)
         cv.addSubview(lbl("Wechsel:", 335, 296)); cv.addSubview(cyclePopup)
         cv.addSubview(lbl("Leerlauf:", 335, 262)); cv.addSubview(idlePopup)
 
@@ -112,6 +116,7 @@ final class ConfigWindowController: NSWindowController {
         AppSettings.apertureMask = Float(maskSlider.doubleValue)
         AppSettings.bloomScale = Float(bloomSlider.doubleValue)
         AppSettings.trails = Float(trailsSlider.doubleValue)
+        AppSettings.terminalScale = Float(termSlider.doubleValue)
         AppSettings.showHud = hudCheck.state == .on
         AppSettings.sound = soundCheck.state == .on
         AppSettings.autoCycle = cycleCheck.state == .on
