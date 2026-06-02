@@ -213,7 +213,8 @@ final class Renderer {
                        kanji: preset.kanji, t: t, scene: SceneRegistry.ids[sceneIndex],
                        terminalScale: settings.terminalScale,
                        matrix: wantMatrix, matrixOpacity: 0.7,
-                       terminalLayout: settings.terminalLayout, showPanels: settings.showHud)
+                       terminalLayout: settings.terminalLayout, terminalBand: settings.terminalBandHeight,
+                       showPanels: settings.showHud)
             text.flush(tenc)
         }
         tenc.endEncoding()

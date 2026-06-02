@@ -6,7 +6,7 @@ import AppKit
 final class ConfigWindowController: NSWindowController {
     private var lookPopup, scenePopup, presetPopup, speedPopup, altPopup, fogPopup, weatherPopup, cyclePopup, idlePopup, terminalPopup: NSPopUpButton!
     private var hudCheck, dayNightCheck, soundCheck, cycleCheck, autostartCheck: NSButton!
-    private var intensitySlider, curvSlider, maskSlider, bloomSlider, trailsSlider, ntscSlider, halSlider, termSlider: NSSlider!
+    private var intensitySlider, curvSlider, maskSlider, bloomSlider, trailsSlider, ntscSlider, halSlider, termSlider, bandSlider: NSSlider!
     private var previewContainer: NSView!
     private var previewView: MetalHostView?
 
@@ -16,7 +16,7 @@ final class ConfigWindowController: NSWindowController {
     private let weathers = [("Klar", "clear"), ("Sturm", "storm"), ("Staub", "dust")]
     private let cycleMins: [Double] = [0.5, 1, 2, 5]
     private let idleMins: [Double] = [1, 2, 5, 10, 15]
-    private let termLayouts = [("Aus", "off"), ("Unten", "strip"), ("Unten + Box", "stripdark"), ("Fenster (Lisa)", "window")]
+    private let termLayouts = [("Aus", "off"), ("Unten", "strip"), ("Leiste (unten)", "stripdark"), ("Fenster (Lisa)", "window")]
 
     convenience init() {
         let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 884),
@@ -99,6 +99,8 @@ final class ConfigWindowController: NSWindowController {
         terminalPopup.addItems(withTitles: termLayouts.map { $0.0 })
         terminalPopup.selectItem(at: termLayouts.firstIndex { $0.1 == AppSettings.terminalLayout } ?? 1)
         cv.addSubview(lbl("Terminal:", 340, 190)); cv.addSubview(terminalPopup)
+        bandSlider = slider(445, 156, Double(AppSettings.terminalBandHeight), 0.5, 0.12, 155)
+        cv.addSubview(lbl("Leisten-Höhe:", 340, 158)); cv.addSubview(bandSlider)
 
         let startBtn = NSButton(title: "Vollbild starten", target: self, action: #selector(startFullscreen))
         startBtn.frame = NSRect(x: 340, y: 234, width: 260, height: 36); startBtn.bezelStyle = .rounded; startBtn.keyEquivalent = "\r"
@@ -158,6 +160,7 @@ final class ConfigWindowController: NSWindowController {
         AppSettings.terminalScale = Float(termSlider.doubleValue)
         AppSettings.showHud = hudCheck.state == .on
         AppSettings.terminalLayout = termLayouts[max(0, terminalPopup.indexOfSelectedItem)].1
+        AppSettings.terminalBandHeight = Float(bandSlider.doubleValue)
         AppSettings.dayNight = dayNightCheck.state == .on
         AppSettings.sound = soundCheck.state == .on
         AppSettings.autoCycle = cycleCheck.state == .on

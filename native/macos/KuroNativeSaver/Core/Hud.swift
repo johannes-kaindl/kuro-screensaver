@@ -26,7 +26,8 @@ final class Hud {
     func render(_ tr: TextRenderer, width: Int, height: Int, accent: SIMD3<Float>,
                 kanji: String, t: Double, scene: String, terminalScale: Float = 1,
                 matrix: Bool = false, matrixOpacity: Float = 0.4,
-                terminalLayout: Settings.TerminalLayout = .strip, showPanels: Bool = true) {
+                terminalLayout: Settings.TerminalLayout = .strip, terminalBand: Float = 0.24,
+                showPanels: Bool = true) {
         let dim = accent * 0.72
         let s = Float(height) / 64                         // base cell height (px)
         let pad = s * 1.5
@@ -38,8 +39,8 @@ final class Hud {
         // narrative terminal — independent of the HUD flight panels
         switch terminalLayout {
         case .off: break
-        case .strip: renderTerminalStrip(tr, W: W, H: H, s: s, accent: accent, dim: dim, t: t, scale: terminalScale, darken: false)
-        case .stripDark: renderTerminalStrip(tr, W: W, H: H, s: s, accent: accent, dim: dim, t: t, scale: terminalScale, darken: true)
+        case .strip: renderTerminalStrip(tr, W: W, H: H, s: s, accent: accent, dim: dim, t: t, scale: terminalScale)
+        case .stripDark: renderTerminalBand(tr, W: W, H: H, s: s, accent: accent, dim: dim, t: t, scale: terminalScale, bandFraction: terminalBand)
         case .window: renderTerminalWindow(tr, W: W, H: H, accent: accent, dim: dim, t: t, scale: terminalScale)
         }
 
@@ -83,7 +84,7 @@ final class Hud {
 
     // --- terminal: bottom-left strip, fading upward (the compact overlay) ---
     private func renderTerminalStrip(_ tr: TextRenderer, W: Float, H: Float, s: Float,
-                                     accent: SIMD3<Float>, dim: SIMD3<Float>, t: Double, scale: Float, darken: Bool) {
+                                     accent: SIMD3<Float>, dim: SIMD3<Float>, t: Double, scale: Float) {
         // Keep clear of the curved glass edge: extra left/bottom margin, cap lines.
         let ts = s * scale
         let lh = ts * 1.3
@@ -92,27 +93,43 @@ final class Hud {
         let promptY = H - (H * 0.07 + ts * 1.6)
         let maxLines = max(2, min(10, Int((promptY - H * 0.06) / lh)))
         let lines = terminal.visibleLines(max: maxLines)
-        // optional dark panel behind the whole text block (drawn first → text over it)
-        if darken, !lines.isEmpty {
-            var maxW = tr.width(terminal.promptLine(t: t), pxHeight: cell)
-            for ln in lines { maxW = max(maxW, tr.width(ln.text, pxHeight: cell)) }
-            let topY = promptY - Float(lines.count) * lh
-            let px = leftPad - cell * 0.6, py = topY - lh * 0.25
-            let pw = maxW + cell * 1.2, ph = (promptY - topY) + lh * 1.25
-            tr.fillRect(xPx: px, yPx: py, wPx: pw, hPx: ph, color: SIMD3(0, 0, 0), opacity: 0.62)
-            // faint accent edges so the panel reads even over dark areas
-            let b = max(1, H * 0.0013), eop: Float = 0.16
-            tr.fillRect(xPx: px, yPx: py, wPx: pw, hPx: b, color: accent, opacity: eop)
-            tr.fillRect(xPx: px, yPx: py + ph - b, wPx: pw, hPx: b, color: accent, opacity: eop)
-            tr.fillRect(xPx: px, yPx: py, wPx: b, hPx: ph, color: accent, opacity: eop)
-            tr.fillRect(xPx: px + pw - b, yPx: py, wPx: b, hPx: ph, color: accent, opacity: eop)
-        }
         for (i, ln) in lines.reversed().enumerated() {
             let op = max(0.05, pow(0.72, Float(i)))
             let col = ln.category == .quotes ? accent : dim
             tr.add(ln.text, xPx: leftPad, yPx: promptY - Float(i + 1) * lh, pxHeight: cell, color: col, opacity: op)
         }
         tr.add(terminal.promptLine(t: t), xPx: leftPad, yPx: promptY, pxHeight: cell, color: accent, opacity: 0.95)
+    }
+
+    // --- terminal: a full-width darkened band at the bottom, height = bandFraction·H ---
+    private func renderTerminalBand(_ tr: TextRenderer, W: Float, H: Float, s: Float,
+                                    accent: SIMD3<Float>, dim: SIMD3<Float>, t: Double, scale: Float, bandFraction: Float) {
+        let ts = s * scale
+        let lh = ts * 1.3, cell = ts * 0.9
+        let bandH = max(lh * 2.4, H * bandFraction)
+        let bandTop = H - bandH
+        tr.fillRect(xPx: 0, yPx: bandTop, wPx: W, hPx: bandH, color: SIMD3(0, 0, 0), opacity: 0.5)
+        tr.fillRect(xPx: 0, yPx: bandTop, wPx: W, hPx: max(1, H * 0.0016), color: accent, opacity: 0.28)
+
+        let leftPad = W * 0.025
+        let contentTop = bandTop + lh * 0.35
+        let promptY = H - lh * 1.05
+        let maxRows = max(2, Int((promptY - contentTop) / lh))
+        let maxChars = max(12, Int((W - 2 * leftPad) / tr.charWidth(pxHeight: cell)))
+        let logical = terminal.visibleLines(max: maxRows + 6)
+        var rows: [(String, SIMD3<Float>, Float)] = []
+        for ln in logical {
+            let (col, op) = colorFor(ln.category, accent: accent, dim: dim)
+            for r in wrap(ln.text, maxChars) { rows.append((r, col, op)) }
+        }
+        for r in wrap(terminal.promptLine(t: t), maxChars) { rows.append((r, accent, 0.95)) }
+        let shown = Array(rows.suffix(maxRows + 1))            // +1 for the prompt row
+        let n = shown.count
+        for (i, row) in shown.enumerated() {
+            let y = promptY - Float(n - 1 - i) * lh
+            if y < bandTop - lh { continue }
+            tr.add(row.0, xPx: leftPad, yPx: y, pxHeight: cell, color: row.1, opacity: row.2)
+        }
     }
 
     // --- terminal: Apple-Lisa-style centered CORP OS window (the story mode) ---

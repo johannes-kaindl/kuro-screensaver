@@ -28,7 +28,8 @@ struct Settings {
     var cityAltitude: Altitude = .low
     var showHud = true              // HUD panels (flight data, crosshair, kanji, scene label)
     enum TerminalLayout: String, CaseIterable { case off, strip, stripDark = "stripdark", window }
-    var terminalLayout: TerminalLayout = .strip   // narrative terminal: off / bottom-strip / Lisa center-window
+    var terminalLayout: TerminalLayout = .strip   // narrative terminal: off / strip / full-width band / Lisa window
+    var terminalBandHeight: Float = 0.24          // band layout: fraction of screen height it occupies
     var bloomScale: Float = 1       // multiplier on the per-preset bloom strength (0 = off)
     var fog: Fog = .auto
     var curvature: Float = 0.12     // CRT screen barrel curvature (0 = flat)
