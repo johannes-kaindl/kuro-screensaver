@@ -65,6 +65,7 @@ func parseArgs() -> Args {
         case "--halation": a.halation = Float(it.next() ?? "") ?? a.halation
         case "--matrix": a.matrix = true
         case "--matrix-only": a.matrix = true; a.matrixOnly = true; a.noHud = true
+        case "--black": a.matrixOnly = true   // black scene (verify HUD/terminal overlays alone)
         default: FileHandle.standardError.write("unknown arg \(k)\n".data(using: .utf8)!)
         }
     }
