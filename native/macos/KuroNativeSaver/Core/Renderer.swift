@@ -59,7 +59,7 @@ final class Renderer {
         ds.isDepthWriteEnabled = true
         depthState = device.makeDepthStencilState(descriptor: ds)!
 
-        bloom = BloomChain(device: device, library: lib, sigma: 6)
+        bloom = BloomChain(device: device, library: lib, sigma: 3)   // quarter-res → sigma 3 ≈ half-res 6
         glitch = GlitchScheduler(intensity: settings.crtIntensity,
                                  seed: (settings.seed ?? freshSeed()) &+ 777)
     }

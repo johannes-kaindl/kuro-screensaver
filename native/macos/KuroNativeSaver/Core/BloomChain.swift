@@ -47,7 +47,9 @@ final class BloomChain {
 
     /// Encode threshold + blur into `cb`; returns the blurred bloom texture.
     func generate(_ cb: MTLCommandBuffer, sceneHDR: MTLTexture) -> MTLTexture {
-        ensure(max(1, sceneHDR.width / 2), max(1, sceneHDR.height / 2))
+        // Quarter-res bloom: the glow is soft, so the lower-res blur is visually
+        // ~identical but markedly cheaper (helps the heavier scenes at 4K/5K).
+        ensure(max(1, sceneHDR.width / 4), max(1, sceneHDR.height / 4))
         guard let src, let dst else { return sceneHDR }
 
         let rp = MTLRenderPassDescriptor()
