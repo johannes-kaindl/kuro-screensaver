@@ -31,6 +31,25 @@ enum Mathx {
         float4x4(diagonal: SIMD4<Float>(s, s, s, 1))
     }
 
+    /// Right-handed world→eye view matrix (camera looks down -Z).
+    static func lookAt(eye: SIMD3<Float>, center: SIMD3<Float>, up: SIMD3<Float>) -> float4x4 {
+        let z = simd_normalize(eye - center)            // backward
+        let x = simd_normalize(simd_cross(up, z))       // right
+        let y = simd_cross(z, x)                        // up
+        return float4x4(columns: (
+            SIMD4<Float>(x.x, y.x, z.x, 0),
+            SIMD4<Float>(x.y, y.y, z.y, 0),
+            SIMD4<Float>(x.z, y.z, z.z, 0),
+            SIMD4<Float>(-simd_dot(x, eye), -simd_dot(y, eye), -simd_dot(z, eye), 1)
+        ))
+    }
+
+    /// Rotate vector v about a unit axis by angle (Rodrigues).
+    static func rotate(_ v: SIMD3<Float>, axis: SIMD3<Float>, angle: Float) -> SIMD3<Float> {
+        let c = cos(angle), s = sin(angle)
+        return v * c + simd_cross(axis, v) * s + axis * simd_dot(axis, v) * (1 - c)
+    }
+
     static func rotationX(_ a: Float) -> float4x4 {
         let c = cos(a), s = sin(a)
         return float4x4(columns: (

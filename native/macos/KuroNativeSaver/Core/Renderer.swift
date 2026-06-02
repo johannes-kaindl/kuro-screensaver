@@ -85,6 +85,9 @@ final class Renderer {
     /// Advance simulation by `dt` seconds without drawing.
     func advance(dt: Double) {
         t += dt
+        // Set the aspect-aware base FOV before update so scenes (tunnel) can
+        // adjust it (boost). Uses the last drawn size; 72° on the very first tick.
+        scene.camera.fovDegrees = Camera.defaultFovDeg(width: width, height: height)
         scene.update(t: t, dt: dt)
         glitch.update(t: t)
         scanDriftY = (scanDriftY + 36 * Float(dt)).truncatingRemainder(dividingBy: 4)
@@ -111,9 +114,7 @@ final class Renderer {
         enc.setDepthStencilState(depthState)
 
         let aspect = Float(width) / Float(height)
-        // Apply the web's aspect-aware vertical FOV (core.ts onResize parity).
-        scene.camera.fovDegrees = Camera.defaultFovDeg(width: width, height: height)
-        let cam = scene.camera
+        let cam = scene.camera   // FOV already set in advance() (so scenes can adjust it)
         let view = cam.view()
         let viewProj = cam.projection(aspect: aspect) * view
         // three.js PointsMaterial sizeAttenuation: gl_PointSize = size * height/2 / -z

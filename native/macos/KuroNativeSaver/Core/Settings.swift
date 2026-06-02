@@ -17,6 +17,7 @@ struct Settings {
     var presetID: String = "toxic-haze"
     var speed: Speed = .norm
     var crtIntensity: Float = 0.35     // 0..1, drives the glitch scheduler cadence
+    var tunnelAutoBoost: Bool = true   // tunnel: speed surge on straight sections
     var seed: Int32? = nil             // nil → fresh per activation
 
     var preset: ColorPreset { Palette.preset(presetID) }

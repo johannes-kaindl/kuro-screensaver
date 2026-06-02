@@ -11,7 +11,8 @@ enum SceneRegistry {
         switch id {
         case "rift": return RiftScene(ctx: ctx)
         case "void": return VoidScene(ctx: ctx)
-        // tunnel/city added as they are implemented
+        case "tunnel": return TunnelScene(ctx: ctx)
+        // city added when implemented
         default: return TerrainScene(ctx: ctx)
         }
     }

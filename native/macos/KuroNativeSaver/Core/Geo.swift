@@ -83,6 +83,21 @@ enum Geo {
         return (verts, idx)
     }
 
+    /// Torus wireframe (hole axis = Z), as flat positions + grid line indices.
+    /// Big circle radius R in the XY plane, tube radius `tube`.
+    static func torus(R: Float, tube: Float, radial: Int, tubular: Int) -> (pos: [Float], idx: [UInt32]) {
+        var p = [Float](); p.reserveCapacity((radial + 1) * (tubular + 1) * 3)
+        for j in 0...tubular {
+            let v = Float(j) / Float(tubular) * 2 * .pi
+            for i in 0...radial {
+                let w = Float(i) / Float(radial) * 2 * .pi
+                let ringR = R + tube * cos(w)
+                p.append(ringR * cos(v)); p.append(ringR * sin(v)); p.append(tube * sin(w))
+            }
+        }
+        return (p, gridLineIndices(cols: radial, rows: tubular))
+    }
+
     /// Unique edges of a triangle face list, as a line index buffer.
     static func triangleEdges(_ faces: [(Int, Int, Int)]) -> [UInt32] {
         var seen = Set<Int64>(); var idx: [UInt32] = []

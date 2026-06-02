@@ -9,6 +9,7 @@ struct Camera {
     var fovDegrees: Float = 72
     var near: Float = 0.1
     var far: Float = 600
+    var viewOverride: float4x4? = nil   // tunnel supplies a lookAt+roll view directly
 
     /// Vertical FOV breakpoints ported from Engine.defaultFov (core.ts).
     static func defaultFovDeg(width: Int, height: Int) -> Float {
@@ -25,6 +26,7 @@ struct Camera {
 
     /// World→eye. Camera world transform is T(pos)·Rx·Ry·Rz; view is its inverse.
     func view() -> float4x4 {
+        if let v = viewOverride { return v }
         let r = Mathx.rotationX(rotation.x)
               * Mathx.rotationY(rotation.y)
               * Mathx.rotationZ(rotation.z)
