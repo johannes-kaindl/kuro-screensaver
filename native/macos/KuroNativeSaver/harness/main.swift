@@ -28,6 +28,7 @@ struct Args {
     var intensity: Float = 0.35
     var forceGlitch: String? = nil   // htear|flicker|chroma|scanpulse (debug)
     var bench = 0                    // if > 0: render N frames timed, no PNG
+    var crash: Float = -1            // if >= 0: freeze crash collapse at this amount
 }
 
 func parseArgs() -> Args {
@@ -47,6 +48,7 @@ func parseArgs() -> Args {
         case "--intensity": a.intensity = Float(it.next() ?? "") ?? a.intensity
         case "--force-glitch": a.forceGlitch = it.next()
         case "--bench": a.bench = Int(it.next() ?? "") ?? a.bench
+        case "--crash": a.crash = Float(it.next() ?? "") ?? 0.85
         default: FileHandle.standardError.write("unknown arg \(k)\n".data(using: .utf8)!)
         }
     }
@@ -120,6 +122,7 @@ let scene: Scene = SceneRegistry.make(args.scene, ctx: ctx)
 let renderer = Renderer(device: device, settings: settings, scene: scene,
                         targetFormat: target.pixelFormat)
 if let g = args.forceGlitch { renderer.debugForceGlitch(g) }
+if args.crash >= 0 { renderer.debugForceCrash(args.crash) }
 
 func drawFrame(path: String) {
     renderer.draw(into: target)

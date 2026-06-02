@@ -22,7 +22,13 @@ enum Shaders {
         float4 p0;        // exposure, bloomStrength, chromaOffset, scanOpacity
         float4 p1;        // scanDriftY(px), vignetteInner, vignetteStrength, time
         float4 p2;        // hTearAmount, hTearBandY, brightness, scanPulse (glitch)
+        float4 p3;        // vRoll, blackFrame, skewX, staticAmt (glitch)
+        float4 p4;        // collapse, flash, _, _ (crash)
     };
+
+    inline float hash21(float2 p) {
+        return fract(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453);
+    }
 
     // ACES filmic tonemap (Narkowicz approximation).
     inline float3 aces(float3 x) {
@@ -101,13 +107,21 @@ enum Shaders {
         constexpr sampler s(filter::linear, address::clamp_to_edge);
         float bs = u.p0.y;
         float2 uv = in.uv;
+        float sy = in.uv.y;                      // original screen y (for line/scan)
 
-        // glitch: horizontal tear on a band near hTearBandY (Task 9 drives these)
+        // geometry glitches: h-tear band, v-roll, wave skew
         float tear = u.p2.x;
-        if (tear != 0.0) {
-            float band = exp(-pow((uv.y - u.p2.y) * 6.0, 2.0));   // soft y-band
-            uv.x += tear * band;
+        if (tear != 0.0) { uv.x += tear * exp(-pow((uv.y - u.p2.y) * 6.0, 2.0)); }
+        uv.y = fract(uv.y + u.p3.x);             // v-roll (wraps)
+        uv.x += (uv.y - 0.5) * u.p3.z;           // wave skew
+
+        // crash collapse: squeeze the image vertically toward a center line
+        float collapse = u.p4.x;
+        if (collapse > 0.0) {
+            float sq = 1.0 - collapse * 0.997;
+            uv.y = 0.5 + (uv.y - 0.5) / sq;
         }
+        bool outside = (collapse > 0.0) && (uv.y < 0.0 || uv.y > 1.0);
 
         // chromatic aberration: radial RGB split about screen center
         float off = u.p0.z;
@@ -116,9 +130,11 @@ enum Shaders {
         col.r = sceneTex.sample(s, uv - dr).r + bloomTex.sample(s, uv - dr).r * bs;
         col.g = sceneTex.sample(s, uv).g       + bloomTex.sample(s, uv).g       * bs;
         col.b = sceneTex.sample(s, uv + dr).b  + bloomTex.sample(s, uv + dr).b  * bs;
+        if (outside) col = float3(0.0);
 
         col = aces(col * u.p0.x);               // exposure + tonemap
         col *= u.p2.z;                          // brightness flicker (default 1)
+        col *= (1.0 + u.p4.y);                  // crash reboot flash
 
         // scanlines: sinusoidal darkening, 4px period, drifting; + glitch pulse
         float scanAmt = u.p0.w * (1.0 + u.p2.w);
@@ -126,9 +142,24 @@ enum Shaders {
         col *= (1.0 - scanAmt * s2);
 
         // vignette: radial smoothstep darkening toward the edges
-        float r = length(uv - 0.5);
+        float r = length(in.uv - 0.5);
         float vig = smoothstep(u.p1.y, 0.72, r);
         col *= (1.0 - vig * 0.72 * u.p1.z);
+
+        // static burst (screen-blended hash noise)
+        if (u.p3.w > 0.0) {
+            float n = hash21(in.uv * 800.0 + u.p1.w);
+            col = 1.0 - (1.0 - col) * (1.0 - n * u.p3.w);
+        }
+
+        // crash power-off line (bright pinch at center while collapsing)
+        if (collapse > 0.0) {
+            float line = exp(-pow((sy - 0.5) * 220.0, 2.0)) * collapse;
+            col += float3(0.78, 0.95, 0.84) * line;   // CRT phosphor-white pinch
+        }
+
+        // black-frame drop
+        if (u.p3.y > 0.5) col = float3(0.0);
 
         return float4(col, 1.0);
     }

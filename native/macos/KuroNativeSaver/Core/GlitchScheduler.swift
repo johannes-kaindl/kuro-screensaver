@@ -10,18 +10,22 @@ final class GlitchScheduler {
     var intensity: Float
     private var rng: LCG
 
-    private enum Kind { case none, hTear, flicker, chroma, scanPulse }
+    private enum Kind { case none, hTear, flicker, chroma, scanPulse, vRoll, blackFrame, skew, staticBurst }
     private var kind: Kind = .none
     private var until: Double = 0
     private var nextAt: Double
     private var forced = false
 
-    // current distortion values (read via uniforms()/chromaOffsetBump)
+    // current distortion values
     private var hTearAmount: Float = 0
     private var hTearBandY: Float = 0
     private var brightness: Float = 1
     private var scanPulse: Float = 0
     private var chromaBump: Float = 0
+    private var vRoll: Float = 0
+    private var blackFrame: Float = 0
+    private var skewX: Float = 0
+    private var staticAmt: Float = 0
 
     init(intensity: Float, seed: Int32) {
         self.intensity = intensity
@@ -37,6 +41,7 @@ final class GlitchScheduler {
 
     private func reset() {
         kind = .none; hTearAmount = 0; brightness = 1; scanPulse = 0; chromaBump = 0
+        vRoll = 0; blackFrame = 0; skewX = 0; staticAmt = 0
     }
 
     private func scheduleNext(now: Double) {
@@ -46,7 +51,7 @@ final class GlitchScheduler {
 
     private func fire(now: Double) {
         let i = intensity
-        let r = rng.next() * 74          // weights: 28 + 20 + 12 + 14
+        let r = rng.next() * 103         // weights 28+20+12+14+4+8+10+7
         let dur: Double
         if r < 28 {                      // h-tear
             kind = .hTear
@@ -55,27 +60,38 @@ final class GlitchScheduler {
             dur = 0.04 + rng.next() * 0.08
         } else if r < 48 {               // brightness flicker
             kind = .flicker
-            if rng.next() < 0.6 {
-                brightness = 1 - 0.3 * i - Float(rng.next()) * 0.2
-            } else {
-                brightness = 1 + 0.3 * i + Float(rng.next()) * 0.4
-            }
+            if rng.next() < 0.6 { brightness = 1 - 0.3 * i - Float(rng.next()) * 0.2 }
+            else { brightness = 1 + 0.3 * i + Float(rng.next()) * 0.4 }
             dur = 0.06 + rng.next() * 0.09
         } else if r < 60 {               // chroma spike
             kind = .chroma
-            chromaBump = (0.003 + Float(rng.next()) * 0.006) * i   // web grouping (crt-sim.ts:220)
+            chromaBump = (0.003 + Float(rng.next()) * 0.006) * i
             dur = 0.08 + rng.next() * 0.12
-        } else {                         // scanline pulse
+        } else if r < 74 {               // scanline pulse
             kind = .scanPulse
             scanPulse = 0.4 + Float(rng.next()) * 1.2 * i
             dur = 0.14 + rng.next() * 0.22
+        } else if r < 78 {               // v-roll
+            kind = .vRoll
+            vRoll = (0.04 + Float(rng.next()) * 0.06) * i
+            dur = 0.15 + rng.next() * 0.2
+        } else if r < 86 {               // black-frame drop
+            kind = .blackFrame; blackFrame = 1
+            dur = 0.02 + rng.next() * 0.03
+        } else if r < 96 {               // wave skew
+            kind = .skew
+            skewX = (Float(rng.next()) - 0.5) * 0.08 * i
+            dur = 0.08 + rng.next() * 0.1
+        } else {                         // static burst
+            kind = .staticBurst
+            staticAmt = (0.35 + 0.55 * i) * Float(rng.next())
+            dur = 0.04 + rng.next() * 0.05
         }
         until = now + dur
     }
 
-    func uniforms() -> SIMD4<Float> {
-        SIMD4(hTearAmount, hTearBandY, brightness, scanPulse)
-    }
+    func uniforms() -> SIMD4<Float> { SIMD4(hTearAmount, hTearBandY, brightness, scanPulse) }
+    func uniforms3() -> SIMD4<Float> { SIMD4(vRoll, blackFrame, skewX, staticAmt) }
     var chromaOffsetBump: Float { chromaBump }
 
     /// Debug: hold one artifact active indefinitely (for single-frame verification).
@@ -86,6 +102,9 @@ final class GlitchScheduler {
         case "flicker": kind = .flicker; brightness = 1.7
         case "chroma": kind = .chroma; chromaBump = 0.012
         case "scanpulse": kind = .scanPulse; scanPulse = 1.6
+        case "vroll": kind = .vRoll; vRoll = 0.2
+        case "skew": kind = .skew; skewX = 0.1
+        case "static": kind = .staticBurst; staticAmt = 0.6
         default: break
         }
     }

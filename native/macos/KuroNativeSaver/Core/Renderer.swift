@@ -11,7 +11,11 @@ final class Renderer {
     let queue: MTLCommandQueue
     let settings: Settings
     let preset: ColorPreset
-    let scene: Scene
+    private var scene: Scene
+    private var sceneIndex = 0
+    private var sceneAge: Double = 0
+    private var crash = CrashFx()
+    var autoCycleSec: Double = 0   // 0 = off (host enables; harness leaves off)
 
     private let scenePipe: MTLRenderPipelineState
     private let compositePipe: MTLRenderPipelineState
@@ -35,6 +39,7 @@ final class Renderer {
         self.settings = settings
         self.preset = settings.preset
         self.scene = scene
+        self.sceneIndex = SceneRegistry.ids.firstIndex(of: settings.scene) ?? 0
         self.queue = device.makeCommandQueue()!
 
         let lib: MTLLibrary
@@ -66,6 +71,15 @@ final class Renderer {
 
     /// Debug: hold one glitch artifact active (single-frame verification).
     func debugForceGlitch(_ name: String) { glitch.forceHold(name) }
+    /// Debug: freeze a crash-collapse amount for single-frame verification.
+    func debugForceCrash(_ amount: Float) { crash.debugSet(collapse: amount) }
+
+    private func swapScene() {
+        sceneIndex = (sceneIndex + 1) % SceneRegistry.ids.count
+        let ctx = SceneContext(device: device, rng: LCG(seed: freshSeed()),
+                               settings: settings, accent: preset.accentRGB)
+        scene = SceneRegistry.make(SceneRegistry.ids[sceneIndex], ctx: ctx)
+    }
 
     private func ensureTextures(_ w: Int, _ h: Int) {
         guard w != width || h != height || sceneHDR == nil else { return }
@@ -91,6 +105,13 @@ final class Renderer {
         scene.update(t: t, dt: dt)
         glitch.update(t: t)
         scanDriftY = (scanDriftY + 36 * Float(dt)).truncatingRemainder(dividingBy: 4)
+
+        // scene auto-cycle via the crash→reboot transition
+        sceneAge += dt
+        if autoCycleSec > 0 && sceneAge > autoCycleSec && !crash.active {
+            crash.trigger(); sceneAge = 0
+        }
+        if crash.update(dt: dt) { swapScene() }
     }
 
     /// Draw the current state into `target`.
@@ -163,7 +184,9 @@ final class Renderer {
             p0: SIMD4(exposure, preset.bloomStrength,
                       0.0015 + glitch.chromaOffsetBump, preset.scanOpacity),
             p1: SIMD4(scanDriftY, vignetteInner, preset.vignetteStrength, Float(t)),
-            p2: glitch.uniforms())
+            p2: glitch.uniforms(),
+            p3: glitch.uniforms3(),
+            p4: crash.uniforms())
         enc2.setFragmentBytes(&pu, length: MemoryLayout<PostUniforms>.stride, index: 0)
         enc2.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         enc2.endEncoding()
