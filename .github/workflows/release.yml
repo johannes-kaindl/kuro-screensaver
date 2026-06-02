@@ -47,6 +47,15 @@ jobs:
           bash scripts/build-native-saver.sh
           mkdir -p dist-native/savers
           cp native/macos/build/KuroNativeSaver.saver.zip dist-native/savers/
+      - name: Build standalone Metal app (compile check)
+        run: |
+          # The robust macOS-26 path (standalone fullscreen app). CI has no
+          # Developer ID cert, so this is ad-hoc signed — a build/smoke check,
+          # NOT a distributable. The notarized release build is produced locally
+          # via scripts/package-native-app.sh (needs the cert + notary profile).
+          bash scripts/build-native-app.sh
+          mkdir -p dist-native
+          ditto -c -k --keepParent native/macos/build/KuroMetalApp.app dist-native/KuroMetalApp-ci-unsigned.zip
       - name: Build video .savers
         run: |
           # Fetch pre-rendered preset videos from the dedicated asset release
@@ -71,6 +80,7 @@ jobs:
           path: |
             dist-native/KuroScreensaver-macos.zip
             dist-native/savers/*.saver.zip
+            dist-native/KuroMetalApp-ci-unsigned.zip
 
   windows:
     runs-on: ubuntu-latest
