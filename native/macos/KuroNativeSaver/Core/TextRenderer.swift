@@ -54,8 +54,9 @@ final class TextRenderer {
             func v(_ x: Float, _ y: Float, _ u: Float, _ vv: Float) {
                 verts.append(contentsOf: [x, y, u, vv, r3, g3, b3, a])
             }
-            v(x0, yt, r.uLo, r.vHi); v(x1, yt, r.uHi, r.vHi); v(x0, yb, r.uLo, r.vLo)
-            v(x0, yb, r.uLo, r.vLo); v(x1, yt, r.uHi, r.vHi); v(x1, yb, r.uHi, r.vLo)
+            // screen-top → glyph-top (vTop); screen-bottom → vBottom
+            v(x0, yt, r.uLo, r.vTop); v(x1, yt, r.uHi, r.vTop); v(x0, yb, r.uLo, r.vBottom)
+            v(x0, yb, r.uLo, r.vBottom); v(x1, yt, r.uHi, r.vTop); v(x1, yb, r.uHi, r.vBottom)
         }
     }
 

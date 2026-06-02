@@ -60,16 +60,17 @@ final class FontAtlas {
                         withBytes: ctx.data!, bytesPerRow: atlasW)
     }
 
-    /// Atlas UV rect for a character: (uLo, vLo, uHi, vHi) where v=0 is the first
-    /// texture row (= image bottom, CG is bottom-up). vHi is the glyph's visual top.
-    func uvRect(_ c: Character) -> (uLo: Float, vLo: Float, uHi: Float, vHi: Float)? {
+    /// Atlas UV rect for a character. CGBitmapContext memory is TOP-DOWN (row 0 =
+    /// image top) and texture.replace preserves that, so Metal's v=0 is the image
+    /// top. vTop is the glyph's visual top (smaller v).
+    func uvRect(_ c: Character) -> (uLo: Float, uHi: Float, vTop: Float, vBottom: Float)? {
         guard let i = index[c] else { return nil }
         let col = i % cols, rowTop = i / cols
         let uLo = Float(col * cellW) / Float(atlasW)
         let uHi = Float((col + 1) * cellW) / Float(atlasW)
-        let vLo = Float(atlasH - (rowTop + 1) * cellH) / Float(atlasH)
-        let vHi = Float(atlasH - rowTop * cellH) / Float(atlasH)
-        return (uLo, vLo, uHi, vHi)
+        let vTop = Float(rowTop * cellH) / Float(atlasH)
+        let vBottom = Float((rowTop + 1) * cellH) / Float(atlasH)
+        return (uLo, uHi, vTop, vBottom)
     }
 
     var cellAspect: Float { Float(cellW) / Float(cellH) }

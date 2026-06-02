@@ -97,11 +97,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             win.level = NSWindow.Level(Int(CGShieldingWindowLevel()))
             win.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
             win.backgroundColor = .black; win.isOpaque = true; win.hasShadow = false
+            win.setFrame(screen.frame, display: true)   // exact per-screen placement
             let view = MetalHostView(frame: NSRect(origin: .zero, size: screen.frame.size),
                                      settings: s, autoCycle: cycle)
             view.autoresizingMask = [.width, .height]
             win.contentView = view
-            win.makeKeyAndOrderFront(nil)
+            win.orderFrontRegardless()                   // shows on non-main screens too
             view.start()
             saverWindows.append(win); saverViews.append(view)
         }

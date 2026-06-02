@@ -20,7 +20,7 @@ enum LoginItem {
             "Label": label,
             "ProgramArguments": [exe, "--agent"],
             "RunAtLoad": true,
-            "KeepAlive": true,
+            "KeepAlive": false,   // start at login only; honor an explicit Quit
             "ProcessType": "Interactive",
         ]
         try? FileManager.default.createDirectory(
