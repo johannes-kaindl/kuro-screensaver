@@ -27,6 +27,7 @@ struct Args {
     var seed: Int32 = 1337
     var intensity: Float = 0.35
     var forceGlitch: String? = nil   // htear|flicker|chroma|scanpulse (debug)
+    var bench = 0                    // if > 0: render N frames timed, no PNG
 }
 
 func parseArgs() -> Args {
@@ -45,6 +46,7 @@ func parseArgs() -> Args {
         case "--seed": a.seed = Int32(it.next() ?? "") ?? a.seed
         case "--intensity": a.intensity = Float(it.next() ?? "") ?? a.intensity
         case "--force-glitch": a.forceGlitch = it.next()
+        case "--bench": a.bench = Int(it.next() ?? "") ?? a.bench
         default: FileHandle.standardError.write("unknown arg \(k)\n".data(using: .utf8)!)
         }
     }
@@ -126,7 +128,16 @@ func drawFrame(path: String) {
     print("wrote \(path)")
 }
 
-if args.seconds > 0 {
+if args.bench > 0 {
+    // Warm up, then time N frames (draw() is synchronous → CPU encode + GPU exec).
+    for _ in 0..<10 { renderer.advance(dt: 1.0 / 60.0); renderer.draw(into: target) }
+    let start = DispatchTime.now().uptimeNanoseconds
+    for _ in 0..<args.bench { renderer.advance(dt: 1.0 / 60.0); renderer.draw(into: target) }
+    let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+    let perFrame = elapsedMs / Double(args.bench)
+    print(String(format: "bench %@/%@ %dx%d: %.3f ms/frame  (%.0f fps cap)",
+                 args.scene, args.preset, args.w, args.h, perFrame, 1000.0 / perFrame))
+} else if args.seconds > 0 {
     let n = Int(args.seconds * args.fps)
     let stepDt = 1.0 / args.fps
     for f in 0..<n {
