@@ -24,6 +24,11 @@ final class KuroNativeSaverView: ScreenSaverView {
     private let sizeLock = NSLock()
     private var pendingDrawableSize: CGSize?
 
+    // Tahoe legacyScreenSaver hardening (Apple FB19204084: stopAnimation is never
+    // called on real stop, so instances stack and run invisibly → RAM/GPU blowup).
+    // We self-stop on the willstop distributed notification.
+    private var lameDuck = false
+
     override init?(frame: NSRect, isPreview: Bool) {
         super.init(frame: frame, isPreview: isPreview)
         animationTimeInterval = 1.0 / 60.0
@@ -32,6 +37,18 @@ final class KuroNativeSaverView: ScreenSaverView {
         setupMetal()
         // No Metal device / failed setup → decline so AppKit falls back gracefully.
         guard metalLayer != nil, renderer != nil else { return nil }
+        DistributedNotificationCenter.default().addObserver(
+            self, selector: #selector(screenSaverWillStop),
+            name: NSNotification.Name("com.apple.screensaver.willstop"), object: nil)
+    }
+
+    /// The host doesn't reliably call stopAnimation on Tahoe; this distributed
+    /// notification fires on real stop. Stop rendering and self-exit (non-preview)
+    /// so instances don't stack and leak.
+    @objc private func screenSaverWillStop() {
+        lameDuck = true
+        stopDisplayLink()
+        if !isPreview { exit(0) }
     }
 
     @available(*, unavailable)
@@ -122,7 +139,7 @@ final class KuroNativeSaverView: ScreenSaverView {
         // (command buffers, drawables, encoders, MPS temporaries) accumulate
         // forever — a multi-GB / Mach-port leak in the long-running saver.
         autoreleasepool {
-            guard isAnimating else { return }   // bail on late callbacks after stop
+            guard !lameDuck, isAnimating else { return }   // bail on late/post-stop callbacks
             guard let ml = metalLayer, let renderer else { return }
 
             sizeLock.lock()
@@ -152,5 +169,8 @@ final class KuroNativeSaverView: ScreenSaverView {
     override var hasConfigureSheet: Bool { true }
     override var configureSheet: NSWindow? { ConfigureSheetController.shared.makeWindow() }
 
-    deinit { stopDisplayLink() }
+    deinit {
+        DistributedNotificationCenter.default().removeObserver(self)
+        stopDisplayLink()
+    }
 }
