@@ -14,6 +14,7 @@ final class CityScene: Scene {
 
     private let speedPerSec: Float
     private let altTarget: Float
+    private var fly: CameraFly
 
     private static let CL: Float = 320, SW: Float = 22, BS: Float = 22
 
@@ -29,6 +30,9 @@ final class CityScene: Scene {
         let device = ctx.device
         speedPerSec = ctx.settings.speed.multiplier * 0.24 * 60   // web *0.24 per frame@60
         altTarget = ctx.settings.cityAltitude.value
+        // banking weave down the corridor (latAmp keeps it between the buildings ~±30)
+        fly = CameraFly(seed: (ctx.settings.seed ?? freshSeed()) &+ 5151,
+                        latAmp: 8, vertAmp: 1.6, vertBase: altTarget, pitchBase: -0.08)
 
         camera.position = SIMD3(0, altTarget, 0)
         camera.rotation = SIMD3(-0.08, 0, 0)
@@ -174,9 +178,8 @@ final class CityScene: Scene {
             b.item.opacity = sin(tf * b.speed + b.phase) > 0 ? b.hi : b.lo
         }
 
-        let target = altTarget + sin(tf * 0.32) * 0.85 + sin(tf * 0.11) * 0.28
-        camera.position.y += (target - camera.position.y) * 0.08
-        camera.position.x = 0; camera.position.z = 0
-        camera.rotation = SIMD3(-0.08, sin(tf * 0.09) * 0.044, sin(tf * 0.18) * 0.013)
+        let f = fly.update(t: t, forwardSpeed: speedPerSec)
+        camera.position = SIMD3(f.x, max(1.8, f.y), 0)   // clamp above the street
+        camera.rotation = SIMD3(f.pitch, f.yaw, f.roll)
     }
 }

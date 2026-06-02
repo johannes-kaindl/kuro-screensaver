@@ -13,6 +13,7 @@ final class VoidScene: Scene {
 
     private let spdMul: Float
     private var rng: LCG
+    private var fly: CameraFly
 
     private struct Roid { var item: DrawItem; var pos: SIMD3<Float>; var rot: SIMD3<Float>; var scale: Float; var spin: SIMD3<Float> }
     private var roids: [Roid] = []
@@ -26,6 +27,8 @@ final class VoidScene: Scene {
     init(ctx: SceneContext) {
         let device = ctx.device
         spdMul = ctx.settings.speed.multiplier
+        fly = CameraFly(seed: (ctx.settings.seed ?? freshSeed()) &+ 6262,
+                        latAmp: 6, vertAmp: 3, vertBase: 0, pitchBase: 0)
         var r = ctx.rng
 
         camera.position = SIMD3(0, 0, 0)
@@ -132,14 +135,13 @@ final class VoidScene: Scene {
     }
 
     func update(t: Double, dt: Double) {
-        let tf = Float(t), dtf = Float(dt)
-        // camera flythrough
+        let dtf = Float(dt)
+        // camera flythrough: forward on z, banking weave through the belt
         camera.position.z -= spdMul * 14 * dtf
-        let dx = sin(tf * 0.13) * 1.4 + sin(tf * 0.31) * 0.55
-        let dy = cos(tf * 0.09) * 0.75 + sin(tf * 0.27) * 0.30
-        camera.position.x = camera.position.x * 0.993 + dx * dtf * 1.2
-        camera.position.y = camera.position.y * 0.993 + dy * dtf * 1.2
-        camera.rotation = SIMD3(cos(tf * 0.11) * 0.06, sin(tf * 0.07) * 0.10, 0)
+        let f = fly.update(t: t, forwardSpeed: spdMul * 14)
+        camera.position.x = f.x
+        camera.position.y = f.y
+        camera.rotation = SIMD3(f.pitch, f.yaw, f.roll)
 
         let camX = camera.position.x, camY = camera.position.y, camZ = camera.position.z
         let recycleZ = camZ + BEHIND

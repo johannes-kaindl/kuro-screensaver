@@ -42,11 +42,14 @@ final class TerrainScene: Scene {
     private var logicalB = Terrain.startB
     private var posAz = Terrain.startA
     private var posBz = Terrain.startB
+    private var fly: CameraFly
 
     init(ctx: SceneContext) {
         let device = ctx.device
         // web: spd = SPEED_VALUES[speed] * 0.2 per frame @60fps → *12 per second.
         speedPerSec = ctx.settings.speed.multiplier * 12
+        fly = CameraFly(seed: (ctx.settings.seed ?? freshSeed()) &+ 4242,
+                        latAmp: 12, vertAmp: 2.6, vertBase: 6.5, pitchBase: -0.2)
 
         camera.position = SIMD3(0, 6, 0)
         camera.rotation = SIMD3(-0.22, 0, 0)
@@ -147,9 +150,9 @@ final class TerrainScene: Scene {
         chunkA.model = Mathx.translation(SIMD3(0, 0, posAz))
         chunkB.model = Mathx.translation(SIMD3(0, 0, posBz))
 
-        camera.position.y = 6 + sin(tf * 0.33) * 0.9
-        camera.rotation.x = -0.22
-        camera.rotation.z = sin(tf * 0.17) * 0.009
+        let f = fly.update(t: t, forwardSpeed: speedPerSec)
+        camera.position = SIMD3(f.x, f.y, 0)
+        camera.rotation = SIMD3(f.pitch, f.yaw, f.roll)
 
         dust.model = Mathx.translation(SIMD3(sin(tf * 0.07) * 4, 0, 0))
     }
