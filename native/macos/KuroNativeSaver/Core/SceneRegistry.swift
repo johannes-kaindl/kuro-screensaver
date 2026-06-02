@@ -10,7 +10,8 @@ enum SceneRegistry {
     static func make(_ id: String, ctx: SceneContext) -> Scene {
         switch id {
         case "rift": return RiftScene(ctx: ctx)
-        // void/tunnel/city added as they are implemented
+        case "void": return VoidScene(ctx: ctx)
+        // tunnel/city added as they are implemented
         default: return TerrainScene(ctx: ctx)
         }
     }

@@ -27,6 +27,10 @@ enum Mathx {
         return m
     }
 
+    static func scale(_ s: Float) -> float4x4 {
+        float4x4(diagonal: SIMD4<Float>(s, s, s, 1))
+    }
+
     static func rotationX(_ a: Float) -> float4x4 {
         let c = cos(a), s = sin(a)
         return float4x4(columns: (
