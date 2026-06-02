@@ -14,14 +14,14 @@ final class MetalHostView: NSView {
     private var displayLink: CVDisplayLink?
     private var lastTime: CFTimeInterval = 0
     private let settings: Settings
-    private let autoCycle: Bool
+    private let autoCycleSec: Double
 
     private let sizeLock = NSLock()
     private var pendingDrawableSize: CGSize?
 
-    init(frame: NSRect, settings: Settings, autoCycle: Bool) {
+    init(frame: NSRect, settings: Settings, autoCycleSec: Double) {
         self.settings = settings
-        self.autoCycle = autoCycle
+        self.autoCycleSec = autoCycleSec
         super.init(frame: frame)
         wantsLayer = true
         layer?.backgroundColor = NSColor.black.cgColor
@@ -45,7 +45,7 @@ final class MetalHostView: NSView {
                                settings: settings, accent: settings.preset.accentRGB)
         let scene = SceneRegistry.make(settings.scene, ctx: ctx)
         let r = Renderer(device: device, settings: settings, scene: scene, targetFormat: .bgra8Unorm)
-        r.autoCycleSec = autoCycle ? 18 : 0
+        r.autoCycleSec = autoCycleSec
         renderer = r
         updateDrawableSize()
     }

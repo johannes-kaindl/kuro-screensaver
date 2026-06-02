@@ -17,11 +17,18 @@ struct Settings {
         case low, mid, high
         var value: Float { switch self { case .low: return 4; case .mid: return 11; case .high: return 24 } }
     }
+    enum Fog: String, CaseIterable {
+        case clear, auto, dense
+        var mul: Float { switch self { case .clear: return 0.45; case .auto: return 1; case .dense: return 2.2 } }
+    }
 
     var scene: String = "terrain"
     var presetID: String = "toxic-haze"
     var speed: Speed = .norm
     var cityAltitude: Altitude = .low
+    var showHud = true              // HUD + terminal overlay
+    var bloom = true                // neon bloom glow
+    var fog: Fog = .auto
     var crtIntensity: Float = 0.35     // 0..1, drives the glitch scheduler cadence
     var tunnelAutoBoost: Bool = true   // tunnel: speed surge on straight sections
     var seed: Int32? = nil             // nil → fresh per activation

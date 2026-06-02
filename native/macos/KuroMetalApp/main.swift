@@ -91,6 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if returnToConfig { config?.pausePreview(); config?.window?.orderOut(nil) }
 
         let (s, cycle) = override ?? AppSettings.make()
+        let cycleSec = cycle ? AppSettings.cycleMinutes * 60 : 0
         for screen in NSScreen.screens {
             let win = NSWindow(contentRect: screen.frame, styleMask: [.borderless],
                                backing: .buffered, defer: false, screen: screen)
@@ -99,7 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             win.backgroundColor = .black; win.isOpaque = true; win.hasShadow = false
             win.setFrame(screen.frame, display: true)   // exact per-screen placement
             let view = MetalHostView(frame: NSRect(origin: .zero, size: screen.frame.size),
-                                     settings: s, autoCycle: cycle)
+                                     settings: s, autoCycleSec: cycleSec)
             view.autoresizingMask = [.width, .height]
             win.contentView = view
             win.orderFrontRegardless()                   // shows on non-main screens too

@@ -157,7 +157,7 @@ final class Renderer {
                 mvp: viewProj * item.model,
                 modelView: view * item.model,
                 color: SIMD4(accent, item.opacity),
-                params: SIMD4(scene.fogDensity, item.pointSizeWorld, pointScale,
+                params: SIMD4(scene.fogDensity * settings.fog.mul, item.pointSizeWorld, pointScale,
                               item.isPoint ? 1 : 0))
             enc.setVertexBuffer(item.positions, offset: 0, index: 0)
             enc.setVertexBytes(&u, length: MemoryLayout<SceneUniforms>.stride, index: 1)
@@ -178,14 +178,16 @@ final class Renderer {
         txtPass.colorAttachments[0].loadAction = .load
         txtPass.colorAttachments[0].storeAction = .store
         let tenc = cb.makeRenderCommandEncoder(descriptor: txtPass)!
-        text.begin(width: width, height: height)
-        hud.render(text, width: width, height: height, accent: preset.accentRGB,
-                   kanji: preset.kanji, t: t, scene: SceneRegistry.ids[sceneIndex])
-        text.flush(tenc)
+        if settings.showHud {
+            text.begin(width: width, height: height)
+            hud.render(text, width: width, height: height, accent: preset.accentRGB,
+                       kanji: preset.kanji, t: t, scene: SceneRegistry.ids[sceneIndex])
+            text.flush(tenc)
+        }
         tenc.endEncoding()
 
         // --- bloom (threshold + blur) ---
-        let bloomTex = bloom.generate(cb, sceneHDR: sceneHDR)
+        let bloomTex = settings.bloom ? bloom.generate(cb, sceneHDR: sceneHDR) : sceneHDR
 
         // --- composite pass → target ---
         let tp = MTLRenderPassDescriptor()
@@ -202,7 +204,7 @@ final class Renderer {
         // (toneMappingExposure 1.15) — match the effective exposure.
         let exposure: Float = 1.15 / 0.6
         var pu = PostUniforms(
-            p0: SIMD4(exposure, preset.bloomStrength,
+            p0: SIMD4(exposure, settings.bloom ? preset.bloomStrength : 0,
                       0.0015 + glitch.chromaOffsetBump, preset.scanOpacity),
             p1: SIMD4(scanDriftY, vignetteInner, preset.vignetteStrength, Float(t)),
             p2: glitch.uniforms(),

@@ -1,49 +1,43 @@
-// AppSettings — persisted config for the standalone app (UserDefaults). Shared by
-// the config window and the fullscreen screensaver mode, so selection actually
-// takes effect (read fresh on each activation — no host caching like the .saver).
+// AppSettings — persisted config for the standalone app (UserDefaults.standard).
+// Shared by the config window + fullscreen mode, so selection takes effect
+// immediately (read fresh per activation — no host caching like the .saver).
 
 import Foundation
 
 enum AppSettings {
-    // NOTE: must NOT be the app's own bundle id (that's invalid as a suite name).
-    private static let store = UserDefaults.standard
+    private static let store = UserDefaults.standard   // NOT the bundle id (invalid as a suite)
 
-    static var scene: String {
-        get { store.string(forKey: "Scene") ?? "random" }
-        set { store.set(newValue, forKey: "Scene") }
-    }
-    static var preset: String {
-        get { store.string(forKey: "Preset") ?? "toxic-haze" }
-        set { store.set(newValue, forKey: "Preset") }
-    }
-    static var intensity: Float {
-        get { store.object(forKey: "Intensity") != nil ? store.float(forKey: "Intensity") : 0.35 }
-        set { store.set(newValue, forKey: "Intensity") }
-    }
-    static var autoCycleMinutes: Double {
-        get { store.object(forKey: "CycleMin") != nil ? store.double(forKey: "CycleMin") : 0.3 }
-        set { store.set(newValue, forKey: "CycleMin") }
-    }
-    /// Idle minutes before the agent auto-activates the screensaver.
-    static var idleMinutes: Double {
-        get { store.object(forKey: "IdleMin") != nil ? store.double(forKey: "IdleMin") : 5 }
-        set { store.set(newValue, forKey: "IdleMin") }
-    }
-    /// Atmospheric audio (off by default — screensavers usually run muted).
-    static var sound: Bool {
-        get { store.bool(forKey: "Sound") }
-        set { store.set(newValue, forKey: "Sound") }
-    }
+    private static func str(_ k: String, _ d: String) -> String { store.string(forKey: k) ?? d }
+    private static func setStr(_ k: String, _ v: String) { store.set(v, forKey: k) }
+    private static func bool(_ k: String, _ d: Bool) -> Bool { store.object(forKey: k) == nil ? d : store.bool(forKey: k) }
+    private static func dbl(_ k: String, _ d: Double) -> Double { store.object(forKey: k) == nil ? d : store.double(forKey: k) }
 
-    /// Build a renderer Settings + whether to auto-cycle (scene == "random").
+    static var scene: String { get { str("Scene", "random") } set { setStr("Scene", newValue) } }
+    static var preset: String { get { str("Preset", "toxic-haze") } set { setStr("Preset", newValue) } }
+    static var speed: String { get { str("Speed", "norm") } set { setStr("Speed", newValue) } }
+    static var cityAltitude: String { get { str("CityAlt", "low") } set { setStr("CityAlt", newValue) } }
+    static var fog: String { get { str("Fog", "auto") } set { setStr("Fog", newValue) } }
+    static var intensity: Float { get { store.object(forKey: "Intensity") != nil ? store.float(forKey: "Intensity") : 0.35 } set { store.set(newValue, forKey: "Intensity") } }
+    static var showHud: Bool { get { bool("ShowHud", true) } set { store.set(newValue, forKey: "ShowHud") } }
+    static var bloom: Bool { get { bool("Bloom", true) } set { store.set(newValue, forKey: "Bloom") } }
+    static var sound: Bool { get { bool("Sound", false) } set { store.set(newValue, forKey: "Sound") } }
+    static var autoCycle: Bool { get { bool("AutoCycle", true) } set { store.set(newValue, forKey: "AutoCycle") } }
+    static var cycleMinutes: Double { get { dbl("CycleMin", 0.5) } set { store.set(newValue, forKey: "CycleMin") } }
+    static var idleMinutes: Double { get { dbl("IdleMin", 5) } set { store.set(newValue, forKey: "IdleMin") } }
+
+    /// Build a renderer Settings + whether to auto-cycle.
     static func make() -> (settings: Settings, autoCycle: Bool) {
         var s = Settings()
         let sc = scene
-        let cycle = (sc == "random")
         s.scene = (sc == "random" || !SceneRegistry.ids.contains(sc))
             ? (SceneRegistry.ids.randomElement() ?? "terrain") : sc
         s.presetID = preset
+        s.speed = Settings.Speed(rawValue: speed) ?? .norm
+        s.cityAltitude = Settings.Altitude(rawValue: cityAltitude) ?? .low
+        s.fog = Settings.Fog(rawValue: fog) ?? .auto
         s.crtIntensity = min(1, max(0, intensity))
-        return (s, cycle)
+        s.showHud = showHud
+        s.bloom = bloom
+        return (s, autoCycle)
     }
 }
