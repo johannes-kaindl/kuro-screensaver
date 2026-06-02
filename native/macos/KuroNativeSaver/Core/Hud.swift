@@ -8,11 +8,12 @@ import Foundation
 enum SceneMeta {
     static let label: [String: String] = [
         "terrain": "TERRAIN", "city": "CITY", "rift": "THE RIFT", "tunnel": "TUNNEL", "void": "VOID",
+        "matrix": "MATRIX",
     ]
     static let modes: [String: [String]] = [
         "terrain": ["RECON", "SWEEP", "PATROL"], "city": ["LOW LEVEL", "URBAN", "HIGH PASS"],
         "rift": ["THE RIFT", "CHASM", "INVERSION"], "tunnel": ["INFIL", "TRANSIT", "BOOST"],
-        "void": ["DRIFT", "BELT", "SWARM"],
+        "void": ["DRIFT", "BELT", "SWARM"], "matrix": ["DIGITAL RAIN", "CASCADE", "DECRYPT"],
     ]
 }
 
@@ -24,14 +25,14 @@ final class Hud {
 
     func render(_ tr: TextRenderer, width: Int, height: Int, accent: SIMD3<Float>,
                 kanji: String, t: Double, scene: String, terminalScale: Float = 1,
-                matrix: Bool = false, showPanels: Bool = true) {
+                matrix: Bool = false, matrixOpacity: Float = 0.4, showPanels: Bool = true) {
         let dim = accent * 0.72
         let s = Float(height) / 64                         // base cell height (px)
         let pad = s * 1.5
         let W = Float(width), H = Float(height)
 
         // matrix rain behind everything (drawn first → other text composites over)
-        if matrix { MatrixRain.render(tr, width: width, height: height, accent: accent, t: t, opacity: 0.4) }
+        if matrix { MatrixRain.render(tr, width: width, height: height, accent: accent, t: t, opacity: matrixOpacity) }
         guard showPanels else { return }
         let mode = (SceneMeta.modes[scene]?.first) ?? scene.uppercased()
         let elapsed = t

@@ -206,13 +206,15 @@ final class Renderer {
         txtPass.colorAttachments[0].loadAction = .load
         txtPass.colorAttachments[0].storeAction = .store
         let tenc = cb.makeRenderCommandEncoder(descriptor: txtPass)!
-        let wantMatrix = settings.matrix && qualityTier < 1
+        let matrixScene = SceneRegistry.ids[sceneIndex] == "matrix"
+        let wantMatrix = (settings.matrix || matrixScene) && qualityTier < 1
         if settings.showHud || wantMatrix {
             text.begin(width: width, height: height)
             hud.render(text, width: width, height: height, accent: preset.accentRGB,
                        kanji: preset.kanji, t: t, scene: SceneRegistry.ids[sceneIndex],
                        terminalScale: settings.terminalScale,
-                       matrix: wantMatrix, showPanels: settings.showHud)
+                       matrix: wantMatrix, matrixOpacity: matrixScene ? 0.7 : 0.4,
+                       showPanels: settings.showHud)
             text.flush(tenc)
         }
         tenc.endEncoding()

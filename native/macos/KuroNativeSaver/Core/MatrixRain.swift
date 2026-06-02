@@ -38,7 +38,7 @@ enum MatrixRain {
         let W = Float(width), H = Float(height)
         let baseCell = H / 42
         let leadIn: Float = 2.0
-        let headBase = mix3(accent, SIMD3<Float>(1, 1, 1), 0.8)   // near-white, tinted by the theme
+        let headBase = mix3(accent, SIMD3<Float>(1, 1, 1), 0.72)  // near-white, tinted by the theme
         // Long-idle Float guard: bound the time magnitude before *speed so the
         // per-frame delta keeps sub-pixel resolution even after hours of uptime.
         let tw = t.truncatingRemainder(dividingBy: 100_000)
@@ -47,7 +47,7 @@ enum MatrixRain {
             let zf = layers > 1 ? Float(L) / Float(layers - 1) : 1
             let cell = baseCell * lerp(0.62, 1.5, zf)
             let cw = tr.charWidth(pxHeight: cell)
-            let bright = lerp(0.38, 1.25, zf)
+            let bright = lerp(0.34, 0.98, zf)
             let tailN = max(8, Int(lerp(15, 30, zf)))
             let colGap = lerp(1.4, 2.1, zf)                      // ≥ ~1 + 2·jitter → no in-layer overlap
             let maxCols = Int(lerp(170, 64, zf))
@@ -108,7 +108,7 @@ enum MatrixRain {
                     // Rare bright sparkle in the tail (deterministic, frame-rate independent).
                     if k >= 3 {
                         let sk: Int = key &* 60_013 &+ slot &* 97 &+ Int((Float(tw) * 3).rounded(.down))
-                        if hash(sk) % 1000 < 6 { col = col * 2.4; op = min(1, op * 2 + 0.3) }
+                        if hash(sk) % 1000 < 6 { col = col * 1.9; op = min(1, op * 2 + 0.3) }
                     }
                     // Soft fade-in at the top + fade-OUT at the bottom (kills the head pop on exit).
                     let eIn = min(1, max(0, (y + cell) / (leadIn * cell)))
