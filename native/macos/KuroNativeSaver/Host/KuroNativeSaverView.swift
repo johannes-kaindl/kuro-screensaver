@@ -117,21 +117,27 @@ final class KuroNativeSaverView: ScreenSaverView {
     /// drawableSize are only ever touched here (the resize handoff is via
     /// `pendingDrawableSize` under `sizeLock`), so there is no cross-thread race.
     private func renderFrame() {
-        guard isAnimating else { return }   // bail on late callbacks after stop
-        guard let ml = metalLayer, let renderer else { return }
+        // CRITICAL: this runs on the CVDisplayLink thread, which has no ambient
+        // autorelease pool. Without this, every frame's autoreleased Metal objects
+        // (command buffers, drawables, encoders, MPS temporaries) accumulate
+        // forever — a multi-GB / Mach-port leak in the long-running saver.
+        autoreleasepool {
+            guard isAnimating else { return }   // bail on late callbacks after stop
+            guard let ml = metalLayer, let renderer else { return }
 
-        sizeLock.lock()
-        if let ps = pendingDrawableSize { ml.drawableSize = ps; pendingDrawableSize = nil }
-        sizeLock.unlock()
+            sizeLock.lock()
+            if let ps = pendingDrawableSize { ml.drawableSize = ps; pendingDrawableSize = nil }
+            sizeLock.unlock()
 
-        let now = CACurrentMediaTime()
-        if lastTime == 0 { lastTime = now }
-        let dt = min(0.05, max(0, now - lastTime))
-        lastTime = now
-        renderer.advance(dt: dt)
-        guard let drawable = ml.nextDrawable() else { return }
-        renderer.draw(into: drawable.texture)
-        drawable.present()
+            let now = CACurrentMediaTime()
+            if lastTime == 0 { lastTime = now }
+            let dt = min(0.05, max(0, now - lastTime))
+            lastTime = now
+            renderer.advance(dt: dt)
+            guard let drawable = ml.nextDrawable() else { return }
+            renderer.draw(into: drawable.texture)
+            drawable.present()
+        }
     }
 
     override func draw(_ rect: NSRect) {

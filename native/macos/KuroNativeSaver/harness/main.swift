@@ -60,6 +60,18 @@ func die(_ msg: String) -> Never {
     exit(2)
 }
 
+/// Resident memory of this process in MB (for the leak check).
+func currentRSSMB() -> Double {
+    var info = mach_task_basic_info()
+    var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
+    let kr = withUnsafeMutablePointer(to: &info) {
+        $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+            task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+        }
+    }
+    return kr == KERN_SUCCESS ? Double(info.resident_size) / 1_048_576 : 0
+}
+
 // ---- PNG output ------------------------------------------------------------
 
 /// Write an rgba8 (premultipliedLast) buffer to a PNG file.
@@ -133,9 +145,14 @@ func drawFrame(path: String) {
 
 if args.bench > 0 {
     // Warm up, then time N frames (draw() is synchronous → CPU encode + GPU exec).
-    for _ in 0..<10 { renderer.advance(dt: 1.0 / 60.0); renderer.draw(into: target) }
+    for _ in 0..<10 { autoreleasepool { renderer.advance(dt: 1.0 / 60.0); renderer.draw(into: target) } }
+    if args.bench > 1 {
+        let rss0 = currentRSSMB()
+        for _ in 0..<200 { autoreleasepool { renderer.advance(dt: 1.0 / 60.0); renderer.draw(into: target) } }
+        FileHandle.standardError.write(String(format: "leak-check: RSS %.0f→%.0f MB after 200 frames\n", rss0, currentRSSMB()).data(using: .utf8)!)
+    }
     let start = DispatchTime.now().uptimeNanoseconds
-    for _ in 0..<args.bench { renderer.advance(dt: 1.0 / 60.0); renderer.draw(into: target) }
+    for _ in 0..<args.bench { autoreleasepool { renderer.advance(dt: 1.0 / 60.0); renderer.draw(into: target) } }
     let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
     let perFrame = elapsedMs / Double(args.bench)
     print(String(format: "bench %@/%@ %dx%d: %.3f ms/frame  (%.0f fps cap)",
