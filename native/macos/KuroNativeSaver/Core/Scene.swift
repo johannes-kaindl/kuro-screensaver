@@ -76,4 +76,11 @@ protocol Scene: AnyObject {
     var items: [DrawItem] { get }
     var fogDensity: Float { get }
     func update(t: Double, dt: Double)
+    /// Optional camera-projected text drawn in the overlay text pass (e.g. the 3D
+    /// matrix rain). Default: nothing. Called with the scene's view-projection.
+    func drawWorldText(_ tr: TextRenderer, viewProj: matrix_float4x4, width: Int, height: Int, t: Double, accent: SIMD3<Float>)
+}
+
+extension Scene {
+    func drawWorldText(_ tr: TextRenderer, viewProj: matrix_float4x4, width: Int, height: Int, t: Double, accent: SIMD3<Float>) {}
 }
