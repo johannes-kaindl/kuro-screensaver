@@ -4,7 +4,7 @@
 import AppKit
 
 final class ConfigWindowController: NSWindowController {
-    private var lookPopup, scenePopup, presetPopup, speedPopup, altPopup, fogPopup, weatherPopup, cyclePopup, idlePopup: NSPopUpButton!
+    private var lookPopup, scenePopup, presetPopup, speedPopup, altPopup, fogPopup, weatherPopup, cyclePopup, idlePopup, terminalPopup: NSPopUpButton!
     private var hudCheck, dayNightCheck, matrixCheck, soundCheck, cycleCheck, autostartCheck: NSButton!
     private var intensitySlider, curvSlider, maskSlider, bloomSlider, trailsSlider, ntscSlider, halSlider, termSlider: NSSlider!
     private var previewContainer: NSView!
@@ -16,6 +16,7 @@ final class ConfigWindowController: NSWindowController {
     private let weathers = [("Klar", "clear"), ("Sturm", "storm"), ("Staub", "dust")]
     private let cycleMins: [Double] = [0.5, 1, 2, 5]
     private let idleMins: [Double] = [1, 2, 5, 10, 15]
+    private let termLayouts = [("Aus", "off"), ("Unten", "strip"), ("Fenster (Lisa)", "window")]
 
     convenience init() {
         let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 884),
@@ -79,7 +80,7 @@ final class ConfigWindowController: NSWindowController {
         [intensitySlider!, curvSlider!, maskSlider!, bloomSlider!, trailsSlider!, ntscSlider!, halSlider!].forEach { cv.addSubview($0) }
 
         // === right column ===
-        hudCheck = chk("HUD + Terminal", 340, 508, AppSettings.showHud, #selector(changed))
+        hudCheck = chk("HUD (Instrumente)", 340, 508, AppSettings.showHud, #selector(changed))
         dayNightCheck = chk("Tag/Nacht-Zyklus", 340, 482, AppSettings.dayNight, #selector(changed))
         soundCheck = chk("Ton (Atmosphäre)", 340, 456, AppSettings.sound, #selector(changed))
         cycleCheck = chk("Szenen automatisch wechseln", 340, 430, AppSettings.autoCycle, #selector(changed))
@@ -94,6 +95,11 @@ final class ConfigWindowController: NSWindowController {
         cv.addSubview(lbl("Wechsel:", 340, 398)); cv.addSubview(cyclePopup)
         cv.addSubview(lbl("Leerlauf:", 340, 364)); cv.addSubview(idlePopup)
         cv.addSubview(lbl("Terminal-Größe:", 340, 332)); cv.addSubview(termSlider)
+
+        terminalPopup = popup(425, 188, 175)
+        terminalPopup.addItems(withTitles: termLayouts.map { $0.0 })
+        terminalPopup.selectItem(at: termLayouts.firstIndex { $0.1 == AppSettings.terminalLayout } ?? 1)
+        cv.addSubview(lbl("Terminal:", 340, 190)); cv.addSubview(terminalPopup)
 
         let startBtn = NSButton(title: "Vollbild starten", target: self, action: #selector(startFullscreen))
         startBtn.frame = NSRect(x: 340, y: 234, width: 260, height: 36); startBtn.bezelStyle = .rounded; startBtn.keyEquivalent = "\r"
@@ -153,6 +159,7 @@ final class ConfigWindowController: NSWindowController {
         AppSettings.halation = Float(halSlider.doubleValue)
         AppSettings.terminalScale = Float(termSlider.doubleValue)
         AppSettings.showHud = hudCheck.state == .on
+        AppSettings.terminalLayout = termLayouts[max(0, terminalPopup.indexOfSelectedItem)].1
         AppSettings.dayNight = dayNightCheck.state == .on
         AppSettings.matrix = matrixCheck.state == .on
         AppSettings.sound = soundCheck.state == .on

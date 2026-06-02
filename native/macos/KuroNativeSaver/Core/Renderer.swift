@@ -208,13 +208,13 @@ final class Renderer {
         let tenc = cb.makeRenderCommandEncoder(descriptor: txtPass)!
         let matrixScene = SceneRegistry.ids[sceneIndex] == "matrix"
         let wantMatrix = (settings.matrix || matrixScene) && qualityTier < 1
-        if settings.showHud || wantMatrix {
+        if settings.showHud || wantMatrix || settings.terminalLayout != .off {
             text.begin(width: width, height: height)
             hud.render(text, width: width, height: height, accent: preset.accentRGB,
                        kanji: preset.kanji, t: t, scene: SceneRegistry.ids[sceneIndex],
                        terminalScale: settings.terminalScale,
                        matrix: wantMatrix, matrixOpacity: matrixScene ? 0.7 : 0.4,
-                       showPanels: settings.showHud)
+                       terminalLayout: settings.terminalLayout, showPanels: settings.showHud)
             text.flush(tenc)
         }
         tenc.endEncoding()

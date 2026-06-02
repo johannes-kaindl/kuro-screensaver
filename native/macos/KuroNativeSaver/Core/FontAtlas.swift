@@ -15,6 +15,8 @@ final class FontAtlas {
     let atlasW: Int, atlasH: Int
     private let cols: Int
     private var index: [Character: Int] = [:]
+    /// UV of a guaranteed fully-opaque texel (a baked solid cell) — for fillRect.
+    let solidU: Float, solidV: Float
 
     init(device: MTLDevice, fontName: String = "Menlo", pointSize: CGFloat = 30) {
         // charset: printable ASCII + katakana + the preset/aspect kanji + glyphs.
@@ -32,8 +34,9 @@ final class FontAtlas {
         var adv = CGSize.zero; CTFontGetAdvancesForGlyphs(font, .horizontal, &glyph, &adv, 1)
         cellW = Int(ceil(adv.width)) + 2
 
-        cols = Int(ceil(Double(chars.count).squareRoot()))
-        let rows = Int(ceil(Double(chars.count) / Double(cols)))
+        // +1 reserves one extra cell, baked fully white, as a solid-fill source.
+        cols = Int(ceil(Double(chars.count + 1).squareRoot()))
+        let rows = Int(ceil(Double(chars.count + 1) / Double(cols)))
         atlasW = cols * cellW; atlasH = rows * cellH
 
         let cs = CGColorSpaceCreateDeviceGray()
@@ -52,6 +55,13 @@ final class FontAtlas {
             ctx.textPosition = CGPoint(x: CGFloat(col * cellW) + 1, y: CGFloat(cellBottom) + descent + 1)
             CTLineDraw(line, ctx)
         }
+
+        // Bake a fully-opaque solid cell (the reserved extra cell) for fillRect.
+        let si = chars.count, sc = si % cols, sr = si / cols
+        ctx.setFillColor(gray: 1, alpha: 1)
+        ctx.fill(CGRect(x: sc * cellW, y: atlasH - (sr + 1) * cellH, width: cellW, height: cellH))
+        solidU = (Float(sc * cellW) + Float(cellW) * 0.5) / Float(atlasW)
+        solidV = (Float(sr * cellH) + Float(cellH) * 0.5) / Float(atlasH)
 
         let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .r8Unorm, width: atlasW, height: atlasH, mipmapped: false)
         td.usage = [.shaderRead]

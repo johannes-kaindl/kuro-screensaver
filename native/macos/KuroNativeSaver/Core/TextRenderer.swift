@@ -60,6 +60,19 @@ final class TextRenderer {
         }
     }
 
+    /// Draw a solid filled rectangle in the same batch (samples the centre of the
+    /// █ glyph, coverage ≈ 1.0) — used for the Lisa terminal-window chrome.
+    func fillRect(xPx: Float, yPx: Float, wPx: Float, hPx: Float, color: SIMD3<Float>, opacity: Float) {
+        guard opacity > 0.002, wPx > 0, hPx > 0 else { return }
+        let u = atlas.solidU, vv = atlas.solidV
+        let x0 = xPx / vpW * 2 - 1, x1 = (xPx + wPx) / vpW * 2 - 1
+        let yt = 1 - yPx / vpH * 2, yb = 1 - (yPx + hPx) / vpH * 2
+        let r3 = color.x, g3 = color.y, b3 = color.z, a = opacity
+        func v(_ x: Float, _ y: Float) { verts.append(contentsOf: [x, y, u, vv, r3, g3, b3, a]) }
+        v(x0, yt); v(x1, yt); v(x0, yb)
+        v(x0, yb); v(x1, yt); v(x1, yb)
+    }
+
     /// Measured pixel width of a string at a given cell height.
     func width(_ text: String, pxHeight: Float) -> Float { Float(text.count) * pxHeight * atlas.cellAspect }
 
