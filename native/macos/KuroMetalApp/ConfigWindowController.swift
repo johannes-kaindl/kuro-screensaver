@@ -16,7 +16,7 @@ final class ConfigWindowController: NSWindowController {
     private let weathers = [("Klar", "clear"), ("Sturm", "storm"), ("Staub", "dust")]
     private let cycleMins: [Double] = [0.5, 1, 2, 5]
     private let idleMins: [Double] = [1, 2, 5, 10, 15]
-    private let termLayouts = [("Aus", "off"), ("Unten", "strip"), ("Fenster (Lisa)", "window")]
+    private let termLayouts = [("Aus", "off"), ("Unten", "strip"), ("Unten + Box", "stripdark"), ("Fenster (Lisa)", "window")]
 
     convenience init() {
         let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 884),

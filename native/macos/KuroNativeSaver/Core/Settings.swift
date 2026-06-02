@@ -27,7 +27,7 @@ struct Settings {
     var speed: Speed = .norm
     var cityAltitude: Altitude = .low
     var showHud = true              // HUD panels (flight data, crosshair, kanji, scene label)
-    enum TerminalLayout: String, CaseIterable { case off, strip, window }
+    enum TerminalLayout: String, CaseIterable { case off, strip, stripDark = "stripdark", window }
     var terminalLayout: TerminalLayout = .strip   // narrative terminal: off / bottom-strip / Lisa center-window
     var bloomScale: Float = 1       // multiplier on the per-preset bloom strength (0 = off)
     var fog: Fog = .auto

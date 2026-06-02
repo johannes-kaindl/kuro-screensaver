@@ -38,7 +38,8 @@ final class Hud {
         // narrative terminal — independent of the HUD flight panels
         switch terminalLayout {
         case .off: break
-        case .strip: renderTerminalStrip(tr, W: W, H: H, s: s, accent: accent, dim: dim, t: t, scale: terminalScale)
+        case .strip: renderTerminalStrip(tr, W: W, H: H, s: s, accent: accent, dim: dim, t: t, scale: terminalScale, darken: false)
+        case .stripDark: renderTerminalStrip(tr, W: W, H: H, s: s, accent: accent, dim: dim, t: t, scale: terminalScale, darken: true)
         case .window: renderTerminalWindow(tr, W: W, H: H, accent: accent, dim: dim, t: t, scale: terminalScale)
         }
 
@@ -73,8 +74,12 @@ final class Hud {
         let cw = tr.width(cross, pxHeight: s)
         tr.add(cross, xPx: (W - cw) / 2, yPx: H / 2 - s / 2, pxHeight: s, color: dim, opacity: 0.4)
 
-        // --- vault kanji (large, faint) ---
-        tr.add(kanji, xPx: W - s * 5.5, yPx: H - s * 6, pxHeight: s * 4.5, color: accent, opacity: 0.18)
+        // --- vault kanji (large, faint, full-width square glyph; lower-right, pulled
+        // in from the dark vignette corner so it stays a readable sigil) ---
+        let kSize = s * 6
+        if let kc = kanji.first {
+            tr.drawKanji(kc, xPx: W * 0.74, yPx: H * 0.62, pxHeight: kSize, color: accent, opacity: 0.22)
+        }
 
         // --- scene-label slab (upper-center) ---
         let label = SceneMeta.label[scene] ?? scene.uppercased()
@@ -85,20 +90,35 @@ final class Hud {
 
     // --- terminal: bottom-left strip, fading upward (the compact overlay) ---
     private func renderTerminalStrip(_ tr: TextRenderer, W: Float, H: Float, s: Float,
-                                     accent: SIMD3<Float>, dim: SIMD3<Float>, t: Double, scale: Float) {
+                                     accent: SIMD3<Float>, dim: SIMD3<Float>, t: Double, scale: Float, darken: Bool) {
         // Keep clear of the curved glass edge: extra left/bottom margin, cap lines.
         let ts = s * scale
         let lh = ts * 1.3
+        let cell = ts * 0.9
         let leftPad = W * 0.03 + s
         let promptY = H - (H * 0.07 + ts * 1.6)
         let maxLines = max(2, min(10, Int((promptY - H * 0.06) / lh)))
         let lines = terminal.visibleLines(max: maxLines)
+        // optional per-line dark backing (drawn first so text composites over it)
+        func backing(_ text: String, _ y: Float, _ op: Float) {
+            guard darken, op > 0.06 else { return }
+            let w = tr.width(text, pxHeight: cell)
+            tr.fillRect(xPx: leftPad - cell * 0.35, yPx: y - lh * 0.12, wPx: w + cell * 0.7, hPx: lh,
+                        color: SIMD3(0, 0, 0), opacity: min(0.5, op * 0.62))
+        }
+        for (i, ln) in lines.reversed().enumerated() {
+            let op = max(0.05, pow(0.72, Float(i)))
+            let y = promptY - Float(i + 1) * lh
+            backing(ln.text, y, op)
+        }
+        backing(terminal.promptLine(t: t), promptY, 0.95)
+        // then the text on top
         for (i, ln) in lines.reversed().enumerated() {
             let op = max(0.05, pow(0.72, Float(i)))
             let col = ln.category == .quotes ? accent : dim
-            tr.add(ln.text, xPx: leftPad, yPx: promptY - Float(i + 1) * lh, pxHeight: ts * 0.9, color: col, opacity: op)
+            tr.add(ln.text, xPx: leftPad, yPx: promptY - Float(i + 1) * lh, pxHeight: cell, color: col, opacity: op)
         }
-        tr.add(terminal.promptLine(t: t), xPx: leftPad, yPx: promptY, pxHeight: ts * 0.9, color: accent, opacity: 0.95)
+        tr.add(terminal.promptLine(t: t), xPx: leftPad, yPx: promptY, pxHeight: cell, color: accent, opacity: 0.95)
     }
 
     // --- terminal: Apple-Lisa-style centered CORP OS window (the story mode) ---
@@ -156,21 +176,41 @@ final class Hud {
         let rw = tr.width(rightS, pxHeight: statusCell)
         tr.add(rightS, xPx: winX + winW - pad - rw, yPx: statusYMid, pxHeight: statusCell, color: dim, opacity: 0.6)
 
-        // content: chronological scrollback (newest just above the prompt) + prompt
+        // content: chronological scrollback + prompt, word-wrapped (no left-clip)
         let contentTop = winY + titleH + pad
-        let promptY = statusY - pad - lh
-        let maxLines = max(3, Int((promptY - contentTop) / lh))
+        let contentBottom = statusY - pad
+        let maxRows = max(3, Int((contentBottom - contentTop) / lh))
         let maxChars = max(8, Int((winW - 2 * pad) / tr.charWidth(pxHeight: cell)))
-        let lines = terminal.visibleLines(max: maxLines)
-        let startI = maxLines - lines.count                    // bottom-align under the prompt
-        for (i, ln) in lines.enumerated() {
+        let logical = terminal.visibleLines(max: maxRows + 6)   // extra: wrapping expands the count
+        var rows: [(String, SIMD3<Float>, Float)] = []
+        for ln in logical {
             let (col, op) = colorFor(ln.category, accent: accent, dim: dim)
-            let txt = ln.text.count > maxChars ? String(ln.text.prefix(maxChars)) : ln.text
-            tr.add(txt, xPx: winX + pad, yPx: contentTop + Float(startI + i) * lh, pxHeight: cell, color: col, opacity: op)
+            for r in wrap(ln.text, maxChars) { rows.append((r, col, op)) }
         }
-        let prompt = terminal.promptLine(t: t)
-        let ptxt = prompt.count > maxChars ? String(prompt.suffix(maxChars)) : prompt
-        tr.add(ptxt, xPx: winX + pad, yPx: promptY, pxHeight: cell, color: accent, opacity: 0.95)
+        for r in wrap(terminal.promptLine(t: t), maxChars) { rows.append((r, accent, 0.95)) }
+        let shown = rows.suffix(maxRows)
+        let startI = maxRows - shown.count                      // bottom-align under the prompt
+        for (i, row) in shown.enumerated() {
+            tr.add(row.0, xPx: winX + pad, yPx: contentTop + Float(startI + i) * lh, pxHeight: cell, color: row.1, opacity: row.2)
+        }
+    }
+
+    /// Word-wrap a line to ≤ maxChars per row (hard-splits overlong single tokens).
+    private func wrap(_ s: String, _ maxChars: Int) -> [String] {
+        if s.count <= maxChars { return [s] }
+        var rows: [String] = [], cur = ""
+        for word in s.split(separator: " ", omittingEmptySubsequences: false) {
+            var w = String(word)
+            while w.count > maxChars {                           // a single token longer than a row
+                if !cur.isEmpty { rows.append(cur); cur = "" }
+                rows.append(String(w.prefix(maxChars))); w = String(w.dropFirst(maxChars))
+            }
+            if cur.isEmpty { cur = w }
+            else if cur.count + 1 + w.count <= maxChars { cur += " " + w }
+            else { rows.append(cur); cur = w }
+        }
+        if !cur.isEmpty { rows.append(cur) }
+        return rows
     }
 
     private func colorFor(_ c: Terminal.Cat, accent: SIMD3<Float>, dim: SIMD3<Float>) -> (SIMD3<Float>, Float) {

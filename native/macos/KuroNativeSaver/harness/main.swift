@@ -38,6 +38,7 @@ struct Args {
     var matrix = false
     var matrixOnly = false
     var termWindow = false
+    var termDark = false
 }
 
 func parseArgs() -> Args {
@@ -68,6 +69,7 @@ func parseArgs() -> Args {
         case "--matrix-only": a.matrix = true; a.matrixOnly = true; a.noHud = true
         case "--black": a.matrixOnly = true   // black scene (verify HUD/terminal overlays alone)
         case "--termwin": a.termWindow = true // Lisa center-window terminal layout
+        case "--termdark": a.termDark = true  // bottom strip with dark backing
         default: FileHandle.standardError.write("unknown arg \(k)\n".data(using: .utf8)!)
         }
     }
@@ -154,6 +156,7 @@ if args.ntsc >= 0 { settings.ntsc = args.ntsc }
 if args.halation >= 0 { settings.halation = args.halation }
 if args.matrix { settings.matrix = true }
 if args.termWindow { settings.terminalLayout = .window }
+if args.termDark { settings.terminalLayout = .stripDark }
 
 let ctx = SceneContext(device: device, rng: LCG(seed: args.seed),
                        settings: settings, accent: settings.preset.accentRGB)
