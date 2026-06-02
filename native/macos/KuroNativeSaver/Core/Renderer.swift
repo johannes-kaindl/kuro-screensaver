@@ -206,18 +206,13 @@ final class Renderer {
         txtPass.colorAttachments[0].loadAction = .load
         txtPass.colorAttachments[0].storeAction = .store
         let tenc = cb.makeRenderCommandEncoder(descriptor: txtPass)!
-        let matrixScene = SceneRegistry.ids[sceneIndex] == "matrix"
-        let wantMatrix = settings.matrix && !matrixScene && qualityTier < 1   // flat 2D overlay (other scenes)
-        let wantField = matrixScene && qualityTier < 1                        // 3D fly-through rain (matrix scene)
-        if settings.showHud || wantMatrix || wantField || settings.terminalLayout != .off {
+        let wantMatrix = (SceneRegistry.ids[sceneIndex] == "matrix") && qualityTier < 1   // static 2D rain — matrix scene only
+        if settings.showHud || wantMatrix || settings.terminalLayout != .off {
             text.begin(width: width, height: height)
-            if wantField {
-                scene.drawWorldText(text, viewProj: viewProj, width: width, height: height, t: t, accent: preset.accentRGB)
-            }
             hud.render(text, width: width, height: height, accent: preset.accentRGB,
                        kanji: preset.kanji, t: t, scene: SceneRegistry.ids[sceneIndex],
                        terminalScale: settings.terminalScale,
-                       matrix: wantMatrix, matrixOpacity: 0.4,
+                       matrix: wantMatrix, matrixOpacity: 0.7,
                        terminalLayout: settings.terminalLayout, showPanels: settings.showHud)
             text.flush(tenc)
         }

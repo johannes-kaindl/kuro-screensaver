@@ -5,7 +5,7 @@ import AppKit
 
 final class ConfigWindowController: NSWindowController {
     private var lookPopup, scenePopup, presetPopup, speedPopup, altPopup, fogPopup, weatherPopup, cyclePopup, idlePopup, terminalPopup: NSPopUpButton!
-    private var hudCheck, dayNightCheck, matrixCheck, soundCheck, cycleCheck, autostartCheck: NSButton!
+    private var hudCheck, dayNightCheck, soundCheck, cycleCheck, autostartCheck: NSButton!
     private var intensitySlider, curvSlider, maskSlider, bloomSlider, trailsSlider, ntscSlider, halSlider, termSlider: NSSlider!
     private var previewContainer: NSView!
     private var previewView: MetalHostView?
@@ -87,11 +87,10 @@ final class ConfigWindowController: NSWindowController {
         cyclePopup = popup(445, 396, 155); cyclePopup.addItems(withTitles: ["30 Sek", "1 Min", "2 Min", "5 Min"]); cyclePopup.selectItem(at: cycleMins.firstIndex(of: AppSettings.cycleMinutes) ?? 0)
         idlePopup = popup(445, 362, 155); idlePopup.addItems(withTitles: idleMins.map { "\(Int($0)) Min" }); idlePopup.selectItem(at: idleMins.firstIndex(of: AppSettings.idleMinutes) ?? 2)
         termSlider = slider(445, 330, Double(AppSettings.terminalScale), 4.8, 0.7, 155)
-        matrixCheck = chk("Matrix-Regen", 340, 296, AppSettings.matrix, #selector(changed))
-        autostartCheck = chk("Bei Inaktivität automatisch starten (Login)", 340, 270, LoginItem.isEnabled, #selector(toggleAutostart))
+        autostartCheck = chk("Bei Inaktivität automatisch starten (Login)", 340, 296, LoginItem.isEnabled, #selector(toggleAutostart))
         autostartCheck.frame.size.width = 280
 
-        [hudCheck!, dayNightCheck!, matrixCheck!, soundCheck!, cycleCheck!, autostartCheck!].forEach { cv.addSubview($0) }
+        [hudCheck!, dayNightCheck!, soundCheck!, cycleCheck!, autostartCheck!].forEach { cv.addSubview($0) }
         cv.addSubview(lbl("Wechsel:", 340, 398)); cv.addSubview(cyclePopup)
         cv.addSubview(lbl("Auto-Start:", 340, 364)); cv.addSubview(idlePopup)
         cv.addSubview(lbl("Terminal-Größe:", 340, 332)); cv.addSubview(termSlider)
@@ -135,7 +134,6 @@ final class ConfigWindowController: NSWindowController {
         halSlider.doubleValue = Double(look.halation)
         bloomSlider.doubleValue = Double(look.bloomScale)
         intensitySlider.doubleValue = Double(look.intensity)
-        matrixCheck.state = look.matrix ? .on : .off
         persist()
         AppSettings.look = look.id   // keep the popup on this Look (persist() doesn't touch it)
         rebuildPreview()
@@ -161,7 +159,6 @@ final class ConfigWindowController: NSWindowController {
         AppSettings.showHud = hudCheck.state == .on
         AppSettings.terminalLayout = termLayouts[max(0, terminalPopup.indexOfSelectedItem)].1
         AppSettings.dayNight = dayNightCheck.state == .on
-        AppSettings.matrix = matrixCheck.state == .on
         AppSettings.sound = soundCheck.state == .on
         AppSettings.autoCycle = cycleCheck.state == .on
         if cyclePopup.indexOfSelectedItem >= 0 { AppSettings.cycleMinutes = cycleMins[cyclePopup.indexOfSelectedItem] }
