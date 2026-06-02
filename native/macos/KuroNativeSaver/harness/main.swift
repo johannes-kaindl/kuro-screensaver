@@ -116,7 +116,7 @@ settings.crtIntensity = args.intensity
 
 let ctx = SceneContext(device: device, rng: LCG(seed: args.seed),
                        settings: settings, accent: settings.preset.accentRGB)
-let scene: Scene = TerrainScene(ctx: ctx)   // (slice: terrain only)
+let scene: Scene = SceneRegistry.make(args.scene, ctx: ctx)
 let renderer = Renderer(device: device, settings: settings, scene: scene,
                         targetFormat: target.pixelFormat)
 if let g = args.forceGlitch { renderer.debugForceGlitch(g) }
