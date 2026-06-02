@@ -9,20 +9,21 @@ import Foundation
 final class VoidScene: Scene {
     var camera = Camera()
     private(set) var items: [DrawItem] = []
-    let fogDensity: Float = 0.006
+    let fogDensity: Float = 0.0045   // a bit further view distance (was 0.006)
 
     private let spdMul: Float
     private var rng: LCG
     private var fly: CameraFly
 
-    private struct Roid { var item: DrawItem; var pos: SIMD3<Float>; var rot: SIMD3<Float>; var scale: Float; var spin: SIMD3<Float> }
+    private struct Roid { var item: DrawItem; var pos: SIMD3<Float>; var rot: SIMD3<Float>; var scale: Float; var spin: SIMD3<Float>; var baseOpacity: Float }
     private var roids: [Roid] = []
     private let speed: DrawItem
     private let spvCount = 56
 
     // field constants (void.ts)
     private let FIELD_W: Float = 44, NOSPAWN: Float = 5.5, BELT_S: Float = 14
-    private let OFFBELT_P: Float = 0.08, FAR: Float = -68, FAR_VAR: Float = 45, BEHIND: Float = 10
+    private let OFFBELT_P: Float = 0.08, FAR: Float = -100, FAR_VAR: Float = 55, BEHIND: Float = 10
+    private let FADE_START: Float = 100, FADE_RANGE: Float = 24   // distance-based fade-in (no pop)
 
     init(ctx: SceneContext) {
         let device = ctx.device
@@ -75,8 +76,8 @@ final class VoidScene: Scene {
             return SIMD3((r.nextF() < 0.5 ? -1 : 1) * (8 + r.nextF() * 10), sampleBeltY(), -18 - r.nextF() * 95)
         }
 
-        // --- 90 asteroids ---
-        for _ in 0..<90 {
+        // --- asteroids (fewer; fade in from the far plane) ---
+        for _ in 0..<60 {
             let t = pickTpl()
             let opacity = 0.60 + r.nextF() * 0.30
             let it = DrawItem(positions: t.pos, indices: t.idx, count: t.ic, vertexCount: t.vc,
@@ -85,7 +86,7 @@ final class VoidScene: Scene {
             let pos = seedInitial()
             let rot = SIMD3(r.nextF() * .pi, r.nextF() * .pi, r.nextF() * .pi)
             let spin = SIMD3((r.nextF() - 0.5) * 0.024, (r.nextF() - 0.5) * 0.024, (r.nextF() - 0.5) * 0.020)
-            roids.append(Roid(item: it, pos: pos, rot: rot, scale: scale, spin: spin))
+            roids.append(Roid(item: it, pos: pos, rot: rot, scale: scale, spin: spin, baseOpacity: opacity))
         }
 
         // --- starfield (2200 static) ---
@@ -154,6 +155,9 @@ final class VoidScene: Scene {
                 roids[i].scale = 0.9 + rng.nextF() * 3.0
                 roids[i].rot = SIMD3(rng.nextF() * .pi, rng.nextF() * .pi, rng.nextF() * .pi)
             }
+            // distance-based fade-in so they don't pop into view at the far plane
+            let dist = camZ - roids[i].pos.z
+            roids[i].item.opacity = roids[i].baseOpacity * max(0, min(1, (FADE_START - dist) / FADE_RANGE))
             roids[i].item.model = model(roids[i])
         }
 
