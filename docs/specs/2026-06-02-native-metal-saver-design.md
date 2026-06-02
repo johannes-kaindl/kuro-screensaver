@@ -294,6 +294,28 @@ where WebGL did not — but this is the assumption under test.)
 5. **ProMotion 120 Hz** — drive all motion from the clamped seconds-delta so
    speed matches across refresh rates (the web engine drifts here).
 
+## Build-out status (follow-up slices, 2026-06-02)
+
+After the gate passed, the deferred subsystems are being built on the proven base:
+
+- **Slice 2 — Scenes & loop: DONE & shipped.** All 5 scenes ported (terrain,
+  rift, void, tunnel, city) via the `Scene`/`SceneRegistry` contract; scene
+  **auto-cycle** through the diegetic **crash→reboot** loop-seam (`CrashFx`); the
+  glitch scheduler extended to **8 artifacts**; **quarter-res bloom** perf pass.
+  Each scene verified via PNG; `.saver` rebuilt + loads. Perf (synchronous, M5
+  Pro, ms/frame @4K): terrain ~10, rift ~10, void ~12, tunnel ~12, city ~21
+  (~48fps) — all comfortable ≥60fps at ≤1440p; city is GPU-bound and dips below
+  60 only at 4K/5K (geometry/resolution reduction, not pipelining, would help —
+  see review note; documented, not blocking).
+- **Slice 3 — Terminal narrative + HUD: TODO.** Needs a Metal text stack (font
+  atlas via CoreText + a textured-quad text pipeline so the CRT post treats the
+  text) plus the narrative engine (state machine, personas, typing, script-bank)
+  and HUD/radar/boot. Large but PNG-verifiable.
+- **Slice 4 — Audio + atmosphere: TODO.** Web-Audio synth → AVAudioEngine
+  (CRT hum/whine + Carpenter soundscape) + day/night/weather/perf-adapt loops.
+  **Audio output is not autonomously verifiable here (no audio capture)** — needs
+  on-device ears.
+
 ## Post-implementation review (2026-06-02)
 
 An adversarial multi-dimension review (Metal lifecycle, host threading, web
