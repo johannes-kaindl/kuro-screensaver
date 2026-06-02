@@ -26,7 +26,7 @@ swiftc -O -emit-library -Xlinker -bundle \
   -o "$MACOS_DIR/KuroNativeSaver" \
   $(ls "$SRC"/Core/*.swift) $(ls "$SRC"/Host/*.swift) \
   -module-name KuroNativeSaver \
-  -framework ScreenSaver -framework Metal -framework MetalPerformanceShaders \
+  -framework ScreenSaver -framework Metal -framework MetalPerformanceShaders -framework AVFoundation \
   -framework QuartzCore -framework AppKit -framework CoreText -framework Foundation
 
 cp "$SRC/Host/Info.plist" "$SAVER/Contents/Info.plist"

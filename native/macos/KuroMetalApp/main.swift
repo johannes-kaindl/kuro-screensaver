@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var monitors: [Any] = []
     private var startTime = CACurrentMediaTime()
     private var active = false
+    private var synth: Synth?
 
     init(mode: Mode, override: (Settings, Bool)?) {
         self.mode = mode
@@ -94,6 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NSApp.activate(ignoringOtherApps: true)
         NSCursor.hide()
+        if AppSettings.sound { let sy = Synth(); sy.start(); synth = sy }
         startTime = CACurrentMediaTime()
         installInputMonitors()
         if returnToConfig { dismissTarget = .config }
@@ -110,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         monitors.forEach { NSEvent.removeMonitor($0) }; monitors.removeAll()
         saverViews.forEach { $0.stop() }; saverViews.removeAll()
         saverWindows.forEach { $0.orderOut(nil) }; saverWindows.removeAll()
+        synth?.stop(); synth = nil
         NSCursor.unhide()
         switch dismissTarget {
         case .terminate: NSApp.terminate(nil)

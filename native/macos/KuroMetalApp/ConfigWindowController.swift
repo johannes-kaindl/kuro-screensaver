@@ -10,6 +10,7 @@ final class ConfigWindowController: NSWindowController {
     private var intensitySlider: NSSlider!
     private var idlePopup: NSPopUpButton!
     private var autostartCheck: NSButton!
+    private var soundCheck: NSButton!
     private var previewContainer: NSView!
     private var previewView: MetalHostView?
 
@@ -68,12 +69,18 @@ final class ConfigWindowController: NSWindowController {
         startBtn.frame = NSRect(x: 360, y: 222, width: 170, height: 34)
         startBtn.bezelStyle = .rounded; startBtn.keyEquivalent = "\r"
 
+        let soundCheck = NSButton(checkboxWithTitle: "Ton (Atmosphäre)", target: self, action: #selector(toggleSound))
+        soundCheck.frame = NSRect(x: 360, y: 160, width: 180, height: 22)
+        soundCheck.state = AppSettings.sound ? .on : .off
+        self.soundCheck = soundCheck
+
         cv.addSubview(label("Szene:", 230)); cv.addSubview(scenePopup)
         cv.addSubview(label("Farbe:", 194)); cv.addSubview(presetPopup)
         cv.addSubview(label("CRT-Glitch:", 160)); cv.addSubview(intensitySlider)
         cv.addSubview(label("Leerlauf:", 122)); cv.addSubview(idlePopup)
         cv.addSubview(autostartCheck)
         cv.addSubview(startBtn)
+        cv.addSubview(soundCheck)
 
         let hint = NSTextField(labelWithString: "Vorschau läuft live. Im Vollbild beendet jede Eingabe den Screensaver. „random“ wechselt die Szenen automatisch durch.")
         hint.frame = NSRect(x: 20, y: 24, width: 520, height: 48)
@@ -95,6 +102,8 @@ final class ConfigWindowController: NSWindowController {
     @objc private func toggleAutostart() {
         if autostartCheck.state == .on { LoginItem.enable() } else { LoginItem.disable() }
     }
+
+    @objc private func toggleSound() { AppSettings.sound = (soundCheck.state == .on) }
 
     private func rebuildPreview() {
         previewView?.stop(); previewView?.removeFromSuperview()

@@ -28,6 +28,11 @@ enum AppSettings {
         get { store.object(forKey: "IdleMin") != nil ? store.double(forKey: "IdleMin") : 5 }
         set { store.set(newValue, forKey: "IdleMin") }
     }
+    /// Atmospheric audio (off by default — screensavers usually run muted).
+    static var sound: Bool {
+        get { store.bool(forKey: "Sound") }
+        set { store.set(newValue, forKey: "Sound") }
+    }
 
     /// Build a renderer Settings + whether to auto-cycle (scene == "random").
     static func make() -> (settings: Settings, autoCycle: Bool) {

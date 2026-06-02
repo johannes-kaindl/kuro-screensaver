@@ -22,7 +22,7 @@ echo "compiling app…"
 swiftc -O \
   $(ls "$SRC"/Core/*.swift) $(ls "$APPSRC"/*.swift) \
   -o "$APP/Contents/MacOS/KuroMetalApp" \
-  -framework Metal -framework MetalPerformanceShaders -framework QuartzCore \
+  -framework Metal -framework MetalPerformanceShaders -framework AVFoundation -framework QuartzCore \
   -framework AppKit -framework CoreText -framework Foundation
 
 cp "$APPSRC/Info.plist" "$APP/Contents/Info.plist"
