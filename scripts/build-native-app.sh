@@ -27,6 +27,17 @@ swiftc -O \
 
 cp "$APPSRC/Info.plist" "$APP/Contents/Info.plist"
 
+# App icon: generate AppIcon.icns from the committed 1024² source.
+ICON_SRC="$APPSRC/icon-1024.png"
+if [ -f "$ICON_SRC" ]; then
+  ISET="$BUILD/AppIcon.iconset"; rm -rf "$ISET"; mkdir -p "$ISET" "$APP/Contents/Resources"
+  for sz in 16 32 128 256 512; do
+    sips -z "$sz" "$sz" "$ICON_SRC" --out "$ISET/icon_${sz}x${sz}.png" >/dev/null 2>&1
+    sips -z "$((sz*2))" "$((sz*2))" "$ICON_SRC" --out "$ISET/icon_${sz}x${sz}@2x.png" >/dev/null 2>&1
+  done
+  iconutil -c icns "$ISET" -o "$APP/Contents/Resources/AppIcon.icns" && echo "icon generated"
+fi
+
 echo "signing…"
 if security find-identity -v -p codesigning 2>/dev/null | grep -q "$SIGN_ID"; then
   codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$APP"

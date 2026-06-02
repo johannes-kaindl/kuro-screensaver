@@ -29,6 +29,8 @@ struct Args {
     var forceGlitch: String? = nil   // htear|flicker|chroma|scanpulse (debug)
     var bench = 0                    // if > 0: render N frames timed, no PNG
     var crash: Float = -1            // if >= 0: freeze crash collapse at this amount
+    var noHud = false
+    var curv: Float = -1             // override curvature if >= 0
 }
 
 func parseArgs() -> Args {
@@ -49,6 +51,8 @@ func parseArgs() -> Args {
         case "--force-glitch": a.forceGlitch = it.next()
         case "--bench": a.bench = Int(it.next() ?? "") ?? a.bench
         case "--crash": a.crash = Float(it.next() ?? "") ?? 0.85
+        case "--no-hud": a.noHud = true
+        case "--curv": a.curv = Float(it.next() ?? "") ?? a.curv
         default: FileHandle.standardError.write("unknown arg \(k)\n".data(using: .utf8)!)
         }
     }
@@ -127,6 +131,8 @@ settings.scene = args.scene
 settings.presetID = args.preset
 settings.seed = args.seed
 settings.crtIntensity = args.intensity
+if args.noHud { settings.showHud = false }
+if args.curv >= 0 { settings.curvature = args.curv }
 
 let ctx = SceneContext(device: device, rng: LCG(seed: args.seed),
                        settings: settings, accent: settings.preset.accentRGB)

@@ -32,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ note: Notification) {
+        buildMainMenu()
         switch mode {
         case .oneShot:
             startScreensaver()
@@ -43,6 +44,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             idleTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in self?.tickIdle() }
         }
     }
+
+    // MARK: - main menu (standard macOS app menu: About / Settings / Quit)
+
+    private func buildMainMenu() {
+        let main = NSMenu()
+        let appItem = NSMenuItem(); main.addItem(appItem)
+        let appMenu = NSMenu(); appItem.submenu = appMenu
+
+        let about = appMenu.addItem(withTitle: "Über Kuro Screensaver", action: #selector(showAbout), keyEquivalent: "")
+        about.target = self
+        appMenu.addItem(.separator())
+        let settings = appMenu.addItem(withTitle: "Einstellungen…", action: #selector(menuConfig), keyEquivalent: ",")
+        settings.target = self
+        let start = appMenu.addItem(withTitle: "Vollbild starten", action: #selector(menuStart), keyEquivalent: "s")
+        start.target = self
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Kuro Screensaver ausblenden", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Kuro Screensaver beenden", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+
+        // a minimal Window menu so the config window has standard controls
+        let winItem = NSMenuItem(); main.addItem(winItem)
+        let winMenu = NSMenu(title: "Fenster"); winItem.submenu = winMenu
+        winMenu.addItem(withTitle: "Minimieren", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        winMenu.addItem(withTitle: "Schließen", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        NSApp.windowsMenu = winMenu
+
+        NSApp.mainMenu = main
+    }
+
+    @objc private func showAbout() { NSApp.orderFrontStandardAboutPanel(nil) }
 
     // MARK: - agent idle watching
 
