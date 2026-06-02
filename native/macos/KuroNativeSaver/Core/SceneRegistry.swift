@@ -12,7 +12,7 @@ enum SceneRegistry {
         case "rift": return RiftScene(ctx: ctx)
         case "void": return VoidScene(ctx: ctx)
         case "tunnel": return TunnelScene(ctx: ctx)
-        // city added when implemented
+        case "city": return CityScene(ctx: ctx)
         default: return TerrainScene(ctx: ctx)
         }
     }

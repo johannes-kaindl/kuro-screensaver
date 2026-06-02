@@ -13,9 +13,15 @@ struct Settings {
         }
     }
 
+    enum Altitude: String, CaseIterable {
+        case low, mid, high
+        var value: Float { switch self { case .low: return 4; case .mid: return 11; case .high: return 24 } }
+    }
+
     var scene: String = "terrain"
     var presetID: String = "toxic-haze"
     var speed: Speed = .norm
+    var cityAltitude: Altitude = .low
     var crtIntensity: Float = 0.35     // 0..1, drives the glitch scheduler cadence
     var tunnelAutoBoost: Bool = true   // tunnel: speed surge on straight sections
     var seed: Int32? = nil             // nil → fresh per activation
