@@ -12,7 +12,7 @@ export const VoidScene: SceneModule = {
   build(ctx: SceneCtx): SceneUpdater {
     const { world, cam, mats, scene, rng } = ctx;
 
-    scene.fog = new THREE.FogExp2(0x000000, 0.006);
+    scene.fog = new THREE.FogExp2(0x000000, 0.0045);   // matches native VoidScene (a bit further view distance)
     cam.position.set(0, 0, 0);
     cam.rotation.set(0, 0, 0);
 

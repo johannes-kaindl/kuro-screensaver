@@ -7,7 +7,8 @@
 import type { ScreensaverSettings } from '../engine/data/defaults';
 import { DEFAULT_SCREENSAVER } from '../engine/data/defaults';
 
-const STORAGE_KEY = 'kuro-animation:settings';
+const STORAGE_KEY = 'kuro-screensaver:settings';
+const LEGACY_KEY = 'kuro-animation:settings';   // pre-rename (commit dcf4b7f) — migrated on load/save
 
 function deepMerge<T extends object>(base: T, overrides: any): T {
   if (!overrides || typeof overrides !== 'object') return base;
@@ -26,7 +27,7 @@ function deepMerge<T extends object>(base: T, overrides: any): T {
 
 function loadFromStorage(): ScreensaverSettings {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_KEY);
     if (!raw) return structuredClone(DEFAULT_SCREENSAVER);
     const parsed = JSON.parse(raw);
     // Merge user overrides over defaults so newly-added settings always get a value.
@@ -60,6 +61,7 @@ export class WebHost {
     this.settings = settings;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+      localStorage.removeItem(LEGACY_KEY);   // one-time migration off the old project name
     } catch {
       // Quota exceeded or storage disabled — fail silently. Stats are non-critical.
     }

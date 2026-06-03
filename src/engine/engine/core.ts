@@ -304,12 +304,15 @@ export class Engine {
     return [r / 255, g / 255, b / 255];
   }
 
-  /** Draw one rain frame to the offscreen canvas + flag the texture for re-upload. */
+  /** Draw one rain frame to the offscreen canvas + flag the texture for re-upload.
+   *  density drives BOTH column count and overall opacity (0.35..0.8), so the slider
+   *  reads as a single "how much rain" knob rather than just thinning the columns. */
   private drawMatrixFrame() {
     this.sizeMatrixCanvas(window.innerWidth, window.innerHeight);
+    const d = this.settings.fx.matrix.density;
     this.matrixRain.render(
       this.matrixCtx, this.matrixCanvas2d.width, this.matrixCanvas2d.height,
-      this.clockT, this.matrixAccent(), 0.6, this.settings.fx.matrix.density,
+      this.clockT, this.matrixAccent(), 0.35 + 0.45 * d, d,
     );
     this.matrixTex.needsUpdate = true;
   }

@@ -97,6 +97,22 @@ export class ScreensaverController {
     const color = resolveColor(s);
     const scene: SceneId = opts.scene || s.defaultScene;
 
+    // Accessibility: honour prefers-reduced-motion by dialling down the most intense
+    // motion artifacts (CRT glitches, afterimage trails, scanline drift, noise bursts,
+    // auto-cycle, fast flight). Runtime-only — applied to this `s` clone, not persisted,
+    // so flipping the OS setting takes effect on the next open without losing the user's
+    // saved preferences.
+    if (typeof window !== 'undefined' &&
+        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      s.crtSim.on = false;
+      s.autoCycle.on = false;
+      s.speed = 'slow';
+      s.fx.trails.on = false;
+      s.fx.burnDecay.on = false;
+      s.fx.noiseBursts.on = false;
+      s.fx.scanlineDrift.on = false;
+    }
+
     // Build overlay
     this.overlay = document.createElement('div');
     this.overlay.id = 'kuro-screensaver-overlay';
@@ -515,8 +531,12 @@ export class ScreensaverController {
     });
 
     // LOOK — one-click bundles that set the color preset + every CRT knob at once.
+    // Active state is DERIVED (activeLookKey) by matching current settings to a Look,
+    // so it needs no reset bookkeeping: change any knob/color directly and the Look
+    // highlight clears itself on the next rebuild.
     sep(); lbl('LOOK');
-    Object.keys(LOOKS).forEach(k => btn(LOOKS[k].label, false, () => {
+    const activeLook = this.activeLookKey();
+    Object.keys(LOOKS).forEach(k => btn(LOOKS[k].label, activeLook === k, () => {
       applyLook(this.s, k);
       this.saveSettingsDebounced();
       const eff = this.effectiveSettings();
@@ -600,6 +620,28 @@ export class ScreensaverController {
         if (this.fpsBarEl && this.engine) this.fpsBarEl.textContent = String(this.engine.fps || '--');
       }, 500);
     }
+  }
+
+  /** Which Look (if any) the current settings exactly match — for the LOOK button
+   *  highlight. Derived from state, so no reset logic is needed when the user edits
+   *  a knob directly. Mirrors applyLook()'s field mapping. */
+  private activeLookKey(): string | null {
+    const s = this.s, f = s.fx;
+    const near = (a: number, b: number) => Math.abs(a - b) < 0.01;
+    for (const k of Object.keys(LOOKS)) {
+      const L = LOOKS[k];
+      if (s.colorPreset !== L.preset) continue;
+      if (!near(f.curvature.amount, L.curvature)) continue;
+      if (!near(f.aperture.strength, L.aperture)) continue;
+      if (!near(f.ntsc.amount, L.ntsc)) continue;
+      if (!near(f.halation.amount, L.halation)) continue;
+      if (!near(f.bloom.strength, L.bloom)) continue;
+      if (!near(f.trails.damp, 0.5 + L.trails * 0.45)) continue;
+      if (f.matrix.on !== L.matrix) continue;
+      if (!near(s.crtSim.intensity, L.intensity)) continue;
+      return k;
+    }
+    return null;
   }
 
   private toggleFx(fx: keyof ScreensaverSettings['fx']) {
