@@ -28,6 +28,7 @@ export interface HostPlugin {
   app?: { workspace?: { getActiveFile?: () => { basename?: string } | null } };
 }
 import { NarrativeRunner } from './terminal/narrative';
+import { ReactiveWorld } from './fx/reactive-world';
 import { mkRng, freshSeed } from './engine/rng';
 import { CrtSim } from './fx/crt-sim';
 
@@ -44,6 +45,7 @@ export class ScreensaverController {
   hud: Hud | null = null;
   audio: AudioLayer | null = null;
   narrative: NarrativeRunner | null = null;
+  reactiveWorld: ReactiveWorld | null = null;
   crt: CrtSim | null = null;
 
   private autoCycleTimer = 0;
@@ -83,7 +85,7 @@ export class ScreensaverController {
     return s;
   }
 
-  async open(opts: { embed?: boolean; scene?: SceneId; storyScale?: number } = {}) {
+  async open(opts: { embed?: boolean; scene?: SceneId; storyScale?: number; reactiveThreat?: number } = {}) {
     if (this.state.open) return;
     this.state.open = true;
     this.state.embed = !!opts.embed;
@@ -102,8 +104,9 @@ export class ScreensaverController {
     // auto-cycle, fast flight). Runtime-only — applied to this `s` clone, not persisted,
     // so flipping the OS setting takes effect on the next open without losing the user's
     // saved preferences.
-    if (typeof window !== 'undefined' &&
-        window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    const reduceMotion = typeof window !== 'undefined' &&
+        !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) {
       s.crtSim.on = false;
       s.autoCycle.on = false;
       s.speed = 'slow';
@@ -281,30 +284,43 @@ export class ScreensaverController {
       this.narrative.start();
     }
 
+    // Reactive world: the 3D environment reacts to the shift phase (subtle build →
+    // PANIC payoff, released by the crash). Only when the narrative drives a phase.
+    if (s.narrativeReactiveWorld && this.narrative && this.engine && !this.state.embed) {
+      this.reactiveWorld = new ReactiveWorld({
+        engine: this.engine,
+        narrative: this.narrative,
+        crt: this.crt,
+        settings: s,
+        calm: reduceMotion,
+        forcedThreat: opts.reactiveThreat,
+      });
+    }
+
     // Auto-cycle
     if (s.autoCycle.on && !this.state.embed) {
       this.autoCycleTimer = window.setInterval(() => this.cycleScene(), s.autoCycle.intervalMin * 60_000);
     }
 
-    // Weather: apply fog density override + dust toggle
-    const fog = this.engine!.scene.fog as any;
-    if (fog) {
+    // Weather: fold the fog override into baseFogDensity so it composes with fogMode +
+    // the day-night cycle (the engine is the single fog writer: fogBase × fogThreatMult).
+    {
       switch (s.weather) {
-        case 'clear':     fog.density = 0.004; break;
+        case 'clear':     this.baseFogDensity = 0.004; break;
         case 'light-fog': /* scene default */   break;
-        case 'heavy-fog': fog.density = (fog.density || 0.01) * 2.5; break;
+        case 'heavy-fog': this.baseFogDensity *= 2.5; break;
         case 'storm':
-          // Storm flicker: occasional bloom-strength surge
+          // Storm flicker: occasional bloom-strength surge (on bloomBase — the engine
+          // composes the final strength as bloomBase × bloomThreatMult each frame).
           (this as any)._stormInterval = window.setInterval(() => {
             if (this.engine && Math.random() < 0.06) {
-              const bp = this.engine.bloomPass;
-              const orig = bp.strength;
-              bp.strength = orig * 2.4;
-              setTimeout(() => { if (this.engine) this.engine.bloomPass.strength = orig; }, 80 + Math.random() * 60);
+              const orig = this.engine.bloomBase;
+              this.engine.bloomBase = orig * 2.4;
+              setTimeout(() => { if (this.engine) this.engine.bloomBase = orig; }, 80 + Math.random() * 60);
             }
           }, 400);
           break;
-        case 'dust':      fog.density = (fog.density || 0.01) * 1.6; break;
+        case 'dust':      this.baseFogDensity *= 1.6; break;
       }
     }
 
@@ -317,7 +333,7 @@ export class ScreensaverController {
         if (fps && fps < 40) lowFrames++; else lowFrames = 0;
         if (lowFrames >= 3) {
           // Reduce trails + bloom strength
-          this.engine.bloomPass.strength = Math.max(0.4, this.engine.bloomPass.strength * 0.85);
+          this.engine.bloomBase = Math.max(0.4, this.engine.bloomBase * 0.85);
           if (this.engine.trailPass.enabled) this.engine.trailPass.enabled = false;
           if (this.engine.burnPass.enabled) this.engine.burnPass.enabled = false;
           lowFrames = 0;
@@ -364,14 +380,14 @@ export class ScreensaverController {
       if (!this.engine) return;
       const idleMs = performance.now() - lastInteractionT;
       const shouldDrift = idleMs > 5 * 60_000;
-      const fog = this.engine.scene.fog as any;
       if (shouldDrift && !inDrift) {
         inDrift = true;
-        // Visual drift: gentler bloom + thicker fog gives a "settling" feel
-        preDriftBloom = this.engine.bloomPass.strength;
-        preDriftFog = fog?.density ?? 0.01;
-        this.engine.bloomPass.strength = preDriftBloom * 0.65;
-        if (fog) fog.density = preDriftFog * 1.45;
+        // Visual drift: gentler bloom + thicker fog gives a "settling" feel.
+        // Operate on the engine bases (the engine is the single fog/bloom writer).
+        preDriftBloom = this.engine.bloomBase;
+        preDriftFog = this.engine.fogBase;
+        this.engine.bloomBase = preDriftBloom * 0.65;
+        this.engine.fogBase = preDriftFog * 1.45;
         if (this.audio?.master) this.audio.master.gain.value = Math.min(1.0, this.s.sound.volume * 1.3);
         this.audio?.pauseSoundscape?.();
         // NOTE: deliberately do NOT pause the narrative here. A screensaver is
@@ -381,8 +397,8 @@ export class ScreensaverController {
         // (bloom/fog/ambient) is enough of a "settling" cue on its own.
       } else if (!shouldDrift && inDrift) {
         inDrift = false;
-        this.engine.bloomPass.strength = preDriftBloom;
-        if (fog) fog.density = preDriftFog;
+        this.engine.bloomBase = preDriftBloom;
+        this.engine.fogBase = preDriftFog;
         if (this.audio?.master) this.audio.master.gain.value = this.s.sound.volume;
         this.audio?.resumeSoundscape?.();
       }
@@ -393,14 +409,14 @@ export class ScreensaverController {
     // that this loop leaves alone.
     if (s.dayNightCycle.on) {
       const periodMs = s.dayNightCycle.periodMin * 60_000;
-      const baseBloom = this.engine!.bloomPass.strength;
+      const baseBloom = this.engine!.bloomBase;
       (this as any)._dayNightInterval = window.setInterval(() => {
         const phase = ((Date.now() - this.dayNightT0) % periodMs) / periodMs;
         const cycleVal = Math.sin(phase * Math.PI * 2);
         if (this.engine) {
-          this.engine.bloomPass.strength = baseBloom * (1 + cycleVal * 0.35);
-          if (this.s.fogMode === 'auto' && this.engine.scene.fog) {
-            (this.engine.scene.fog as any).density = this.baseFogDensity * (1 + cycleVal * 0.4);
+          this.engine.bloomBase = baseBloom * (1 + cycleVal * 0.35);
+          if (this.s.fogMode === 'auto') {
+            this.engine.fogBase = this.baseFogDensity * (1 + cycleVal * 0.4);
           }
         }
       }, 250);
@@ -411,15 +427,15 @@ export class ScreensaverController {
     this.applyFogMode();
   }
 
-  /** Fog / view-distance control — see ScreensaverSettings.fogMode. */
+  /** Fog / view-distance control — see ScreensaverSettings.fogMode. Sets the engine's
+   *  fogBase; the engine composes the final density as fogBase × fogThreatMult. */
   private applyFogMode() {
-    const fog = this.engine?.scene.fog as any;
-    if (!fog) return;
+    if (!this.engine) return;
     switch (this.s.fogMode) {
-      case 'clear': fog.density = this.baseFogDensity * 0.45; break;
-      case 'dense': fog.density = this.baseFogDensity * 2.2;  break;
+      case 'clear': this.engine.fogBase = this.baseFogDensity * 0.45; break;
+      case 'dense': this.engine.fogBase = this.baseFogDensity * 2.2;  break;
       case 'auto':
-      default:      fog.density = this.baseFogDensity;        break;
+      default:      this.engine.fogBase = this.baseFogDensity;        break;
     }
   }
 
@@ -605,6 +621,22 @@ export class ScreensaverController {
       };
       btn(labels[fx], (s.fx as any)[fx].on, () => this.toggleFx(fx as any));
     });
+    // REACT — the world reacts to the narrative shift (fog/CRT/camera/storm). Live toggle.
+    btn('REACT', this.s.narrativeReactiveWorld, () => {
+      this.s.narrativeReactiveWorld = !this.s.narrativeReactiveWorld;
+      this.saveSettingsDebounced();
+      if (this.s.narrativeReactiveWorld) {
+        if (!this.reactiveWorld && this.narrative && this.engine) {
+          this.reactiveWorld = new ReactiveWorld({
+            engine: this.engine, narrative: this.narrative, crt: this.crt, settings: this.s,
+          });
+        }
+      } else {
+        this.reactiveWorld?.dispose();
+        this.reactiveWorld = null;
+      }
+      this.rebuildBar();
+    }, 'The 3D world reacts to the shift: fog closes in, CRT degrades, camera hesitates, PANIC storm');
 
     // FPS — live, updated by separate ticker so we don't rebuild the bar each frame
     sep(); lbl('FPS');
@@ -831,6 +863,7 @@ export class ScreensaverController {
     if (document.fullscreenElement) {
       try { await document.exitFullscreen(); } catch {}
     }
+    this.reactiveWorld?.dispose();
     this.narrative?.stop();
     this.crt?.dispose();
     this.audio?.dispose();
@@ -838,6 +871,7 @@ export class ScreensaverController {
     this.engine?.dispose();
     this.overlay?.remove();
     this.overlay = null; this.engine = null; this.hud = null; this.audio = null; this.narrative = null; this.crt = null;
+    this.reactiveWorld = null;
     this.state.open = false;
   }
 

@@ -28,7 +28,7 @@ import {
 } from './script-bank';
 import type { MentorExchange } from './script-bank';
 
-type Phase = 'ROUTINE' | 'INTRUSION' | 'ALARM' | 'PANIC' | 'SILENCE';
+export type Phase = 'ROUTINE' | 'INTRUSION' | 'ALARM' | 'PANIC' | 'SILENCE';
 
 // Phase-dependent expected duration (seconds). Variance applied at runtime.
 // Total cycle: ~6-9 minutes. ROUTINE kept short so first intrusion lands while
@@ -55,10 +55,13 @@ export interface NarrativeRunnerDeps {
    * resolves once the reboot flicker is done.
    */
   onShiftEnd?: (clearScreen: () => void) => Promise<void>;
+  /** Fired when an intrusion event lands — drives the reactive-world camera hesitation. */
+  onIntrusion?: () => void;
 }
 
 export class NarrativeRunner {
   private phase: Phase = 'ROUTINE';
+  private phaseStartedAt = 0;
   private phaseEndsAt = 0;
   private alive = false;
   private timers: number[] = [];
@@ -82,6 +85,16 @@ export class NarrativeRunner {
   constructor(public d: NarrativeRunnerDeps, rng: () => number, private durationScale = 1) {
     this.persona = makePersona(rng);
     this.refreshPrompt();
+  }
+
+  // ── Reactive-world signal (read by ReactiveWorld each frame) ───────────
+  /** Current shift phase. */
+  get currentPhase(): Phase { return this.phase; }
+  /** 0..1 elapsed within the current phase (from the live phase timers). */
+  get phaseProgress(): number {
+    const span = this.phaseEndsAt - this.phaseStartedAt;
+    if (span <= 0) return 0;
+    return Math.min(1, Math.max(0, (Date.now() - this.phaseStartedAt) / span));
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────
@@ -121,7 +134,8 @@ export class NarrativeRunner {
     const myGen = this.generation;
     this.phase = p;
     const [lo, hi] = PHASE_DURATION[p];
-    this.phaseEndsAt = Date.now() + (lo + Math.random() * (hi - lo)) * 1000 * this.durationScale;
+    this.phaseStartedAt = Date.now();
+    this.phaseEndsAt = this.phaseStartedAt + (lo + Math.random() * (hi - lo)) * 1000 * this.durationScale;
     this.scheduleTransition();
     this.runPhaseLoop(myGen);
   }
@@ -302,6 +316,7 @@ export class NarrativeRunner {
     // 60% intrusion event, 40% follow-up reaction or routine command
     if (Math.random() < 0.6) {
       const ev = pick([...INTRUSIONS_QUOTES, ...INTRUSIONS_FRAGMENTS]);
+      this.d.onIntrusion?.();
       await this.d.hud.addLine(ev.text, 'QUOTES');
       if (ev.followup) {
         await this.sleep(500);
@@ -369,6 +384,7 @@ export class NarrativeRunner {
     } else {
       // Intrusion event
       const ev = pick(INTRUSIONS_QUOTES);
+      this.d.onIntrusion?.();
       await this.d.hud.addLine(ev.text, 'QUOTES');
     }
   }
@@ -406,6 +422,7 @@ export class NarrativeRunner {
     } else {
       // Multiple rapid intrusions
       for (let i = 0; i < 2 + Math.floor(Math.random() * 2); i++) {
+        this.d.onIntrusion?.();
         await this.d.hud.addLine(pick(INTRUSIONS_QUOTES).text, 'QUOTES');
         await this.sleep(280 + Math.random() * 220);
       }

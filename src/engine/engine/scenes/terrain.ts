@@ -99,8 +99,10 @@ export const TerrainScene: SceneModule = {
       cam.position.x = f.x; cam.position.y = f.y;
       cam.rotation.set(f.pitch, f.yaw, f.roll);
 
-      // Dust drifts laterally
-      dust.position.x = Math.sin(t * 0.07) * 4;
+      // Dust drifts laterally; under the narrative PANIC storm it whips + brightens.
+      const storm = ctx.storm?.() ?? 0;
+      dust.position.x = Math.sin(t * 0.07) * 4 + storm * 12 * Math.sin(t * 3.1);
+      (dust.material as THREE.PointsMaterial).size = 0.06 + storm * 0.14;
     };
   },
 };

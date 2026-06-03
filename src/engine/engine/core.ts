@@ -138,6 +138,31 @@ export class Engine {
   currentUpdater: SceneUpdater | null = null;
   currentSceneObj: any = null;
 
+  // ── Reactive-world hooks (driven by fx/reactive-world.ts) ───────────────
+  /** Called at the TOP of each tick (before the scene updater) so the conductor's
+   *  threat value is ready for scenes to read this same frame. */
+  onFrame: ((t: number, dt: number) => void) | null = null;
+  /** Live signal mirrored from the conductor; scenes read these via SceneCtx thunks. */
+  threat = 0;
+  storm = 0;
+  /** Fog is composed as fogBase × fogThreatMult and written ONCE per frame by the
+   *  engine (single writer — avoids the day-night/threat ordering clobber). The
+   *  controller sets fogBase; the conductor sets fogThreatMult. */
+  fogBase = 0.01;
+  fogThreatMult = 1;
+  // Bloom is likewise composed as bloomBase × bloomThreatMult and written ONCE per
+  // frame by the engine. Controller (day-night / idle-drift) sets bloomBase; the
+  // conductor sets bloomThreatMult (storm surge).
+  bloomBase = 1.4;
+  bloomThreatMult = 1;
+  private _crtHalBase = 0;        // base CRT halation/ntsc (pre-threat); set in setCrtUniforms
+  private _crtNtscBase = 0;
+  private _crtHalAdd = 0;         // threat add on halation/ntsc; set by setCrtThreat
+  private _crtNtscAdd = 0;
+  private _crtBaseOn = false;     // any base CRT sub-effect enabled by the user
+  private _hesT0 = -1;            // camera-hesitation envelope start (clockT); <0 = inactive
+  private _hesDur = 0;
+
   rng: () => number;
   seed: number;
 
@@ -214,6 +239,7 @@ export class Engine {
 
     this.bloomPass = new UnrealBloomPass(new THREE.Vector2(W, H), settings.fx.bloom.strength, 0.6, 0.05);
     this.bloomPass.enabled = settings.fx.bloom.on;
+    this.bloomBase = settings.fx.bloom.strength;
     this.composer.addPass(this.bloomPass);
 
     this.trailPass = new AfterimagePass(settings.fx.trails.damp);
@@ -281,9 +307,38 @@ export class Engine {
     const f = s.fx;
     this.crtPass.uniforms.curvature.value = f.curvature.on ? f.curvature.amount : 0;
     this.crtPass.uniforms.aperture.value  = f.aperture.on  ? f.aperture.strength : 0;
-    this.crtPass.uniforms.ntsc.value      = f.ntsc.on      ? f.ntsc.amount : 0;
-    this.crtPass.uniforms.halation.value  = f.halation.on  ? f.halation.amount : 0;
-    this.crtPass.enabled = f.curvature.on || f.aperture.on || f.ntsc.on || f.halation.on;
+    this._crtHalBase  = f.halation.on ? f.halation.amount : 0;
+    this._crtNtscBase = f.ntsc.on     ? f.ntsc.amount : 0;
+    this._crtBaseOn = f.curvature.on || f.aperture.on || f.ntsc.on || f.halation.on;
+    this.applyCrtThreat();
+  }
+
+  /** Re-derive the CRT halation/ntsc uniforms from base + threat add (single point
+   *  so threat escalation composes on the user's settings instead of clobbering). */
+  private applyCrtThreat() {
+    this.crtPass.uniforms.halation.value = this._crtHalBase + this._crtHalAdd;
+    this.crtPass.uniforms.ntsc.value     = this._crtNtscBase + this._crtNtscAdd;
+    this.crtPass.enabled = this._crtBaseOn || this._crtHalAdd > 0.001 || this._crtNtscAdd > 0.001;
+  }
+
+  /** Conductor: additive CRT escalation (halation + NTSC) driven by threat. */
+  setCrtThreat(halAdd: number, ntscAdd: number) {
+    this._crtHalAdd = halAdd;
+    this._crtNtscAdd = ntscAdd;
+    this.applyCrtThreat();
+  }
+
+  /** Conductor: bloom strength multiplier on the current base (storm payoff surge). */
+  setBloomThreat(mult: number) {
+    this.bloomThreatMult = mult;
+  }
+
+  /** Conductor: start a lateral camera-hesitation envelope (the operator "noticing").
+   *  No-op if one is already active. Applied in the tick after the scene update. */
+  pulseHesitation(durationSec: number) {
+    if (this._hesT0 >= 0) return;
+    this._hesT0 = this.clockT;
+    this._hesDur = Math.max(0.3, durationSec);
   }
 
   /** Size the offscreen rain canvas to the viewport aspect, capped to bound the
@@ -340,12 +395,16 @@ export class Engine {
     const ctx: SceneCtx = {
       scene: this.scene, world: this.world, cam: this.cam,
       mats: this.mats, rng: this.rng, settings: this.settings,
+      threat: () => this.threat, storm: () => this.storm,
     };
     const mod = SCENE_REGISTRY[id];
     this.currentSceneObj = mod;
     this.currentUpdater = mod.build.call(mod, ctx);
     this.currentScene = id;
     this.updateMatrixEnabled();   // the MATRIX scene force-enables the rain pass
+    // Capture the scene's chosen fog density as the base the conductor scales.
+    const fd = (this.scene.fog as any)?.density;
+    if (typeof fd === 'number') this.fogBase = fd;
   }
 
   /** The matrix rain renders when the fx toggle is on OR the MATRIX scene is active
@@ -365,6 +424,13 @@ export class Engine {
       const dt = this.lastT === 0 ? 16 : Math.min(50, now - this.lastT);
       this.lastT = now;
       this.clockT += dt / 1000;
+
+      // Step 0 — conductor: compute threat (ready for the scene updater this frame),
+      // then write the composed fog density (single writer: base × threat mult).
+      this.onFrame?.(this.clockT, dt);
+      if (this.scene.fog) (this.scene.fog as any).density = this.fogBase * this.fogThreatMult;
+      this.bloomPass.strength = this.bloomBase * this.bloomThreatMult;
+
       // Step 1 — restore cam.rotation to the previous frame's *scene-natural* baseline.
       //   Without this, scenes that don't set rotation.x/.y every frame (TERRAIN sets only .z;
       //   CITY/CANYON set .y and .z) would let parallax delta compound across frames.
@@ -389,6 +455,18 @@ export class Engine {
         this.cam.rotation.y += this.parallaxX * this.parallaxStrength;
         this.cam.rotation.x += this.parallaxY * this.parallaxStrength;
         this.cam.updateProjectionMatrix();
+      }
+
+      // Camera hesitation: while a pulse is active, gently steady the lateral weave
+      // (pull cam.x toward centre) so the flight "notices something". Scenes re-set
+      // cam.x every frame, so this dampens without compounding. CameraFly untouched.
+      if (this._hesT0 >= 0) {
+        const p = (this.clockT - this._hesT0) / this._hesDur;
+        if (p >= 1) { this._hesT0 = -1; }
+        else {
+          const s = Math.sin(Math.PI * p); const env = s * s;   // sin²: smooth in/out
+          this.cam.position.x *= (1 - 0.55 * env);
+        }
       }
 
       if (this.matrixPass.enabled) this.drawMatrixFrame();
@@ -436,7 +514,7 @@ export class Engine {
   applyFxSettings(s: ScreensaverSettings) {
     this.settings = s;
     this.bloomPass.enabled  = s.fx.bloom.on;
-    this.bloomPass.strength = s.fx.bloom.strength;
+    this.bloomBase = s.fx.bloom.strength;
     this.trailPass.enabled  = s.fx.trails.on;
     (this.trailPass.uniforms as any).damp.value = s.fx.trails.damp;
     this.burnPass.enabled   = s.fx.burnDecay.on;

@@ -168,18 +168,21 @@ export const VoidScene: SceneModule = {
         }
       }
 
-      // Speed particles cycle past camera.
+      // Speed particles cycle past camera; the PANIC storm widens their spread.
+      const storm = ctx.storm?.() ?? 0;
+      const spreadX = 24 * (1 + storm * 0.5), spreadY = 16 * (1 + storm * 0.5);
       const spa = speedPts.geometry.attributes.position as THREE.BufferAttribute;
       const arr = spa.array as Float32Array;
       for (let i = 0; i < SPV; i++) {
         const zi = i * 3 + 2;
         if (arr[zi] > camZ + 2) {
           arr[zi] = camZ - 40 - rng() * 30;
-          arr[i * 3]     = (rng() - 0.5) * 24 + cam.position.x;
-          arr[i * 3 + 1] = (rng() - 0.5) * 16 + cam.position.y;
+          arr[i * 3]     = (rng() - 0.5) * spreadX + cam.position.x;
+          arr[i * 3 + 1] = (rng() - 0.5) * spreadY + cam.position.y;
         }
       }
       spa.needsUpdate = true;
+      (speedPts.material as THREE.PointsMaterial).size = 0.14 + storm * 0.12;
     };
   },
 };

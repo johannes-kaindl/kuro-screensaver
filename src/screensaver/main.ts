@@ -44,6 +44,12 @@ const audioOn = params.get('audio') === 'on';
 // CRT-curved). Off by default; also reachable via the Matrix Look / FX toggle.
 const matrixOn = params.get('matrix') === '1' || params.get('matrix') === 'on';
 
+// Reactive-world tuning — ?threat=<0..1> pins the narrative threat level so each
+// escalation state (fog/CRT/storm) is screenshot-able without the 6-9 min cycle.
+const threatRaw = parseFloat(params.get('threat') ?? '');
+const reactiveThreat = Number.isFinite(threatRaw)
+  ? Math.min(1, Math.max(0, threatRaw)) : undefined;
+
 const host = new WebHost({
   activePreset: preset,
   vaultKanji: PRESETS[preset].kanji,
@@ -83,7 +89,7 @@ controller.close = async () => {
   await origClose();
 };
 
-void controller.open({ scene, storyScale });
+void controller.open({ scene, storyScale, reactiveThreat });
 
 // DEV-only: expose the controller so the crash-preview render script can
 // trigger playCrash() directly instead of waiting for a full ~8-min shift.

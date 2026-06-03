@@ -104,6 +104,7 @@ export interface ScreensaverSettings {
    * of a passive scroll of atmospheric lines. Recommended ON.
    */
   narrativeTerminal: boolean;
+  narrativeReactiveWorld: boolean;   // the 3D world reacts to the shift phase (fog/CRT/camera/storm)
   /**
    * Terminal layout mode:
    *   bottom-strip  — original mode: terminal hugs the bottom of the screen.
@@ -200,6 +201,7 @@ export const DEFAULT_SCREENSAVER: ScreensaverSettings = {
   escapeOnlyExit: false,
   controlBarAutoHideSec: 30,
   narrativeTerminal: true,
+  narrativeReactiveWorld: true,
   terminalLayout: 'bottom-strip',
 
   dayNightCycle: { on: true, periodMin: 4 },

@@ -10,6 +10,10 @@ export interface SceneCtx {
   mats: MaterialPool;
   rng: () => number;
   settings: ScreensaverSettings;
+  /** Reactive-world signal (0..1), live per frame. Optional — scenes that don't
+   *  read it are unaffected. `storm` is the high-threat payoff scalar. */
+  threat?: () => number;
+  storm?: () => number;
 }
 
 export type SceneUpdater = (t: number, dt: number) => void;

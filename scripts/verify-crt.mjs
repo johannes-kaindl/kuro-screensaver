@@ -11,7 +11,8 @@ for (const s of shots) {
   const [scene, preset, flag] = s.split(':');
   const matrix = flag === 'matrix';
   const page = await ctx.newPage();
-  const url = `${BASE}/screensaver.html?scene=${scene}&preset=${preset}${matrix ? '&matrix=1' : ''}`;
+  const threat = process.env.THREAT != null ? `&threat=${process.env.THREAT}` : '';
+  const url = `${BASE}/screensaver.html?scene=${scene}&preset=${preset}${matrix ? '&matrix=1' : ''}${threat}`;
   await page.goto(url, { waitUntil: 'load' });
   await page.waitForTimeout(wait);
   const name = `crt-${scene}${matrix ? '-matrix' : ''}.png`;
