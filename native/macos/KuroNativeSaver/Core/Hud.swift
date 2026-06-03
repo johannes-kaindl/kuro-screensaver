@@ -13,7 +13,7 @@ enum SceneMeta {
     static let modes: [String: [String]] = [
         "terrain": ["RECON", "SWEEP", "PATROL"], "city": ["LOW LEVEL", "URBAN", "HIGH PASS"],
         "rift": ["THE RIFT", "CHASM", "INVERSION"], "tunnel": ["INFIL", "TRANSIT", "BOOST"],
-        "void": ["DRIFT", "BELT", "SWARM"], "matrix": ["DIGITAL RAIN", "CASCADE", "DECRYPT"],
+        "void": ["DRIFT", "BELT", "SWARM"], "matrix": ["RAIN", "CASCADE", "DELUGE"],
     ]
 }
 

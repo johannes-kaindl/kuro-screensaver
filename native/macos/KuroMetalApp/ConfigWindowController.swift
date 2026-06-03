@@ -141,6 +141,7 @@ final class ConfigWindowController: NSWindowController {
         bloomSlider.doubleValue = Double(look.bloomScale)
         intensitySlider.doubleValue = Double(look.intensity)
         persist()
+        AppSettings.matrix = look.matrix   // the Look's matrix overlay flag (no separate checkbox)
         AppSettings.look = look.id   // keep the popup on this Look (persist() doesn't touch it)
         rebuildPreview()
     }
