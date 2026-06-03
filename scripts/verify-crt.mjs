@@ -6,11 +6,12 @@ const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, d
 // shot spec: "scene:preset" or "scene:preset:matrix" (3rd token enables ?matrix=1)
 const shots = process.argv.slice(2).length ? process.argv.slice(2) : ['void:phosphor','terrain:toxic-haze'];
 const wait = Number(process.env.WAIT_MS || 9000);
+const BASE = process.env.BASE || 'http://localhost:5173';   // e.g. live Pages URL
 for (const s of shots) {
   const [scene, preset, flag] = s.split(':');
   const matrix = flag === 'matrix';
   const page = await ctx.newPage();
-  const url = `http://localhost:5173/screensaver.html?scene=${scene}&preset=${preset}${matrix ? '&matrix=1' : ''}`;
+  const url = `${BASE}/screensaver.html?scene=${scene}&preset=${preset}${matrix ? '&matrix=1' : ''}`;
   await page.goto(url, { waitUntil: 'load' });
   await page.waitForTimeout(wait);
   const name = `crt-${scene}${matrix ? '-matrix' : ''}.png`;
