@@ -26,7 +26,9 @@ instance — no shim needed there.
 
 ## Workflow conventions
 
-- **Tests:** none yet — visual verification via `npm run dev`.
+- **Tests:** native logic tests via `bash scripts/run-native-tests.sh` (LCG parity,
+  terrain/camera/palette sanity — run in CI). Web: typecheck + visual verification
+  (`npm run dev`, or `node scripts/verify-crt.mjs` for headless CRT screenshots).
 - **Typecheck:** `npm run typecheck` (must pass before commits touching `src/`).
 - **Build:** `npm run build` → `dist/`.
 - **Backport to plugin:** `./scripts/sync-to-plugin.sh --apply`, then in
@@ -88,20 +90,29 @@ instance — no shim needed there.
 
 ## Native builds (`native/`)
 
-The engine also ships natively, both hosting the shared screensaver-mode web
-entry (`screensaver.html` + `src/screensaver/main.ts`) in a WebView:
+- **macOS** — a standalone fullscreen **Metal app** (`native/macos/KuroMetalApp/`
+  + the shared engine in `native/macos/KuroNativeSaver/Core/`). The whole engine
+  runs live on the GPU (no WebView, no pre-rendered video). Built with `swiftc`
+  (no Xcode) via `scripts/build-native-app.sh`; notarized + uploaded to the release
+  locally via `scripts/package-native-app.sh`. Dev tools live alongside Core:
+  `harness/` (headless PNG renders), `tests/`, `tools/`.
+- **Windows** — a real `.scr` (`native/windows/`, .NET WinForms + WebView2 hosting
+  `screensaver.html`). Cross-builds on macOS/Linux via `dotnet publish -r win-x64`.
 
-- **Windows** — a real `.scr` (`native/windows/`, .NET WinForms + WebView2).
-  Cross-builds on macOS/Linux via `dotnet publish -r win-x64`.
-- **macOS** — a fullscreen **`.app`** (`native/macos/KuroScreensaverApp/`), **not
-  a `.saver`**: WebGL does not composite in the sandboxed `legacyScreenSaver`
-  process (confirmed on-device). The `.saver` scaffold under
-  `native/macos/KuroScreensaver/` is kept only for a possible future native
-  (Metal/SceneKit) rewrite. Build needs Xcode (macOS CI runner).
+**Deprecated 2026-06-03 (v0.4.2):** all macOS `.saver` paths were removed — the
+WebGL `.saver`/`.app` scaffold (`KuroScreensaverApp`/`KuroScreensaver`), the live
+native `.saver` host (`KuroNativeSaver/Host`), and the 13 pre-rendered video
+`.saver`s (`KuroVideoSaver`). macOS Tahoe's sandboxed `legacyScreenSaver` process
+broke live GPU compositing; the notarized native app replaces all of them. The
+xcodegen `project.yml` + the `package-macos.sh`/`build-native-saver.sh`/
+`build-video-savers.sh`/`upload-video-assets.sh`/`render-saver-videos.mjs` scripts
+are gone too.
 
-Releases: GitHub Actions in `johannes-kaindl/kuro-screensaver` builds both and
-attaches them to the Codeberg release. Cut one with
-`git tag vX && git push origin vX && git push github vX` (tag both remotes).
+Releases: GitHub Actions (`johannes-kaindl/kuro-screensaver`) typechecks + runs the
+native tests, compile-checks the macOS app, builds the Windows `.scr`, and attaches
+the `.scr` to the Codeberg release. The **notarized macOS app** is built + attached
+locally (CI has no Developer ID cert). Cut a release with `git tag vX && git push
+origin vX` (the Codeberg→GitHub push mirror forwards the tag to trigger CI).
 See `docs/specs/2026-05-28-screensaver-native-port-*.md`.
 
 ## Related repos

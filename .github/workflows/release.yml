@@ -1,22 +1,18 @@
 # Release pipeline (GitHub Actions).
 #
-# Why GitHub and not Codeberg CI: building the macOS .saver needs a macOS
-# runner with Xcode, which Codeberg's hosted CI (Linux only) doesn't provide.
-# GitHub's macos-latest has Xcode preinstalled and is free for public repos —
-# so nobody has to download ~10 GB of Xcode locally.
+# Codeberg is the primary repo; a Codeberg → GitHub push mirror forwards commits +
+# tags automatically, so pushing a tag triggers this workflow on the mirror.
 #
-# Codeberg stays the primary repo. Set up a Codeberg → GitHub *push mirror*
-# (Codeberg repo Settings → Repository → Mirror) so commits and tags sync
-# automatically; pushing a tag then triggers this workflow on the mirror.
+# macOS deliverable = the standalone native Metal app (KuroMetalApp). It is notarized
+# + uploaded to the release LOCALLY (CI has no Developer ID cert) via
+# scripts/package-native-app.sh. CI therefore only *compile-checks* the macOS app and
+# ships the Windows .scr. The legacy .saver paths (WebView .saver, native live .saver,
+# pre-rendered video .savers) were deprecated 2026-06-03 — the native app replaces them.
 #
 # SETUP (one-time, user side):
-#   1. Create an empty GitHub repo (e.g. jkaindl/kuro-screensaver).
-#   2. Codeberg → Settings → add a Push Mirror to that GitHub repo (incl. tags).
-#   3. GitHub repo → Settings → Secrets → add CODEBERG_TOKEN
-#      (a Codeberg access token with repo write — used to upload release assets).
-#   4. Tag a release on Codeberg: `git tag v0.1.0 && git push origin v0.1.0`.
-#      The mirror forwards the tag; this workflow builds both artifacts and
-#      attaches them to the Codeberg release for that tag.
+#   1. Codeberg → Settings → Push Mirror to the GitHub repo (incl. tags).
+#   2. GitHub repo → Settings → Secrets → CODEBERG_TOKEN (Codeberg token, repo write).
+#   3. Tag a release on Codeberg: `git tag v0.4.2 && git push origin v0.4.2`.
 
 name: release
 
@@ -32,55 +28,27 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
-      - name: Install xcodegen
-        run: brew install xcodegen
-      - name: Build macOS app
+          node-version: "22"
+      - name: Typecheck web engine
         run: |
           npm ci
-          bash scripts/package-macos.sh
-      - name: Build native Metal .saver
+          npm run typecheck
+      - name: Run native logic tests
+        run: bash scripts/run-native-tests.sh
+      - name: Build native Metal app (compile check)
         run: |
-          # Live Metal screensaver. Built with swiftc (-Xlinker -bundle) — no
-          # xcodebuild needed, shaders compile at runtime. Output zip joins the
-          # other .savers for upload.
-          bash scripts/build-native-saver.sh
-          mkdir -p dist-native/savers
-          cp native/macos/build/KuroNativeSaver.saver.zip dist-native/savers/
-      - name: Build standalone Metal app (compile check)
-        run: |
-          # The robust macOS-26 path (standalone fullscreen app). CI has no
-          # Developer ID cert, so this is ad-hoc signed — a build/smoke check,
-          # NOT a distributable. The notarized release build is produced locally
-          # via scripts/package-native-app.sh (needs the cert + notary profile).
+          # macOS deliverable is the standalone fullscreen Metal app. CI has no
+          # Developer ID cert, so this is an ad-hoc build/smoke check only — the
+          # NOTARIZED release build is produced + uploaded locally via
+          # scripts/package-native-app.sh. swiftc, no Xcode.
           bash scripts/build-native-app.sh
           mkdir -p dist-native
           ditto -c -k --keepParent native/macos/build/KuroMetalApp.app dist-native/KuroMetalApp-ci-unsigned.zip
-      - name: Build video .savers
-        run: |
-          # Fetch pre-rendered preset videos from the dedicated asset release
-          # (uploaded via scripts/upload-video-assets.sh — rendering needs a GPU
-          # and ~90 min, too expensive per CI run). Skip gracefully if absent so
-          # a release still ships the .app even before videos are uploaded.
-          API="https://codeberg.org/api/v1/repos/jkaindl/kuro-screensaver"
-          mkdir -p render-out/videos
-          urls=$(curl -sS "$API/releases/tags/assets-videos" \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); [print(a['browser_download_url']) for a in d.get('assets',[]) if a['name'].endswith('.mov')]" 2>/dev/null || true)
-          if [ -z "$urls" ]; then
-            echo "::warning::no video assets found at tag 'assets-videos' — skipping .saver build"
-            exit 0
-          fi
-          echo "$urls" | while read -r u; do [ -n "$u" ] && ( cd render-out/videos && curl -sSL -O "$u" ); done
-          ls -la render-out/videos/
-          bash scripts/build-video-savers.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: dist-macos
+          name: dist-macos-ci
           if-no-files-found: ignore
-          path: |
-            dist-native/KuroScreensaver-macos.zip
-            dist-native/savers/*.saver.zip
-            dist-native/KuroMetalApp-ci-unsigned.zip
+          path: dist-native/KuroMetalApp-ci-unsigned.zip
 
   windows:
     runs-on: ubuntu-latest
@@ -88,14 +56,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
-      - name: Build .scr (win-x64 cross-build)
+      - name: Typecheck web engine
         run: |
           npm ci
-          bash scripts/package-windows.sh
+          npm run typecheck
+      - name: Build .scr (win-x64 cross-build)
+        run: bash scripts/package-windows.sh
       - uses: actions/upload-artifact@v4
         with:
           name: dist-windows
@@ -108,7 +78,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      - name: Attach artifacts to the Codeberg release
+      - name: Attach the Windows .scr to the Codeberg release
         env:
           TOKEN: ${{ secrets.CODEBERG_TOKEN }}
           TAG: ${{ github.ref_name }}
@@ -116,39 +86,32 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Create the release for this tag (ignore "already exists" → 409).
+          # Create the release for this tag (ignore 409 = already exists, e.g. when
+          # it was pre-created locally with full notes + the notarized app attached).
           curl -sS -X POST "$API/releases" \
             -H "Authorization: token $TOKEN" \
             -H "Content-Type: application/json" \
             -d "{\"tag_name\":\"$TAG\",\"name\":\"$TAG\",\"body\":\"Kuro Screensaver $TAG\"}" \
             -o /dev/null -w "create release HTTP %{http_code}\n" || true
 
-          # Resolve the release id with a JSON parser. (A greedy sed regex on the
-          # single-line JSON grabs the wrong "id" — author/asset — so use python.)
           rel_id=$(curl -sS "$API/releases/tags/$TAG" -H "Authorization: token $TOKEN" \
             | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
           test -n "$rel_id"
 
-          for f in \
-            artifacts/dist-macos/KuroScreensaver-macos.zip \
-            artifacts/dist-windows/KuroScreensaver-windows.zip \
-            artifacts/dist-macos/savers/*.saver.zip
-          do
-            [ -f "$f" ] || { echo "missing $f"; continue; }
-            name=$(basename "$f")
+          f=artifacts/dist-windows/KuroScreensaver-windows.zip
+          [ -f "$f" ] || { echo "::error::missing $f"; exit 1; }
+          name=$(basename "$f")
 
-            # Upload with retry — the large saver zips (~240 MB) occasionally get a
-            # transient 5xx/502 from Codeberg. Delete any same-name asset first
-            # (idempotent re-runs), then retry the upload with backoff.
-            for attempt in 1 2 3 4; do
-              existing=$(curl -sS "$API/releases/$rel_id/assets" -H "Authorization: token $TOKEN" \
-                | python3 -c "import sys,json; print(next((a['id'] for a in json.load(sys.stdin) if a['name']=='$name'), ''))")
-              [ -n "$existing" ] && curl -sS -X DELETE "$API/releases/$rel_id/assets/$existing" -H "Authorization: token $TOKEN" -o /dev/null
-              code=$(curl -sS -X POST "$API/releases/$rel_id/assets?name=$name" \
-                -H "Authorization: token $TOKEN" -F "attachment=@$f" -o /dev/null -w "%{http_code}")
-              echo "upload $name HTTP $code (attempt $attempt)"
-              case "$code" in 2*) break;; esac
-              [ "$attempt" = 4 ] && { echo "::error::upload $name failed after 4 attempts (last HTTP $code)"; exit 1; }
-              sleep $((attempt * 15))
-            done
+          # Upload with retry (transient Codeberg 5xx). Delete any same-name asset
+          # first so re-runs are idempotent.
+          for attempt in 1 2 3 4; do
+            existing=$(curl -sS "$API/releases/$rel_id/assets" -H "Authorization: token $TOKEN" \
+              | python3 -c "import sys,json; print(next((a['id'] for a in json.load(sys.stdin) if a['name']=='$name'), ''))")
+            [ -n "$existing" ] && curl -sS -X DELETE "$API/releases/$rel_id/assets/$existing" -H "Authorization: token $TOKEN" -o /dev/null
+            code=$(curl -sS -X POST "$API/releases/$rel_id/assets?name=$name" \
+              -H "Authorization: token $TOKEN" -F "attachment=@$f" -o /dev/null -w "%{http_code}")
+            echo "upload $name HTTP $code (attempt $attempt)"
+            case "$code" in 2*) break;; esac
+            [ "$attempt" = 4 ] && { echo "::error::upload $name failed after 4 attempts (last HTTP $code)"; exit 1; }
+            sleep $((attempt * 10))
           done

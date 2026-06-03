@@ -60,7 +60,8 @@ do {
     check(Palette.presets.count == 13, "13 presets")
     let p = Palette.preset("phosphor")
     check(p.accentHex == 0x39ff7a, "phosphor accent hex")
-    approx(Double(p.bloomStrength), Double(max(0.4, 0.7 * 4)), 1e-6, "phosphor bloomStrength")
+    // glow*4 = 2.8, capped at 1.8 (2026-06-03 colour tuning — keeps the hue vs blowing to white)
+    approx(Double(p.bloomStrength), 1.8, 1e-6, "phosphor bloomStrength (capped at 1.8)")
     check(Palette.preset("nope").id == "toxic-haze", "unknown preset falls back to toxic-haze")
 }
 

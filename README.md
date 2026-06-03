@@ -107,24 +107,22 @@ every CRT effect, the whole narrative.
 > Notarized + stapled with a Developer ID — it opens cleanly, no Gatekeeper
 > warning. Requires macOS 11+ (Apple Silicon or Intel).
 
-### Other builds
+### Windows (`.scr`)
 
 | Platform | Download | Run |
 |---|---|---|
 | **Windows** (`.scr`) | [↓ windows.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest) | Unzip, right-click `KuroScreensaver.scr` → **Install**. Needs the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/). |
-| **macOS** video `.saver` (one per preset) | [↓ `Kuro <Preset>.saver.zip`](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest) | A pre-rendered loop that installs into **System Settings ▸ Screen Saver**. |
-| **macOS / Linux** web `.app` | [↓ macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest) | The original WebGL engine in a fullscreen window. **Esc**/**⌘Q** exits. |
+
+Or just play it in a browser: **[jkaindl.codeberg.page/kuro-screensaver](https://jkaindl.codeberg.page/kuro-screensaver/)**.
 
 All versions: **[releases page](https://codeberg.org/jkaindl/kuro-screensaver/releases)**.
 
-> ### ⚠️ First run — the *other* builds are unsigned
-> The native macOS app above is notarized and just opens. The **Windows `.scr`**,
-> the **video `.saver`s** and the **web `.app`** are unsigned (no per-file Apple
-> notarization), so on first use macOS **Gatekeeper** or Windows **SmartScreen**
-> warns you — expected, clears in ~1 minute, once per file.
+> The Windows `.scr` is unsigned, so SmartScreen warns on first run — click
+> **"More info" → "Run anyway"** (once). Full notes: [docs/MACOS-INSTALL.md](docs/MACOS-INSTALL.md).
 >
-> **→ Full step-by-step: [docs/MACOS-INSTALL.md](docs/MACOS-INSTALL.md)**. Quick
-> version for a video `.saver`: `xattr -dr com.apple.quarantine "Kuro <Preset>.saver"`.
+> The old macOS `.saver` builds (pre-rendered video `.saver`s + the legacy WebGL
+> `.app`/`.saver`) were **retired in v0.4.2** — the notarized native app above
+> replaces them.
 
 ---
 
