@@ -99,7 +99,7 @@ instance — no shim needed there.
 - **Windows** — a real `.scr` (`native/windows/`, .NET WinForms + WebView2 hosting
   `screensaver.html`). Cross-builds on macOS/Linux via `dotnet publish -r win-x64`.
 
-**Deprecated 2026-06-03 (v0.4.2):** all macOS `.saver` paths were removed — the
+**Deprecated 2026-06-03 (v0.5.0):** all macOS `.saver` paths were removed — the
 WebGL `.saver`/`.app` scaffold (`KuroScreensaverApp`/`KuroScreensaver`), the live
 native `.saver` host (`KuroNativeSaver/Host`), and the 13 pre-rendered video
 `.saver`s (`KuroVideoSaver`). macOS Tahoe's sandboxed `legacyScreenSaver` process

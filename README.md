@@ -121,7 +121,7 @@ All versions: **[releases page](https://codeberg.org/jkaindl/kuro-screensaver/re
 > **"More info" → "Run anyway"** (once). Full notes: [docs/MACOS-INSTALL.md](docs/MACOS-INSTALL.md).
 >
 > The old macOS `.saver` builds (pre-rendered video `.saver`s + the legacy WebGL
-> `.app`/`.saver`) were **retired in v0.4.2** — the notarized native app above
+> `.app`/`.saver`) were **retired in v0.5.0** — the notarized native app above
 > replaces them.
 
 ---

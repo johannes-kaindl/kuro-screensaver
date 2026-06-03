@@ -12,7 +12,7 @@
 # SETUP (one-time, user side):
 #   1. Codeberg → Settings → Push Mirror to the GitHub repo (incl. tags).
 #   2. GitHub repo → Settings → Secrets → CODEBERG_TOKEN (Codeberg token, repo write).
-#   3. Tag a release on Codeberg: `git tag v0.4.2 && git push origin v0.4.2`.
+#   3. Tag a release on Codeberg: `git tag v0.5.0 && git push origin v0.5.0`.
 
 name: release
 

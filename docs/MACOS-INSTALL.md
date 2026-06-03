@@ -4,7 +4,7 @@ The macOS build is the **native Metal app** (`KuroMetalApp.app`). It is
 **notarized**, so it just opens — no Gatekeeper workaround needed.
 
 > The legacy `.saver` builds (pre-rendered video `.saver`s, the WebGL `.saver`,
-> and the experimental live `.saver`) were **retired in v0.4.2** — the native app
+> and the experimental live `.saver`) were **retired in v0.5.0** — the native app
 > replaces them. macOS Tahoe's sandboxed `legacyScreenSaver` process broke the
 > WebGL/Metal compositing those bundles relied on; the standalone app sidesteps it
 > entirely.
