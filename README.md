@@ -51,6 +51,11 @@ Six seeded procedural scenes, each recolorable by any of 13 phosphor presets:
 </table>
 
 <p align="center">
+  <img alt="Live dynamic banking flight" src="docs/images/motion.gif" width="70%"><br>
+  <sub>Live engine — dynamic banking flight over the terrain (Toxic Haze)</sub>
+</p>
+
+<p align="center">
   <img alt="The narrative terminal in its Apple-Lisa center-window layout" src="docs/images/terminal-window.jpg" width="80%"><br>
   <sub>The narrative terminal in its <b>Apple-Lisa center-window</b> layout (also available as a bottom strip or full-width band)</sub>
 </p>
