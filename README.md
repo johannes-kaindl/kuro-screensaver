@@ -25,9 +25,15 @@
 </p>
 
 Started life as a browser engine (extracted from the `kuro-companion` Obsidian
-plugin). **v0.3.0 adds a full native rewrite in Metal** — a real, live-rendered
+plugin). **The headline is a full native rewrite in Metal** — a real, live-rendered
 macOS screensaver: no WebView, no pre-rendered video, the whole engine running on
 the GPU. The web build lives on for in-browser play and cross-platform packaging.
+
+**New in v0.4.0:** the web build reaches feature parity with native — analog-CRT
+pass (curvature/aperture/NTSC/halation), dynamic banking flight, one-click Looks,
+and a cinematic 5-layer matrix rain rendered in-monitor (bloomed + curved). Native
+gains a flat-HUD toggle (crisp HUD/terminal over the curved scene) and richer,
+better-differentiated preset colours.
 
 ---
 
