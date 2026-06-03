@@ -42,6 +42,71 @@ const CHROMA_SHADER = {
   `,
 };
 
+// Analog-tube CRT composite (ported from the native Metal Shaders.swift composite_f):
+// barrel curvature + bezel, RGB aperture-grille mask, NTSC dot-crawl, warm halation.
+// The web already has bloom/trails/chroma + DOM scanlines/vignette, so this pass adds
+// only the analog-tube layer and runs LAST. Halation is approximated by a warm-tinted
+// blur of the (already-bloomed) frame, since there's no separate bloom texture here.
+const CRT_SHADER = {
+  uniforms: {
+    tDiffuse:   { value: null },
+    curvature:  { value: 0.0 },
+    aperture:   { value: 0.0 },
+    ntsc:       { value: 0.0 },
+    halation:   { value: 0.0 },
+    time:       { value: 0.0 },
+    resolution: { value: new THREE.Vector2(1, 1) },
+  },
+  vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float curvature, aperture, ntsc, halation, time;
+    uniform vec2 resolution;
+    varying vec2 vUv;
+    void main(){
+      vec2 uv = vUv;
+      float bezel = 1.0; bool offGlass = false;
+      if (curvature > 0.0001) {
+        float aspect = resolution.x / resolution.y;
+        vec2 cc = uv * 2.0 - 1.0; cc.x *= aspect;
+        vec2 warp = cc * (1.0 + curvature * dot(cc, cc));
+        warp.x /= aspect;
+        uv = warp * 0.5 + 0.5;
+        vec2 fw = smoothstep(vec2(0.0), vec2(0.012), uv) * smoothstep(vec2(0.0), vec2(0.012), 1.0 - uv);
+        bezel = fw.x * fw.y;
+        offGlass = (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0);
+      }
+      vec3 col = texture2D(tDiffuse, uv).rgb;
+      if (halation > 0.0) {
+        vec2 p1 = 1.5 / resolution; vec2 p2 = 3.5 / resolution;
+        vec3 g = texture2D(tDiffuse, uv + vec2(p1.x, 0.0)).rgb + texture2D(tDiffuse, uv - vec2(p1.x, 0.0)).rgb
+               + texture2D(tDiffuse, uv + vec2(0.0, p1.y)).rgb + texture2D(tDiffuse, uv - vec2(0.0, p1.y)).rgb
+               + texture2D(tDiffuse, uv + p2).rgb + texture2D(tDiffuse, uv - p2).rgb
+               + texture2D(tDiffuse, uv + vec2(p2.x, -p2.y)).rgb + texture2D(tDiffuse, uv + vec2(-p2.x, p2.y)).rgb;
+        g = max(vec3(0.0), g * 0.125 - 0.32);
+        col += g * halation * vec3(1.0, 0.55, 0.25) * 2.2;
+      }
+      if (ntsc > 0.0) {
+        vec2 pos = vUv * resolution;
+        float crawl = sin(pos.y * 1.7 + pos.x * 0.9 + time * 18.0) * ntsc * 0.05;
+        col.r += crawl; col.b -= crawl;
+        float lum = dot(col, vec3(0.299, 0.587, 0.114));
+        col = mix(col, vec3(lum), ntsc * 0.12);
+      }
+      if (aperture > 0.001) {
+        float tx = fract(vUv.x * resolution.x / 6.0);
+        vec3 m = vec3(0.5 + 0.5 * cos(6.2831853 * tx),
+                      0.5 + 0.5 * cos(6.2831853 * (tx - 0.33333)),
+                      0.5 + 0.5 * cos(6.2831853 * (tx - 0.66667))) * 2.0;
+        col *= mix(vec3(1.0), m, aperture);
+      }
+      col *= bezel;
+      if (offGlass) col = vec3(0.0);
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `,
+};
+
 export class Engine {
   canvas: HTMLCanvasElement;
   renderer: THREE.WebGLRenderer;
@@ -55,6 +120,7 @@ export class Engine {
   trailPass: AfterimagePass;
   burnPass: AfterimagePass;
   chromaPass: ShaderPass;
+  crtPass: ShaderPass;
 
   currentScene: SceneId | null = null;
   currentUpdater: SceneUpdater | null = null;
@@ -137,6 +203,12 @@ export class Engine {
     this.chromaPass.enabled = settings.fx.chromaticAberration.on;
     this.composer.addPass(this.chromaPass);
 
+    // Analog-tube CRT pass runs LAST (curvature warps the final composite).
+    this.crtPass = new ShaderPass(CRT_SHADER);
+    this.crtPass.uniforms.resolution.value.set(W, H);
+    this.setCrtUniforms(settings);
+    this.composer.addPass(this.crtPass);
+
     this.mats.setColorHex(color.hex);
 
     this.seed = settings.seedLock ?? freshSeed();
@@ -169,10 +241,22 @@ export class Engine {
     const W = window.innerWidth, H = window.innerHeight;
     this.renderer.setSize(W, H);
     this.composer.setSize(W, H);
+    this.crtPass.uniforms.resolution.value.set(W, H);
     this.cam.aspect = W / H;
     this.cam.fov = Engine.defaultFov(W, H);
     this.cam.updateProjectionMatrix();
   };
+
+  /** Drive the analog-CRT pass uniforms from settings (off → 0, so the pass is a
+   *  no-op when nothing is enabled). */
+  private setCrtUniforms(s: ScreensaverSettings) {
+    const f = s.fx;
+    this.crtPass.uniforms.curvature.value = f.curvature.on ? f.curvature.amount : 0;
+    this.crtPass.uniforms.aperture.value  = f.aperture.on  ? f.aperture.strength : 0;
+    this.crtPass.uniforms.ntsc.value      = f.ntsc.on      ? f.ntsc.amount : 0;
+    this.crtPass.uniforms.halation.value  = f.halation.on  ? f.halation.amount : 0;
+    this.crtPass.enabled = f.curvature.on || f.aperture.on || f.ntsc.on || f.halation.on;
+  }
 
   loadScene(id: SceneId) {
     // Clear world
@@ -241,6 +325,7 @@ export class Engine {
         this.cam.updateProjectionMatrix();
       }
 
+      this.crtPass.uniforms.time.value = this.clockT;
       this.composer.render();
 
       // FPS
@@ -291,6 +376,7 @@ export class Engine {
     (this.burnPass.uniforms as any).damp.value = 0.5 + 0.47 * s.fx.burnDecay.strength;
     this.chromaPass.enabled = s.fx.chromaticAberration.on;
     this.chromaPass.uniforms.offset.value = s.fx.chromaticAberration.offset / 1000;
+    this.setCrtUniforms(s);
   }
 
   getSceneObj() { return this.currentSceneObj; }

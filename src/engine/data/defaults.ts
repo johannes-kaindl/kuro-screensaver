@@ -46,6 +46,11 @@ export interface ScreensaverSettings {
     chromaticAberration: { on: boolean; offset: number };
     noiseBursts:         { on: boolean; freq: number };
     powerOn:             { on: boolean };
+    // Analog-tube CRT pass (ported from the native Metal renderer):
+    curvature:           { on: boolean; amount: number };    // barrel screen-warp + bezel
+    aperture:            { on: boolean; strength: number };   // RGB phosphor grille mask
+    ntsc:                { on: boolean; amount: number };     // composite dot-crawl shimmer
+    halation:            { on: boolean; amount: number };     // warm phosphor glow bleed
   };
 
   /**
@@ -152,6 +157,10 @@ export const DEFAULT_SCREENSAVER: ScreensaverSettings = {
     chromaticAberration: { on: false, offset: 1.5 },
     noiseBursts:         { on: false, freq: 0.5 },
     powerOn:             { on: true },
+    curvature:           { on: true,  amount: 0.12 },
+    aperture:            { on: true,  strength: 0.22 },
+    ntsc:                { on: false, amount: 0.0 },
+    halation:            { on: true,  amount: 0.15 },
   },
 
   crtSim: { on: true, intensity: 0.35 },
