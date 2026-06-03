@@ -17,7 +17,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD="$ROOT/native/macos/build"
 APP="$BUILD/KuroMetalApp.app"
 DIST="$ROOT/dist-native"
-OUT="$DIST/KuroScreensaver-app-macos.zip"
+# Asset name kept stable across releases + matching README/MACOS-INSTALL.md.
+OUT="$DIST/KuroScreensaver-native-app-macos.zip"
 NOTARY_PROFILE="${KURO_NOTARY_PROFILE:-jkaindl}"
 SIGN_ID="${KURO_SIGN_ID:-Developer ID Application: Johannes Kaindl (U9X7M39R56)}"
 
