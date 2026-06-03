@@ -137,17 +137,18 @@ jobs:
             [ -f "$f" ] || { echo "missing $f"; continue; }
             name=$(basename "$f")
 
-            # Make re-runs idempotent: delete any existing asset of the same name.
-            existing=$(curl -sS "$API/releases/$rel_id/assets" -H "Authorization: token $TOKEN" \
-              | python3 -c "import sys,json; print(next((a['id'] for a in json.load(sys.stdin) if a['name']=='$name'), ''))")
-            if [ -n "$existing" ]; then
-              curl -sS -X DELETE "$API/releases/$rel_id/assets/$existing" \
-                -H "Authorization: token $TOKEN" \
-                -o /dev/null -w "delete old $name HTTP %{http_code}\n"
-            fi
-
-            curl -sS --fail-with-body -X POST "$API/releases/$rel_id/assets?name=$name" \
-              -H "Authorization: token $TOKEN" \
-              -F "attachment=@$f" \
-              -o /dev/null -w "upload $name HTTP %{http_code}\n"
+            # Upload with retry — the large saver zips (~240 MB) occasionally get a
+            # transient 5xx/502 from Codeberg. Delete any same-name asset first
+            # (idempotent re-runs), then retry the upload with backoff.
+            for attempt in 1 2 3 4; do
+              existing=$(curl -sS "$API/releases/$rel_id/assets" -H "Authorization: token $TOKEN" \
+                | python3 -c "import sys,json; print(next((a['id'] for a in json.load(sys.stdin) if a['name']=='$name'), ''))")
+              [ -n "$existing" ] && curl -sS -X DELETE "$API/releases/$rel_id/assets/$existing" -H "Authorization: token $TOKEN" -o /dev/null
+              code=$(curl -sS -X POST "$API/releases/$rel_id/assets?name=$name" \
+                -H "Authorization: token $TOKEN" -F "attachment=@$f" -o /dev/null -w "%{http_code}")
+              echo "upload $name HTTP $code (attempt $attempt)"
+              case "$code" in 2*) break;; esac
+              [ "$attempt" = 4 ] && { echo "::error::upload $name failed after 4 attempts (last HTTP $code)"; exit 1; }
+              sleep $((attempt * 15))
+            done
           done
