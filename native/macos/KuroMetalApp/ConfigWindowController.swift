@@ -5,7 +5,7 @@ import AppKit
 
 final class ConfigWindowController: NSWindowController {
     private var lookPopup, scenePopup, presetPopup, speedPopup, altPopup, fogPopup, weatherPopup, cyclePopup, idlePopup, terminalPopup: NSPopUpButton!
-    private var hudCheck, dayNightCheck, soundCheck, cycleCheck, autostartCheck: NSButton!
+    private var hudCheck, dayNightCheck, soundCheck, cycleCheck, autostartCheck, flatHudCheck: NSButton!
     private var intensitySlider, curvSlider, maskSlider, bloomSlider, trailsSlider, ntscSlider, halSlider, termSlider, bandSlider, bankSlider: NSSlider!
     private var previewContainer: NSView!
     private var previewView: MetalHostView?
@@ -89,8 +89,10 @@ final class ConfigWindowController: NSWindowController {
         termSlider = slider(445, 330, Double(AppSettings.terminalScale), 4.8, 0.7, 155)
         autostartCheck = chk("Bei Inaktivität automatisch starten (Login)", 340, 296, LoginItem.isEnabled, #selector(toggleAutostart))
         autostartCheck.frame.size.width = 280
+        flatHudCheck = chk("HUD flach (über Monitor, statt gekrümmt)", 340, 272, AppSettings.flatHud, #selector(changed))
+        flatHudCheck.frame.size.width = 280
 
-        [hudCheck!, dayNightCheck!, soundCheck!, cycleCheck!, autostartCheck!].forEach { cv.addSubview($0) }
+        [hudCheck!, dayNightCheck!, soundCheck!, cycleCheck!, autostartCheck!, flatHudCheck!].forEach { cv.addSubview($0) }
         cv.addSubview(lbl("Wechsel:", 340, 398)); cv.addSubview(cyclePopup)
         cv.addSubview(lbl("Auto-Start:", 340, 364)); cv.addSubview(idlePopup)
         cv.addSubview(lbl("Terminal-Größe:", 340, 332)); cv.addSubview(termSlider)
@@ -161,6 +163,7 @@ final class ConfigWindowController: NSWindowController {
         AppSettings.halation = Float(halSlider.doubleValue)
         AppSettings.terminalScale = Float(termSlider.doubleValue)
         AppSettings.showHud = hudCheck.state == .on
+        AppSettings.flatHud = flatHudCheck.state == .on
         AppSettings.terminalLayout = termLayouts[max(0, terminalPopup.indexOfSelectedItem)].1
         AppSettings.terminalBandHeight = Float(bandSlider.doubleValue)
         AppSettings.bankStrength = Float(bankSlider.doubleValue)

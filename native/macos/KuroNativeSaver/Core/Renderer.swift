@@ -25,6 +25,7 @@ final class Renderer {
     private let glitch: GlitchScheduler
     private let atlas: FontAtlas
     private let text: TextRenderer
+    private let textFlat: TextRenderer   // target-format pipeline for the flat post-composite HUD pass
     let hud = Hud()
     private var fps: Double = 60
 
@@ -81,6 +82,7 @@ final class Renderer {
                                  seed: (settings.seed ?? freshSeed()) &+ 777)
         atlas = FontAtlas(device: device)
         text = TextRenderer(device: device, library: lib, atlas: atlas, format: Renderer.hdrFormat)
+        textFlat = TextRenderer(device: device, library: lib, atlas: atlas, format: targetFormat)
         crash.powerOn()   // diegetic CRT power-on (image expands out of a line + flickers)
     }
 
@@ -207,14 +209,18 @@ final class Renderer {
         txtPass.colorAttachments[0].storeAction = .store
         let tenc = cb.makeRenderCommandEncoder(descriptor: txtPass)!
         let wantMatrix = (SceneRegistry.ids[sceneIndex] == "matrix") && qualityTier < 1   // static 2D rain — matrix scene only
-        if settings.showHud || wantMatrix || settings.terminalLayout != .off {
+        let wantOverlay = settings.showHud || settings.terminalLayout != .off
+        let overlayInMonitor = wantOverlay && !settings.flatHud   // curved into the scene (vs flat post-composite)
+        if wantMatrix || overlayInMonitor {
             text.begin(width: width, height: height)
-            hud.render(text, width: width, height: height, accent: preset.accentRGB,
-                       kanji: preset.kanji, t: t, scene: SceneRegistry.ids[sceneIndex],
-                       terminalScale: settings.terminalScale,
-                       matrix: wantMatrix, matrixOpacity: 0.7,
-                       terminalLayout: settings.terminalLayout, terminalBand: settings.terminalBandHeight,
-                       showPanels: settings.showHud)
+            if wantMatrix { hud.renderMatrix(text, width: width, height: height, accent: preset.accentRGB, t: t, opacity: 0.7) }
+            if overlayInMonitor {
+                hud.renderOverlay(text, width: width, height: height, accent: preset.accentRGB,
+                                  kanji: preset.kanji, t: t, scene: SceneRegistry.ids[sceneIndex],
+                                  terminalScale: settings.terminalScale,
+                                  terminalLayout: settings.terminalLayout, terminalBand: settings.terminalBandHeight,
+                                  showPanels: settings.showHud)
+            }
             text.flush(tenc)
         }
         tenc.endEncoding()
@@ -249,6 +255,24 @@ final class Renderer {
         enc2.setFragmentBytes(&pu, length: MemoryLayout<PostUniforms>.stride, index: 0)
         enc2.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         enc2.endEncoding()
+
+        // --- flat HUD/terminal overlay: drawn onto the final composite, AFTER the
+        // CRT curvature, so it stays crisp + uncurved (like the web's DOM overlay). ---
+        if settings.flatHud, settings.showHud || settings.terminalLayout != .off {
+            let flatPass = MTLRenderPassDescriptor()
+            flatPass.colorAttachments[0].texture = target
+            flatPass.colorAttachments[0].loadAction = .load
+            flatPass.colorAttachments[0].storeAction = .store
+            let fenc = cb.makeRenderCommandEncoder(descriptor: flatPass)!
+            textFlat.begin(width: width, height: height)
+            hud.renderOverlay(textFlat, width: width, height: height, accent: preset.accentRGB,
+                              kanji: preset.kanji, t: t, scene: SceneRegistry.ids[sceneIndex],
+                              terminalScale: settings.terminalScale,
+                              terminalLayout: settings.terminalLayout, terminalBand: settings.terminalBandHeight,
+                              showPanels: settings.showHud)
+            textFlat.flush(fenc)
+            fenc.endEncoding()
+        }
 
         cb.commit()
         cb.waitUntilCompleted()

@@ -23,18 +23,23 @@ final class Hud {
 
     func setFps(_ f: Double) { fps = f }
 
-    func render(_ tr: TextRenderer, width: Int, height: Int, accent: SIMD3<Float>,
-                kanji: String, t: Double, scene: String, terminalScale: Float = 1,
-                matrix: Bool = false, matrixOpacity: Float = 0.4,
-                terminalLayout: Settings.TerminalLayout = .strip, terminalBand: Float = 0.24,
-                showPanels: Bool = true) {
+    /// Matrix rain only — drawn into the HDR scene (gets CRT/bloom). Kept separate
+    /// from the overlay so the renderer can curve the rain into the monitor while
+    /// drawing the HUD/terminal flat on top (flatHud mode).
+    func renderMatrix(_ tr: TextRenderer, width: Int, height: Int, accent: SIMD3<Float>, t: Double, opacity: Float) {
+        MatrixRain.render(tr, width: width, height: height, accent: accent, t: t, opacity: opacity)
+    }
+
+    /// HUD panels + narrative terminal. Drawn either into the HDR scene (in-monitor,
+    /// curved) or flat onto the final composite (flatHud), depending on the renderer.
+    func renderOverlay(_ tr: TextRenderer, width: Int, height: Int, accent: SIMD3<Float>,
+                       kanji: String, t: Double, scene: String, terminalScale: Float = 1,
+                       terminalLayout: Settings.TerminalLayout = .strip, terminalBand: Float = 0.24,
+                       showPanels: Bool = true) {
         let dim = accent * 0.72
         let s = Float(height) / 64                         // base cell height (px)
         let pad = s * 1.5
         let W = Float(width), H = Float(height)
-
-        // matrix rain behind everything (drawn first → other text composites over)
-        if matrix { MatrixRain.render(tr, width: width, height: height, accent: accent, t: t, opacity: matrixOpacity) }
 
         // narrative terminal — independent of the HUD flight panels
         switch terminalLayout {

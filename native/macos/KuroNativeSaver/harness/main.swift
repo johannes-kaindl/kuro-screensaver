@@ -42,6 +42,7 @@ struct Args {
     var termBand: Float = -1
     var bank: Float = -1
     var noTerm = false
+    var flatHud = false
 }
 
 func parseArgs() -> Args {
@@ -76,6 +77,7 @@ func parseArgs() -> Args {
         case "--termband": a.termBand = Float(it.next() ?? "") ?? a.termBand
         case "--bank": a.bank = Float(it.next() ?? "") ?? a.bank
         case "--noterm": a.noTerm = true
+        case "--flathud": a.flatHud = true
         default: FileHandle.standardError.write("unknown arg \(k)\n".data(using: .utf8)!)
         }
     }
@@ -166,6 +168,7 @@ if args.termDark { settings.terminalLayout = .stripDark }
 if args.termBand >= 0 { settings.terminalBandHeight = args.termBand }
 if args.bank >= 0 { settings.bankStrength = args.bank }
 if args.noTerm { settings.terminalLayout = .off }
+if args.flatHud { settings.flatHud = true }
 
 let ctx = SceneContext(device: device, rng: LCG(seed: args.seed),
                        settings: settings, accent: settings.preset.accentRGB)

@@ -27,6 +27,7 @@ struct Settings {
     var speed: Speed = .norm
     var cityAltitude: Altitude = .low
     var showHud = true              // HUD panels (flight data, crosshair, kanji, scene label)
+    var flatHud = false             // draw HUD + terminal flat AFTER the CRT composite (crisp, uncurved) vs in-monitor
     enum TerminalLayout: String, CaseIterable { case off, strip, stripDark = "stripdark", window }
     var terminalLayout: TerminalLayout = .strip   // narrative terminal: off / strip / full-width band / Lisa window
     var terminalBandHeight: Float = 0.24          // band layout: fraction of screen height it occupies
