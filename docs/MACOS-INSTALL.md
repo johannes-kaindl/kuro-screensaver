@@ -1,14 +1,33 @@
-# Installing on macOS (unsigned builds)
+# Installing on macOS
 
-Kuro Screensaver is a hobby project without an Apple Developer signature /
-notarization, so on first use macOS **Gatekeeper** will warn you that it
-"cannot verify" the file. This is expected and harmless, and it takes about a
-minute to clear. You only do it **once** per file.
+The **native app** (`KuroMetalApp.app`) is **notarized** — it just opens, no
+workaround needed. It's the recommended way to run Kuro as a live screensaver.
 
-There are two macOS products:
+The **other** macOS builds — the pre-rendered video `.saver`s and the legacy
+WebGL `.app` — are unsigned (no per-file notarization), so on first use macOS
+**Gatekeeper** warns that it "cannot verify" the file. That's expected and
+harmless, clears in about a minute, and you only do it **once** per file.
 
-- the **video `.saver`** — a real screensaver (one per color preset), and
-- the **live `.app`** — the WebGL engine in a fullscreen window.
+---
+
+## Native app (recommended) — `KuroMetalApp.app`
+
+1. Download `KuroScreensaver-native-app-macos.zip` from the
+   [release](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest),
+   unzip → `KuroMetalApp.app`, and drag it into `/Applications`.
+2. **Double-click to open.** It's notarized, so it launches straight away — no
+   Gatekeeper workaround.
+3. In its window, pick a scene / preset / effects (live preview), and turn on
+   **"Bei Inaktivität automatisch starten"** to run it as a real screensaver
+   (it then starts after the chosen idle time). Any input exits the fullscreen;
+   **⌘Q** quits.
+
+---
+
+## Other (unsigned) builds
+
+The rest of this page covers the **unsigned** downloads — the video `.saver`s and
+the legacy WebGL `.app`.
 
 ---
 

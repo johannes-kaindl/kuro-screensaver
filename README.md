@@ -1,55 +1,58 @@
 # Kuro Screensaver
 
-> A standalone retro-CRT 3D screensaver engine — five seeded procedural
-> scenes, a synthetic CRT signal-degradation pass, a self-typing narrative
-> terminal, and a full Web Audio layer. Runs in any modern browser. No
-> framework, no backend.
+> A retro-CRT 3D screensaver: six seeded procedural scenes, a full synthetic
+> CRT signal-degradation pass, a self-typing operator-under-attack terminal, and
+> a procedural audio layer. Runs as a **native macOS screensaver** (live-rendered
+> in Metal) and in **any browser**.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-8a4dff?style=flat-square)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.4-3178c6?style=flat-square)](https://www.typescriptlang.org)
-[![three.js](https://img.shields.io/badge/three.js-0.164-000000?style=flat-square)](https://threejs.org)
-[![Vite](https://img.shields.io/badge/Vite-5-646cff?style=flat-square)](https://vitejs.dev)
+[![macOS — Metal](https://img.shields.io/badge/macOS-Metal-39ff7a?style=flat-square&logo=apple&logoColor=060709)](native/macos)
+[![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square&logo=swift&logoColor=fff)](native/macos)
+[![Web — three.js](https://img.shields.io/badge/Web-three.js-16e0e0?style=flat-square)](https://threejs.org)
 
 <p align="center">
+  <a href="https://codeberg.org/jkaindl/kuro-screensaver/releases/latest">
+    <img alt="Download the macOS app" src="https://img.shields.io/badge/Download_macOS_App-39ff7a?style=for-the-badge&logo=apple&logoColor=060709">
+  </a>
+  &nbsp;
   <a href="https://jkaindl.codeberg.page/kuro-screensaver/">
     <img alt="Launch the web app" src="https://img.shields.io/badge/Launch_Web_App-16e0e0?style=for-the-badge&logo=pwa&logoColor=060709">
   </a>
 </p>
 
 <p align="center">
-  <img alt="Kuro Screensaver — procedural CRT terrain" src="docs/images/hero.jpg" width="100%">
+  <img alt="Kuro Screensaver — banking flight over procedural CRT terrain" src="docs/images/hero.jpg" width="100%">
 </p>
 
-Extracted from the `kuro-companion` Obsidian plugin into a focused,
-browser-hosted engine. The standalone is the primary development line —
-the plugin gets changes backported only when needed. Designed for static
-hosting (Codeberg Pages) and for embedding on a homepage.
+Started life as a browser engine (extracted from the `kuro-companion` Obsidian
+plugin). **v0.3.0 adds a full native rewrite in Metal** — a real, live-rendered
+macOS screensaver: no WebView, no pre-rendered video, the whole engine running on
+the GPU. The web build lives on for in-browser play and cross-platform packaging.
 
 ---
 
 ## Gallery
 
-Five seeded procedural scenes, each recolored by any of 13 phosphor presets:
+Six seeded procedural scenes, each recolorable by any of 13 phosphor presets:
 
 <table>
   <tr>
-    <td width="50%"><img alt="Terrain" src="docs/images/scene-terrain.jpg"><br><sub><b>TERRAIN</b> — seam-free infinite wireframe landscape</sub></td>
-    <td width="50%"><img alt="The Rift" src="docs/images/scene-rift.jpg"><br><sub><b>THE RIFT</b> — barrel-roll dynamics through a fracture</sub></td>
+    <td width="50%"><img alt="Terrain" src="docs/images/scene-terrain.jpg"><br><sub><b>TERRAIN</b> — seam-free infinite wireframe landscape, banking flythrough</sub></td>
+    <td width="50%"><img alt="City" src="docs/images/scene-city.jpg"><br><sub><b>CITY</b> — banking down a neon-wireframe corridor</sub></td>
   </tr>
   <tr>
-    <td><img alt="City" src="docs/images/scene-city.jpg"><br><sub><b>CITY</b> — drifting wireframe towers</sub></td>
+    <td><img alt="The Rift" src="docs/images/scene-rift.jpg"><br><sub><b>THE RIFT</b> — barrel-roll dynamics through a fracture</sub></td>
     <td><img alt="Tunnel" src="docs/images/scene-tunnel.jpg"><br><sub><b>TUNNEL</b> — banking flight down a Catmull-Rom spine</sub></td>
   </tr>
   <tr>
-    <td><img alt="Void" src="docs/images/scene-void.jpg"><br><sub><b>VOID</b> — suspended particle fields</sub></td>
-    <td valign="center"><sub>Same seed → same run. The renderer recolors the
-    entire material pool in a single pass on a preset switch.</sub></td>
+    <td><img alt="Void" src="docs/images/scene-void.jpg"><br><sub><b>VOID</b> — flythrough an asteroid belt (depth fade-in)</sub></td>
+    <td><img alt="Matrix" src="docs/images/scene-matrix.jpg"><br><sub><b>MATRIX</b> — multi-layer 3D-depth digital rain</sub></td>
   </tr>
 </table>
 
 <p align="center">
-  <img alt="Live motion" src="docs/images/motion.gif" width="70%"><br>
-  <sub>Live engine — terrain flythrough (Ember preset)</sub>
+  <img alt="The narrative terminal in its Apple-Lisa center-window layout" src="docs/images/terminal-window.jpg" width="80%"><br>
+  <sub>The narrative terminal in its <b>Apple-Lisa center-window</b> layout (also available as a bottom strip or full-width band)</sub>
 </p>
 
 ### 13 phosphor presets
@@ -61,188 +64,159 @@ Voidwitch · Circuit · Crimson · Phosphor · Ember · Spectre · Pearl</sub>
 
 ---
 
-## The loop that never repeats the same way
+## The story that never repeats the same way
 
-Each run is a CORP operator's shift, told through the narrative terminal:
-`ROUTINE → INTRUSION → ALARM → PANIC → SILENCE`. When the shift ends the
-system **crashes** — a choreographed CRT collapse to a power-off line, then
-black, then an unstable reboot into a fresh shift with a new persona.
+Each run is a CORP compliance operator's shift, told through the narrative
+terminal: `ROUTINE → INTRUSION → ALARM → PANIC → SILENCE`. An encrypted
+"ghostlink" backchannel to a former instructor (**INSTR-KARSEN**) answers in
+koans — growing guarded, then silent, as things worsen; HQ turns automated and
+hollow; the operator drafts, hesitates, and deletes. Every shift differs (role ×
+trait × HQ tier × which exchanges fire). When the shift ends the system
+**crashes** — a choreographed CRT collapse to a power-off line, black, then an
+unstable reboot into a fresh shift with a new persona.
 
 <p align="center"><img alt="The diegetic CRT crash sequence" src="docs/images/crash-sequence.jpg" width="100%"></p>
 
 <sub>Signal failure → glitch storm → power-off collapse → dead screen → reboot →
-new shift. In the pre-rendered video screensaver, this black moment is also the
+new shift. In the pre-rendered video screensaver this black moment is also the
 seamless loop point — the loop is diegetic, not a hidden crossfade.</sub>
 
 ---
 
-## Download — native builds
+## Download
 
-The same engine ships natively for both platforms:
+### macOS — native app · **notarized** (recommended)
+
+The live Metal screensaver as a standalone app — full procedural variation,
+every CRT effect, the whole narrative.
+
+**[↓ KuroScreensaver-native-app-macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** → unzip, drag **KuroMetalApp.app** to `/Applications`, open. Turn on **auto-start-on-idle** in its settings to use it as a real screensaver.
+
+> Notarized + stapled with a Developer ID — it opens cleanly, no Gatekeeper
+> warning. Requires macOS 11+ (Apple Silicon or Intel).
+
+### Other builds
 
 | Platform | Download | Run |
 |---|---|---|
-| **Windows** (`.scr` screen saver) | **[↓ windows.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** | Unzip, right-click `KuroScreensaver.scr` → **Install**. Needs the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (preinstalled on current Win10/11). |
-| **macOS** (`.saver`, one per preset) | **[↓ pick a preset](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** (`Kuro <Preset>.saver.zip`) | Unzip, double-click → Install, then pick it in **System Settings ▸ Screen Saver**. Pre-rendered video loops — a real screensaver. See the **first-run note below**. |
-| **macOS** (live `.app`) | **[↓ macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** | The live WebGL engine in a fullscreen window (full procedural variation). **Esc**/**⌘Q** exits. See the **first-run note below**. |
+| **Windows** (`.scr`) | [↓ windows.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest) | Unzip, right-click `KuroScreensaver.scr` → **Install**. Needs the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/). |
+| **macOS** video `.saver` (one per preset) | [↓ `Kuro <Preset>.saver.zip`](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest) | A pre-rendered loop that installs into **System Settings ▸ Screen Saver**. |
+| **macOS / Linux** web `.app` | [↓ macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest) | The original WebGL engine in a fullscreen window. **Esc**/**⌘Q** exits. |
 
 All versions: **[releases page](https://codeberg.org/jkaindl/kuro-screensaver/releases)**.
 
-> **Why both a `.saver` and an `.app` on macOS?** WebGL doesn't composite inside
-> macOS's sandboxed screen-saver process, so the *live* engine can't run as a
-> real `.saver`. The video `.saver` sidesteps this by playing a pre-rendered
-> loop (AVFoundation video composites fine there) — a true screensaver that
-> starts on idle. The `.app` keeps the live, fully procedural engine for when
-> you want it.
-
-> ### ⚠️ First run — unsigned builds
-> Every download is **unsigned** (hobby project, no paid Apple notarization), so
-> on first use macOS **Gatekeeper** ("cannot verify…") or Windows **SmartScreen**
-> warns you. It's expected and clears in ~1 minute — you do it once per file.
+> ### ⚠️ First run — the *other* builds are unsigned
+> The native macOS app above is notarized and just opens. The **Windows `.scr`**,
+> the **video `.saver`s** and the **web `.app`** are unsigned (no per-file Apple
+> notarization), so on first use macOS **Gatekeeper** or Windows **SmartScreen**
+> warns you — expected, clears in ~1 minute, once per file.
 >
-> **→ Full step-by-step: [docs/MACOS-INSTALL.md](docs/MACOS-INSTALL.md)**
->
-> Quick version for the macOS `.saver` (the prompt is easy to miss otherwise):
-> ```bash
-> xattr -dr com.apple.quarantine "Kuro <Preset>.saver"
-> ```
-> then double-click → Install. For the `.app`: launch → **Done** → System
-> Settings → Privacy & Security → **"Open Anyway"**.
+> **→ Full step-by-step: [docs/MACOS-INSTALL.md](docs/MACOS-INSTALL.md)**. Quick
+> version for a video `.saver`: `xattr -dr com.apple.quarantine "Kuro <Preset>.saver"`.
 
 ---
 
 ## What it does
 
-- **Five seeded procedural 3D scenes** — `TERRAIN · CITY · THE RIFT ·
-  TUNNEL · VOID`. Logical-offset chunk tiling for seam-free infinite
-  landscapes; a curved Catmull-Rom tunnel spine with banking flight;
-  barrel-roll dynamics in The Rift. Same seed → same run.
-- **Narrative terminal** — a bottom strip that types itself out: a
-  scripted persona working a shift, driven by a realistic typing engine
-  (typos, hesitations, abandoned lines) over a phase-modulated script
-  bank. Ends each shift with a diegetic system crash (see above).
-- **CRT simulation** — a composite signal-degradation post-pass:
-  H-sync tear, V-roll, brightness flicker, black-frame drops, VHS-style
-  rolling band, chromatic spikes, wave distortion, static bursts,
-  scanline pulse / hum bar / interlace flicker. One intensity knob drives
-  the whole chain.
-- **HUD overlay** — DOM info panels, sweeping radar, scrolling terminal,
-  crosshair, vault kanji (黒), real-time clock, scene-label slab, plus a
-  power-on boot sequence.
-- **Synthetic audio** — a fully procedural Web Audio layer (CRT hum,
-  scanline whine, boot beeps, scene-switch whoosh, jet crescendo on
-  tunnel boost, sonar ping). No audio assets.
-- **13 color presets** — phosphor palettes in `engine/data/presets.ts`.
-  The renderer recolors the whole material pool in one pass on a switch.
+- **Six procedural 3D scenes** — `TERRAIN · CITY · THE RIFT · TUNNEL · VOID` plus
+  a static **MATRIX** rain scene. **Dynamic banking flight**: a weaving camera
+  that banks into its turns (adjustable strength, always-level start) with
+  occasional eased maneuvers; seam-free infinite terrain; a Catmull-Rom tunnel
+  spine; barrel rolls in The Rift. Same seed → same run.
+- **Narrative terminal** — the full operator's-shift story (INSTR-KARSEN
+  ghostlink, HQ escalation drafts, hesitations, last words) driven by a realistic
+  typewriter over a phase-modulated script bank, in three layouts: a bottom
+  **strip**, a full-width **band**, or an **Apple-Lisa center-window**.
+- **Retro-CRT suite** — screen curvature, aperture-grille phosphor mask, phosphor
+  persistence trails, bloom + warm halation, NTSC dot-crawl, scanlines + vignette,
+  a power-on flash, and a glitch chain (H-sync tear, V-roll, flicker, black
+  frames, static) feeding the diegetic crash→reboot. One intensity knob, or
+  per-effect sliders.
+- **Looks** — one-click vibe presets (*Clean · Heavy CRT · Broken Terminal ·
+  Vaporwave · Matrix*) that set every effect at once.
+- **HUD overlay** — tactical info panels, crosshair, scene-label slab, real-time
+  clock, plus a power-on + BIOS boot sequence.
+- **Procedural audio** — a synthetic CRT hum + Carpenter-style soundscape. No
+  audio assets.
+- **Day/night + weather**, **13 color presets**, scene auto-cycle, and
+  auto-start-on-idle (native app).
+
+<sub>Native macOS app: Swift + Metal (shaders compiled at runtime — no Xcode
+needed). Web / cross-platform builds: TypeScript + three.js (WebGL2).</sub>
 
 ---
 
-## Quickstart
+## Build
+
+### Native macOS app (Metal — Xcode-free)
+
+```bash
+bash scripts/build-native-app.sh       # build + sign → native/macos/build/KuroMetalApp.app
+bash scripts/package-native-app.sh     # + notarize + staple → dist-native/ (needs a Developer ID)
+bash scripts/run-native-tests.sh       # logic tests (assert-based, headless)
+```
+
+The renderer is verified headlessly by rendering frames to PNG
+(`scripts/build-native-harness.sh`) — no window or real screensaver activation
+needed.
+
+### Web app
 
 ```bash
 npm install
 npm run dev        # Vite dev server → http://localhost:5173
-# … or
 npm run build      # production bundle → dist/
-npm run preview    # serve the built bundle locally
 npm run typecheck  # tsc --noEmit (run before committing src/ changes)
 ```
 
-Open the page and hit **▶ Start Screensaver**. It goes fullscreen; press
-**Esc** to exit.
-
-To re-render the video screensavers (needs a GPU + ffmpeg):
-
-```bash
-npm run dev &                              # serve the screensaver entry
-node scripts/render-saver-videos.mjs       # one looping H.265 clip per preset
-```
-
----
-
-## Controls
-
-| Key       | Action                          |
-|-----------|---------------------------------|
-| `1`–`5`   | Switch scene                    |
-| `M`       | Mute / unmute audio             |
-| `P`       | Pause / resume                  |
-| `S`       | Screenshot                      |
-| `Esc`     | Exit fullscreen / close         |
-| any other | Close the screensaver           |
+The web app exits on **Esc**; the native app exits on any input and keeps its
+settings (scene, preset, effects, terminal layout, bank strength…) in a config
+window with a live preview.
 
 ---
 
 ## Architecture at a glance
 
-The engine is **plugin-shaped but framework-free**: it never `import`s
-from `obsidian`. The host contract it depends on (`HostPlugin`) is
-declared locally in `controller.ts`. In the browser, `host-web/`
-fulfils that contract — settings live in `localStorage` and the few DOM
-helpers Obsidian adds to `HTMLElement` (`createEl` / `createDiv` /
-`createSpan` / `empty`) are polyfilled. The same engine bundle can
-therefore be backported into the Obsidian plugin unchanged.
+**Native (`native/macos/`)** — a platform-agnostic Metal renderer plus a thin host:
 
 ```
-src/
-├── main.ts                       Standalone browser entry (sane non-Obsidian defaults)
-├── screensaver/main.ts           Screensaver-mode entry (?preset= / ?scene= / ?storyScale=)
-├── host-web/                     Web host — bridges the plugin-shaped engine to the browser
-│   ├── plugin-shim.ts            Fulfils the HostPlugin contract (settings tree + saveData)
-│   ├── persistence.ts            Settings in localStorage
-│   └── obsidian-dom-polyfill.ts  Polyfills createEl / createDiv / createSpan / empty
-└── engine/                       The screensaver engine (no `import` from 'obsidian')
-    ├── controller.ts             Overlay lifecycle, hotkeys, fullscreen; declares HostPlugin
-    ├── engine/                   THREE renderer (inner namespace — intentional doubling)
-    │   ├── core.ts               Renderer + composer + scene manager + frame loop
-    │   ├── color.ts              Color resolver (kuro-preset / custom)
-    │   ├── materials.ts          Material pool (recolor / dispose en masse)
-    │   ├── rng.ts                Seeded LCG
-    │   └── scenes/               terrain · city · rift · tunnel · void (+ scene-base)
-    ├── fx/crt-sim.ts             CRT signal-degradation post-pass (+ the crash sequence)
-    ├── audio/synth.ts            Synthetic Web Audio layer
-    ├── terminal/                 Bottom-strip narrative (narrative · persona · typing · script-bank)
-    ├── hud/                      DOM overlay (index + boot sequence)
-    └── data/                     Static config (defaults · dictionary · presets)
+native/macos/
+├── KuroNativeSaver/Core/   Platform-agnostic engine (Metal):
+│   ├── Renderer · Shaders   scene pass → bloom/trails → CRT composite
+│   ├── *Scene.swift         terrain · city · rift · tunnel · void · matrix
+│   ├── CameraFly            banked weaving flight choreography
+│   ├── Terminal · Script    the operator narrative (+ INSTR-KARSEN ghostlink)
+│   ├── Hud · TextRenderer · FontAtlas   overlay + runtime CoreText glyph atlas
+│   └── MatrixRain · Synth · Palette · …
+├── KuroMetalApp/           Standalone macOS app host (CAMetalLayer + CVDisplayLink)
+└── harness/                Headless PNG render harness for verification
 ```
 
-Native builds live in `native/` (Windows `.scr`, macOS video `.saver` +
-live `.app`); the video render + `.saver` pipeline is in `scripts/`.
-Conventions for AI assistants and contributors live in
-[`AGENTS.md`](AGENTS.md). Design history is under [`docs/specs/`](docs/specs/).
+**Web (`src/`)** — the original engine is **plugin-shaped but framework-free**
+(it never `import`s from `obsidian`); `host-web/` fulfils the host contract in
+the browser, so the same bundle backports into the Obsidian plugin unchanged.
 
----
-
-## Deployment
-
-The build is a static `dist/` — it can be served from anywhere. The repo
-ships two helper scripts for the Codeberg setup:
-
-```bash
-# Publish dist/ to the `pages` branch → https://jkaindl.codeberg.page/kuro-screensaver/
-bash scripts/deploy-page.sh
-
-# Push the source repo to Codeberg (SSH — no token needed)
-bash scripts/push-to-codeberg.sh
+```
+src/engine/   controller · engine/scenes · fx/crt-sim · audio/synth · terminal · hud · data
+src/host-web/ plugin-shim · persistence (localStorage) · obsidian-dom-polyfill
 ```
 
-Both scripts authenticate via SSH (your Codeberg SSH key); no token is
-required or stored. Codeberg serves any branch named exactly `pages`
-automatically.
+Conventions for contributors and AI assistants are in [`AGENTS.md`](AGENTS.md);
+design history is under [`docs/specs/`](docs/specs/).
 
 ---
 
 ## Compatibility
 
-- **Modern browsers** — Chromium ≥ 90, Firefox ≥ 90, Safari ≥ 14.
-- **WebGL2** required (three.js renderer).
-- **Desktop-oriented** — uses `requestFullscreen` and `AudioContext`;
-  audio starts on the first user gesture (the Start button).
+- **macOS 11+** — the native app (Apple Silicon + Intel; Metal). The 60 fps cap
+  and adaptive quality keep it smooth on weaker GPUs.
+- **Modern browsers** — the web app: Chromium ≥ 90, Firefox ≥ 90, Safari ≥ 14,
+  WebGL2 required.
 
 ---
 
 ## License
 
-[GNU AGPL-3.0](LICENSE) — copyleft with the network-use clause. If you
-host this engine (or a fork) so others can use it over a network, the
-source of your variant must also be available under the AGPL.
+[GNU AGPL-3.0](LICENSE) — copyleft with the network-use clause. If you host this
+engine (or a fork) so others can use it over a network, the source of your
+variant must also be available under the AGPL.
