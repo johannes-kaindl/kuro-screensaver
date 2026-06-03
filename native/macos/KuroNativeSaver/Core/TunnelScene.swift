@@ -36,11 +36,15 @@ private struct Spline {
         let p0 = pts[((i - 1) % n + n) % n], p1 = pts[i % n]
         let p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n]
         let t2 = f * f, t3 = t2 * f
-        let c0: SIMD3<Float> = 2 * p1
-        let c1: SIMD3<Float> = (p2 - p0) * f
-        let c2: SIMD3<Float> = (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2
-        let c3: SIMD3<Float> = (3 * p1 - 3 * p2 + p3 - p0) * t3
-        return 0.5 * (c0 + c1 + c2 + c3)
+        // Catmull-Rom basis — broken into pairwise SIMD ops with explicit Float
+        // scalars so swiftc can't time out type-checking the combined expression.
+        let c0 = p1 * Float(2)
+        let c1 = (p2 - p0) * f
+        let c2v = (p0 * Float(2) - p1 * Float(5)) + (p2 * Float(4) - p3)
+        let c2 = c2v * t2
+        let c3v = (p1 * Float(3) - p2 * Float(3)) + (p3 - p0)
+        let c3 = c3v * t3
+        return (c0 + c1 + c2 + c3) * Float(0.5)
     }
 
     /// Arc-length parameterized point, u in [0,1).
