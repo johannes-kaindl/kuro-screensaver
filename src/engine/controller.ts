@@ -14,6 +14,7 @@ import { DICT } from './data/dictionary';
 import type { ScreensaverSettings, SceneId } from './data/defaults';
 import { HUD_PRESETS, SCENES, SCENE_LABELS } from './data/defaults';
 import { PRESETS } from './data/presets';
+import { LOOKS, applyLook } from './data/looks';
 
 export interface HostPlugin {
   settings: {
@@ -512,6 +513,19 @@ export class ScreensaverController {
       b.style.cssText += `width:14px;height:14px;border-radius:50%;padding:0;background:${p.darkAccent.color};margin:0 2px;`;
       b.textContent = '';
     });
+
+    // LOOK — one-click bundles that set the color preset + every CRT knob at once.
+    sep(); lbl('LOOK');
+    Object.keys(LOOKS).forEach(k => btn(LOOKS[k].label, false, () => {
+      applyLook(this.s, k);
+      this.saveSettingsDebounced();
+      const eff = this.effectiveSettings();
+      const c = resolveColor(eff);
+      this.engine?.setColor(c); this.hud?.applyColor(c);
+      this.engine?.applyFxSettings(eff);
+      this.hud?.applySettings(eff);
+      this.rebuildBar();
+    }, `Look: ${LOOKS[k].label}`));
 
     // FX primary
     //
