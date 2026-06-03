@@ -18,7 +18,15 @@ final class Terminal {
     private var persona = Persona.make()
 
     private var phase: ShiftPhase = .routine
+    private var phaseStartedAt: Double = 0
     private var phaseEndsAt: Double = -1
+
+    // Reactive-world signal (read by ReactiveWorld in Renderer each frame).
+    var currentPhase: ShiftPhase { phase }
+    func phaseProgress(_ t: Double) -> Double {
+        let span = phaseEndsAt - phaseStartedAt
+        return span > 0 ? min(1, max(0, (t - phaseStartedAt) / span)) : 0
+    }
     private var cps: Double = 22
 
     // mentor channel state (per shift)
@@ -140,7 +148,7 @@ final class Terminal {
         }
     }
     private func enterPhase(_ p: ShiftPhase, t: Double) {
-        phase = p; phaseEndsAt = t + dur(p); queue.removeAll(); actionStart = -1; restUntil = t
+        phase = p; phaseStartedAt = t; phaseEndsAt = t + dur(p); queue.removeAll(); actionStart = -1; restUntil = t
         cps = 26.3 / Double(persona.trait.baseSpeed) * phaseSpeed(p)
     }
     private func advancePhase(_ t: Double) {

@@ -41,6 +41,7 @@ struct Settings {
     var halation: Float = 0.15      // warm glow bleed around bright areas
     var dayNight = false            // slow brightness/bloom day-night cycle
     var matrix = false              // matrix-rain background
+    var reactiveWorld = true        // the 3D world reacts to the narrative shift phase (fog/CRT escalation)
     enum Weather: String, CaseIterable { case clear, storm, dust }
     var weather: Weather = .clear
     var bankStrength: Float = 1        // flight banking intensity (0 = level flight, 2 = aggressive)

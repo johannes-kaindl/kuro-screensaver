@@ -116,6 +116,41 @@ final class Renderer {
     }
 
     /// Advance simulation by `dt` seconds without drawing.
+    // ── Reactive world: the 3D world reacts to the narrative shift phase ─────
+    // (mirrors src/engine/fx/reactive-world.ts). A continuous threat (0..1) from the
+    // terminal phase + progress drives fog/bloom/CRT escalation; released by the crash.
+    private var threat: Float = 0
+    private var relaxing = false
+    private var lastPhase: ShiftPhase = .routine
+    var forcedThreat: Float? = nil          // harness --threat pins the value
+    private var stormScalar: Float { Renderer.smoothstep(0.70, 1.0, threat) }
+
+    private static func smoothstep(_ e0: Float, _ e1: Float, _ x: Float) -> Float {
+        let t = min(1, max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t)
+    }
+    private func updateThreat(dt: Double) {
+        guard settings.reactiveWorld else { threat = 0; return }
+        if let f = forcedThreat { threat = min(1, max(0, f)); return }
+        let phase = hud.terminal.currentPhase
+        if phase == .routine && lastPhase != .routine { relaxing = true }
+        if phase != .routine { relaxing = false }
+        lastPhase = phase
+        let band: (Float, Float)
+        switch phase {
+        case .routine:   band = (0.00, 0.12)
+        case .intrusion: band = (0.12, 0.38)
+        case .alarm:     band = (0.38, 0.70)
+        case .panic:     band = (0.70, 1.00)
+        case .silence:   band = (1.00, 1.00)
+        }
+        let p = Float(hud.terminal.phaseProgress(t))
+        let target = band.0 + (band.1 - band.0) * Renderer.smoothstep(0, 1, p)
+        let tau: Float = relaxing ? 0.4 : 2.5
+        let k = 1 - exp(-Float(min(0.1, dt)) / tau)
+        threat += (target - threat) * k
+        if relaxing && threat < 0.02 { relaxing = false }
+    }
+
     func advance(dt: Double) {
         t += dt
         // Set the aspect-aware base FOV before update so scenes (tunnel) can
@@ -126,6 +161,9 @@ final class Renderer {
         if dt > 0 { fps = fps * 0.9 + (1.0 / dt) * 0.1 }
         hud.setFps(fps)
         hud.terminal.update(t: t)
+        updateThreat(dt: dt)
+        glitch.intensity = settings.reactiveWorld
+            ? min(1, settings.crtIntensity + threat * 0.7) : settings.crtIntensity
         scanDriftY = (scanDriftY + 36 * Float(dt)).truncatingRemainder(dividingBy: 4)
 
         // scene auto-cycle via the crash→reboot transition
@@ -184,6 +222,10 @@ final class Renderer {
         case .dust: fogMul *= 1.6; bloomMul *= 0.85
         case .clear: break
         }
+        // Reactive world: the shift's threat closes the fog in + surges the bloom
+        // (CRT halation/ntsc + glitch handled in advance + p6 below).
+        fogMul *= 1 + threat * 1.6
+        bloomMul *= 1 + stormScalar * 0.4
 
         for item in (debugBlackScene ? [] : scene.items) {
             var u = SceneUniforms(
@@ -254,7 +296,7 @@ final class Renderer {
             p3: glitch.uniforms3(),
             p4: SIMD4(crash.uniforms().x, crash.uniforms().y, settings.curvature, 1.0),
             p5: SIMD4(settings.apertureMask, 6, 0.02, 0.012),
-            p6: SIMD4(settings.ntsc, settings.halation, 0, 0))
+            p6: SIMD4(settings.ntsc + threat * 0.45, settings.halation + threat * 0.35, 0, 0))
         enc2.setFragmentBytes(&pu, length: MemoryLayout<PostUniforms>.stride, index: 0)
         enc2.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
         enc2.endEncoding()

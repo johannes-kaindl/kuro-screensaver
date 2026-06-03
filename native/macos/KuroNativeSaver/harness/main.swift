@@ -35,6 +35,7 @@ struct Args {
     var term: Float = -1
     var ntsc: Float = -1
     var halation: Float = -1
+    var threat: Float? = nil    // --threat pins the reactive-world threat (0..1)
     var matrix = false
     var matrixOnly = false
     var termWindow = false
@@ -69,6 +70,7 @@ func parseArgs() -> Args {
         case "--term": a.term = Float(it.next() ?? "") ?? a.term
         case "--ntsc": a.ntsc = Float(it.next() ?? "") ?? a.ntsc
         case "--halation": a.halation = Float(it.next() ?? "") ?? a.halation
+        case "--threat": a.threat = Float(it.next() ?? "")
         case "--matrix": a.matrix = true
         case "--matrix-only": a.matrix = true; a.matrixOnly = true; a.noHud = true
         case "--black": a.matrixOnly = true   // black scene (verify HUD/terminal overlays alone)
@@ -175,6 +177,7 @@ let ctx = SceneContext(device: device, rng: LCG(seed: args.seed),
 let scene: Scene = SceneRegistry.make(args.scene, ctx: ctx)
 let renderer = Renderer(device: device, settings: settings, scene: scene,
                         targetFormat: target.pixelFormat)
+if let th = args.threat { renderer.forcedThreat = th }
 if let g = args.forceGlitch { renderer.debugForceGlitch(g) }
 if args.crash >= 0 { renderer.debugForceCrash(args.crash) }
 if args.matrixOnly { renderer.debugBlackScene = true }
