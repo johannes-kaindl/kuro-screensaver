@@ -8,7 +8,7 @@ for (const s of shots) {
   const [scene, preset] = s.split(':');
   const page = await ctx.newPage();
   await page.goto(`http://localhost:5173/screensaver.html?scene=${scene}&preset=${preset}`, { waitUntil: 'load' });
-  await page.waitForTimeout(6000);
+  await page.waitForTimeout(13000);
   await page.screenshot({ path: `${OUT}/crt-${scene}.png` });
   console.log(`shot ${scene}/${preset}`);
   await page.close();

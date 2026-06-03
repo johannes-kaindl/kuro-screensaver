@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { SceneCtx, SceneModule, SceneUpdater } from './scene-base';
 import { SPEED_VALUES } from '../../data/defaults';
+import { CameraFly } from '../camera-fly';
 
 // Heightfield is a pure function of LOGICAL world position. Each chunk carries
 // its own constant logicalOffset (NOT its rendered position.z). The offset only
@@ -26,6 +27,7 @@ export const TerrainScene: SceneModule = {
 
     cam.position.set(0, 6, 0); cam.rotation.set(-0.22, 0, 0);
     scene.fog = new THREE.FogExp2(0x000000, 0.012);
+    const fly = new CameraFly(Math.floor(rng() * 2e9), 12, 2.6, 6.5, -0.2, ctx.settings.bankStrength);
 
     // Width 280 chosen so even at FOV 72° + camera y=6 the lateral edges sit well
     // beyond the visible cone — no horizon-edge artifacts. Lateral seg count scaled
@@ -93,8 +95,9 @@ export const TerrainScene: SceneModule = {
         sampleChunk(g2, p2 as THREE.BufferAttribute, logicalB);
       }
 
-      cam.position.y = 6 + Math.sin(t * 0.33) * 0.9;
-      cam.rotation.z = Math.sin(t * 0.17) * 0.009;
+      const f = fly.sample(t, SPEED_VALUES[ctx.settings.speed] * 0.2 * 60);
+      cam.position.x = f.x; cam.position.y = f.y;
+      cam.rotation.set(f.pitch, f.yaw, f.roll);
 
       // Dust drifts laterally
       dust.position.x = Math.sin(t * 0.07) * 4;

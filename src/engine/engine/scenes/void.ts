@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import type { SceneCtx, SceneModule, SceneUpdater } from './scene-base';
 import { SPEED_VALUES } from '../../data/defaults';
+import { CameraFly } from '../camera-fly';
 
 export const VoidScene: SceneModule = {
   modeLabels: ['DRIFT', 'BELT', 'SWARM'] as const,
@@ -132,6 +133,7 @@ export const VoidScene: SceneModule = {
 
     // ── Update ──────────────────────────────────────────────────────────
     // dt from core is in ms; convert via t-diff (clockT is in seconds).
+    const fly = new CameraFly(Math.floor(rng() * 2e9), 6, 3, 0, 0, ctx.settings.bankStrength);
     let lastT = 0;
     return (t: number, _dt: number) => {
       const dts = lastT === 0 ? 0.016 : Math.min(0.1, t - lastT);
@@ -141,17 +143,10 @@ export const VoidScene: SceneModule = {
       // Forward flight — dt-safe step.
       cam.position.z -= spd * 14 * dts;
 
-      // Side drift — meaningful amplitude so the camera curves visibly.
-      // Path is the integral of these forces, damped to keep us roughly
-      // centered. Steady-state offset ~6 units, oscillating.
-      const dx = Math.sin(t * 0.13) * 1.4 + Math.sin(t * 0.31) * 0.55;
-      const dy = Math.cos(t * 0.09) * 0.75 + Math.sin(t * 0.27) * 0.30;
-      cam.position.x = cam.position.x * 0.993 + dx * dts * 1.2;
-      cam.position.y = cam.position.y * 0.993 + dy * dts * 1.2;
-
-      // Yaw/pitch — slight wobble.
-      cam.rotation.x = Math.cos(t * 0.11) * 0.06;
-      cam.rotation.y = Math.sin(t * 0.07) * 0.10;
+      // Banking weave through the belt (forward-on-z kept above).
+      const f = fly.sample(t, spd * 14);
+      cam.position.x = f.x; cam.position.y = f.y;
+      cam.rotation.set(f.pitch, f.yaw, f.roll);
 
       // Asteroid rotation + recycle.
       const camX = cam.position.x;

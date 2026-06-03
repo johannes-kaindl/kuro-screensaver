@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import type { SceneCtx, SceneModule, SceneUpdater } from './scene-base';
 import { ALT_VALUES, SPEED_VALUES } from '../../data/defaults';
+import { CameraFly } from '../camera-fly';
 import { mkRng } from '../rng';
 
 const CL = 320;  // chunk length
@@ -184,6 +185,7 @@ export const CityScene: SceneModule = {
 
     cam.position.set(0, ALT_VALUES[settings.cityAltitude], 0);
     cam.rotation.set(-0.08, 0, 0);
+    const fly = new CameraFly(Math.floor(ctx.rng() * 2e9), 8, 1.6, ALT_VALUES[settings.cityAltitude], -0.08, ctx.settings.bankStrength);
 
     let blinkTick = 0;
 
@@ -194,9 +196,10 @@ export const CityScene: SceneModule = {
       if (cA.position.z > CL / 2 + 8) cA.position.z -= CL * 2;
       if (cB.position.z > CL / 2 + 8) cB.position.z -= CL * 2;
 
-      cam.position.y += (altTarget + Math.sin(t * 0.32) * 0.85 + Math.sin(t * 0.11) * 0.28 - cam.position.y) * 0.08;
-      cam.rotation.z = Math.sin(t * 0.18) * 0.013;
-      cam.rotation.y = Math.sin(t * 0.09) * 0.044;
+      fly.vertBase = altTarget;
+      const f = fly.sample(t, spd * 60);
+      cam.position.x = f.x; cam.position.y = Math.max(1.8, f.y);   // clamp above the street
+      cam.rotation.set(f.pitch, f.yaw, f.roll);
 
       blinkTick++;
       if (blinkTick % 2 === 0) {

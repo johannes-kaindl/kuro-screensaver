@@ -6,6 +6,7 @@ export interface ScreensaverSettings {
   speed: 'slow' | 'norm' | 'fast';
   cityAltitude: 'low' | 'mid' | 'high';
   tunnelAutoBoost: boolean;
+  bankStrength: number;          // flight banking intensity (0 = level, 2 = aggressive)
   seedLock: number | null;
 
   colorMode: 'kuro-auto' | 'kuro-preset' | 'custom';
@@ -135,6 +136,7 @@ export const DEFAULT_SCREENSAVER: ScreensaverSettings = {
   speed: 'norm',
   cityAltitude: 'low',
   tunnelAutoBoost: true,
+  bankStrength: 1,
   seedLock: null,
 
   colorMode: 'kuro-auto',
