@@ -15,6 +15,8 @@ import { CityScene }    from './scenes/city';
 import { RiftScene }    from './scenes/rift';
 import { TunnelScene }  from './scenes/tunnel';
 import { VoidScene }    from './scenes/void';
+import { MatrixRain }   from '../fx/matrix-rain';
+import { MATRIX_SHADER } from '../fx/matrix-pass';
 
 const SCENE_REGISTRY = {
   terrain: TerrainScene,
@@ -121,6 +123,14 @@ export class Engine {
   burnPass: AfterimagePass;
   chromaPass: ShaderPass;
   crtPass: ShaderPass;
+  matrixPass: ShaderPass;
+
+  // Cinematic matrix rain: drawn to an offscreen 2D canvas and fed as a texture
+  // into matrixPass (before bloom) so it blooms + curves like native in-monitor rain.
+  private matrixRain = new MatrixRain();
+  private matrixCanvas2d!: HTMLCanvasElement;
+  private matrixCtx!: CanvasRenderingContext2D;
+  private matrixTex!: THREE.CanvasTexture;
 
   currentScene: SceneId | null = null;
   currentUpdater: SceneUpdater | null = null;
@@ -186,6 +196,20 @@ export class Engine {
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.cam));
 
+    // Matrix-rain pass runs right after the scene render and BEFORE bloom, so the
+    // near-white heads bloom (threshold 0.05) and the CRT pass later warps the rain.
+    this.matrixCanvas2d = document.createElement('canvas');   // offscreen — not in the DOM
+    this.sizeMatrixCanvas(W, H);
+    this.matrixCtx = this.matrixCanvas2d.getContext('2d')!;
+    this.matrixTex = new THREE.CanvasTexture(this.matrixCanvas2d);
+    this.matrixTex.minFilter = THREE.LinearFilter;
+    this.matrixTex.magFilter = THREE.LinearFilter;
+    this.matrixTex.generateMipmaps = false;
+    this.matrixPass = new ShaderPass(MATRIX_SHADER);
+    (this.matrixPass.uniforms as any).tMatrix.value = this.matrixTex;
+    this.matrixPass.enabled = settings.fx.matrix.on;
+    this.composer.addPass(this.matrixPass);
+
     this.bloomPass = new UnrealBloomPass(new THREE.Vector2(W, H), settings.fx.bloom.strength, 0.6, 0.05);
     this.bloomPass.enabled = settings.fx.bloom.on;
     this.composer.addPass(this.bloomPass);
@@ -194,7 +218,9 @@ export class Engine {
     this.trailPass.enabled = settings.fx.trails.on;
     this.composer.addPass(this.trailPass);
 
-    this.burnPass = new AfterimagePass(0.97 * settings.fx.burnDecay.strength + 0.5);
+    // damp must stay in [0,1] (AfterimagePass max-feedback); use the SAME mapping as
+    // applyFxSettings so the constructor can't seed damp > 1 on initial load.
+    this.burnPass = new AfterimagePass(0.5 + 0.47 * settings.fx.burnDecay.strength);
     this.burnPass.enabled = settings.fx.burnDecay.on;
     this.composer.addPass(this.burnPass);
 
@@ -256,6 +282,34 @@ export class Engine {
     this.crtPass.uniforms.ntsc.value      = f.ntsc.on      ? f.ntsc.amount : 0;
     this.crtPass.uniforms.halation.value  = f.halation.on  ? f.halation.amount : 0;
     this.crtPass.enabled = f.curvature.on || f.aperture.on || f.ntsc.on || f.halation.on;
+  }
+
+  /** Size the offscreen rain canvas to the viewport aspect, capped to bound the
+   *  per-frame Canvas-2D fillText + texture-upload cost (it samples via normalized
+   *  UVs, so a sub-native resolution is fine — the CRT pass softens it anyway). */
+  private sizeMatrixCanvas(W: number, H: number) {
+    const tw = Math.max(1, Math.min(W, 2048));
+    const th = Math.max(1, Math.round(tw * H / W));
+    if (this.matrixCanvas2d.width !== tw || this.matrixCanvas2d.height !== th) {
+      this.matrixCanvas2d.width = tw;
+      this.matrixCanvas2d.height = th;
+    }
+  }
+
+  /** Theme accent as 0..1 RGB (ResolvedColor.rgb is 0..255). */
+  private matrixAccent(): [number, number, number] {
+    const [r, g, b] = this.color.rgb;
+    return [r / 255, g / 255, b / 255];
+  }
+
+  /** Draw one rain frame to the offscreen canvas + flag the texture for re-upload. */
+  private drawMatrixFrame() {
+    this.sizeMatrixCanvas(window.innerWidth, window.innerHeight);
+    this.matrixRain.render(
+      this.matrixCtx, this.matrixCanvas2d.width, this.matrixCanvas2d.height,
+      this.clockT, this.matrixAccent(), 0.6, this.settings.fx.matrix.density,
+    );
+    this.matrixTex.needsUpdate = true;
   }
 
   loadScene(id: SceneId) {
@@ -325,6 +379,7 @@ export class Engine {
         this.cam.updateProjectionMatrix();
       }
 
+      if (this.matrixPass.enabled) this.drawMatrixFrame();
       this.crtPass.uniforms.time.value = this.clockT;
       this.composer.render();
 
@@ -376,6 +431,7 @@ export class Engine {
     (this.burnPass.uniforms as any).damp.value = 0.5 + 0.47 * s.fx.burnDecay.strength;
     this.chromaPass.enabled = s.fx.chromaticAberration.on;
     this.chromaPass.uniforms.offset.value = s.fx.chromaticAberration.offset / 1000;
+    this.matrixPass.enabled = s.fx.matrix.on;
     this.setCrtUniforms(s);
   }
 
@@ -390,6 +446,7 @@ export class Engine {
       for (const m of ms) m.dispose?.();
     });
     this.mats.disposeAll();
+    this.matrixTex?.dispose();
     this.composer.dispose?.();
     this.renderer.dispose();
     this.canvas.remove();

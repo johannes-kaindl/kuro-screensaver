@@ -32,9 +32,8 @@ export class Hud {
   slab!: HTMLDivElement;
   kanji!: HTMLDivElement;
 
-  matrixCanvas!: HTMLCanvasElement;
-  mctx!: CanvasRenderingContext2D;
-  matrixCols: number[] = [];
+  // (Matrix rain moved into the engine composer — see engine/fx/matrix-rain.ts. It
+  // is now in-monitor: bloomed + CRT-curved, instead of the old flat z-index:2 overlay.)
 
   scanlines!: HTMLDivElement;
   vignette!: HTMLDivElement;
@@ -70,31 +69,12 @@ export class Hud {
     this.applySettings(settings);
     for (let i = 0; i < 12; i++) this.blips.push({ a: Math.random() * Math.PI * 2, r: 10 + Math.random() * 32, l: 0.85 });
 
-    // v1.2 — Live-Test 2026-05-13: Matrix-canvas + matrixCols were sized ONCE
-    // at construct-time from window.innerWidth. On iPhone, rotating from
-    // portrait to landscape kept the canvas at portrait width, so the matrix
-    // rain only rendered in the left strip of the landscape viewport. The
-    // resize handler now re-dimensions canvas + re-seeds the column array.
+    // v1.2 — Live-Test 2026-05-13: re-layout HUD elements (radar offset, etc.) on
+    // viewport rotation; iPhone portrait↔landscape used to leave stale layouts.
     window.addEventListener('resize', this.onResize);
     window.addEventListener('orientationchange', this.onResize);
     // Initial radar layout — aspect-aware bottom offset.
     this.updateRadarLayout();
-  }
-
-  /** Re-size the matrix-rain canvas + re-seed column starts to match host. */
-  private resizeMatrixCanvas() {
-    const W = this.root.clientWidth || window.innerWidth;
-    const H = this.root.clientHeight || window.innerHeight;
-    this.matrixCanvas.width = W;
-    this.matrixCanvas.height = H;
-    if (!this.mctx) this.mctx = this.matrixCanvas.getContext('2d')!;
-    // Re-seed columns to span the new width; preserve y-positions for existing
-    // columns so the rain doesn't jump-reset visually.
-    const cols = Math.floor(W / 13);
-    const old = this.matrixCols || [];
-    this.matrixCols = Array.from({ length: cols }, (_, i) =>
-      i < old.length ? old[i] : Math.floor(Math.random() * (H / 13)),
-    );
   }
 
   /**
@@ -113,7 +93,6 @@ export class Hud {
   }
 
   private onResize = () => {
-    this.resizeMatrixCanvas();
     this.updateRadarLayout();
   };
 
@@ -133,10 +112,6 @@ export class Hud {
     this.vignette = make('div',
       'position:absolute;inset:0;z-index:31;pointer-events:none;' +
       'background:radial-gradient(ellipse at center,transparent 52%,rgba(0,0,0,.72) 100%)');
-
-    // Matrix rain canvas
-    this.matrixCanvas = make('canvas', 'position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .5s');
-    this.resizeMatrixCanvas();
 
     // Control bar
     // v1.2 — Mobile safe-area-insets (Live-Test 2026-05-13): on iPhone the
@@ -522,7 +497,6 @@ export class Hud {
     this.kanji.style.display = s.hud.vaultKanji ? '' : 'none';
     this.scanlines.style.opacity = s.fx.scan.on ? String(s.fx.scan.opacity * 5) : '0';
     this.vignette.style.opacity = s.fx.vignette.on ? String(s.fx.vignette.strength) : '0';
-    this.matrixCanvas.style.opacity = s.fx.matrix.on ? '0.5' : '0';
     // Vignette strength via inline gradient stop
     this.vignette.style.background = `radial-gradient(ellipse at center, transparent ${52 - s.fx.vignette.strength * 30}%, rgba(0,0,0,.72) 100%)`;
     // (Old `glitch` FX removed — superseded by the CrtSim subsystem in fx/crt-sim.ts.)
@@ -712,7 +686,7 @@ export class Hud {
     return cursor + 200;
   }
 
-  // Per-frame loop: radar, matrix, scanline drift, ping, noise, flash, hud values, terminal, day-night
+  // Per-frame loop: radar, scanline drift, ping, noise, flash, hud values, terminal, day-night
   startLoop(t0: number) {
     let prevDriftY = 0;
     const tick = (now: number) => {
@@ -750,9 +724,6 @@ export class Hud {
 
       // Radar
       if (this.settings.hud.radar) this.drawRadar();
-
-      // Matrix rain
-      if (this.settings.fx.matrix.on) this.drawMatrix();
 
       // Scanline drift
       if (this.settings.fx.scanlineDrift.on) {
@@ -840,23 +811,6 @@ export class Hud {
     }
     ctx.beginPath(); ctx.arc(44, 44, 2.5, 0, Math.PI * 2);
     ctx.fillStyle = this.color.css; ctx.fill();
-  }
-
-  private drawMatrix() {
-    const ctx = this.mctx;
-    ctx.fillStyle = 'rgba(0,0,0,.06)';
-    ctx.fillRect(0, 0, this.matrixCanvas.width, this.matrixCanvas.height);
-    ctx.font = '12px "Share Tech Mono"';
-    ctx.fillStyle = this.color.css;
-    const CHARS = 'アイウエオカキクABCDEFGHIJKLM0123456789#@!%*';
-    const density = this.settings.fx.matrix.density;
-    for (let x = 0; x < this.matrixCols.length; x++) {
-      if (Math.random() > density) continue;
-      const y = this.matrixCols[x];
-      ctx.fillText(CHARS[(Math.random() * CHARS.length) | 0], x * 13, y * 13);
-      if (y * 13 > this.matrixCanvas.height && Math.random() > 0.97) this.matrixCols[x] = 0;
-      else this.matrixCols[x]++;
-    }
   }
 
   private firePing() {

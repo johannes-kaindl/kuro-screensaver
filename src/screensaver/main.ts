@@ -40,6 +40,10 @@ const storyScale = Number.isFinite(scaleParam)
 
 const audioOn = params.get('audio') === 'on';
 
+// Cinematic matrix rain — ?matrix=1|on enables the in-monitor rain fx (bloomed +
+// CRT-curved). Off by default; also reachable via the Matrix Look / FX toggle.
+const matrixOn = params.get('matrix') === '1' || params.get('matrix') === 'on';
+
 const host = new WebHost({
   activePreset: preset,
   vaultKanji: PRESETS[preset].kanji,
@@ -63,6 +67,7 @@ const host = new WebHost({
 // partially through it without a type error, so toggle audio directly on the
 // merged settings (deepMerge has already run in the WebHost constructor).
 host.getSettings().sound.master = audioOn;
+if (matrixOn) host.getSettings().fx.matrix.on = true;
 
 const controller = new ScreensaverController(makePluginShim(host));
 
