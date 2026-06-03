@@ -19,7 +19,11 @@ struct ColorPreset {
     }
 
     // CRT mapping (fxInheritFromTheme): the intended bloom/scan/vignette per preset.
-    var bloomStrength: Float { max(0.4, glow * 4) }
+    // Bloom capped at 1.8 (2026-06-03): glow×4 reached 2.8 (phosphor)/2.0 (crimson/
+    // ember), which — with the ACES shoulder — bloomed the punchiest presets to a
+    // white glow instead of a saturated hue. The cap keeps the glow as a look while
+    // letting the colour come through, closer to the web's per-preset bloom feel.
+    var bloomStrength: Float { min(1.8, max(0.4, glow * 4)) }
     var scanOpacity: Float { max(0.02, scanline * 5) }
     var vignetteStrength: Float { max(0.15, vignette + 0.15) }
 }

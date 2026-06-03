@@ -169,7 +169,10 @@ final class Renderer {
         let tf = Float(t)
         var bloomMul = settings.bloomScale
         var fogMul = settings.fog.mul
-        var expo: Float = 1.15 / 0.6
+        // Exposure lowered 2026-06-03 (~1.92 → 1.4): the old value pushed bright/
+        // saturated presets deep into the ACES highlight shoulder → wash to white.
+        // 1.4 keeps colours in the more-saturated midtones, closer to the web look.
+        var expo: Float = 1.4
         if settings.dayNight {
             let dn = 0.5 + 0.5 * sin(tf / 240 * 2 * .pi)   // 0 night .. 1 day (4-min cycle)
             expo *= 0.7 + 0.6 * dn; bloomMul *= 0.8 + 0.5 * dn; fogMul *= 1 + 0.5 * (1 - dn)
