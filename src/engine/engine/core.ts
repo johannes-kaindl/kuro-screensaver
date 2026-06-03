@@ -119,6 +119,9 @@ export class Engine {
   world: THREE.Group;
   cam: THREE.PerspectiveCamera;
   mats = new MaterialPool();
+  // Second pool for the "enemy" infection: scenes tag an infectable subset of meshes
+  // with enemyMats; setEnemyFraction lerps its colour accent→enemy as threat rises.
+  enemyMats = new MaterialPool();
 
   bloomPass: UnrealBloomPass;
   trailPass: AfterimagePass;
@@ -162,6 +165,9 @@ export class Engine {
   private _crtBaseOn = false;     // any base CRT sub-effect enabled by the user
   private _hesT0 = -1;            // camera-hesitation envelope start (clockT); <0 = inactive
   private _hesDur = 0;
+  private _accentHex = 0x00ff41;  // current accent + its derived enemy hue (HSL +160°)
+  private _enemyHex = 0xff0040;
+  private _enemyFraction = 0;     // 0 = subset matches accent, 1 = full enemy
 
   rng: () => number;
   seed: number;
@@ -264,6 +270,8 @@ export class Engine {
     this.composer.addPass(this.crtPass);
 
     this.mats.setColorHex(color.hex);
+    this._accentHex = color.hex;
+    this._enemyHex = this.enemyHexOf(color.hex);
 
     this.seed = settings.seedLock ?? freshSeed();
     this.rng = mkRng(this.seed);
@@ -341,6 +349,24 @@ export class Engine {
     this._hesDur = Math.max(0.3, durationSec);
   }
 
+  /** HSL hue +160° → a vivid contrasting "enemy" hue for the infection crossfade. */
+  private enemyHexOf(hex: number): number {
+    const c = new THREE.Color(hex);
+    const hsl = { h: 0, s: 0, l: 0 };
+    c.getHSL(hsl);
+    c.setHSL((hsl.h + 160 / 360) % 1, Math.max(0.75, hsl.s), Math.min(0.6, Math.max(0.45, hsl.l)));
+    return c.getHex();
+  }
+
+  /** Conductor: 0 = the infectable subset matches the accent (invisible), 1 = full
+   *  enemy colour. Lerps the enemyMats pool colour accent→enemy in RGB. */
+  setEnemyFraction(f: number) {
+    this._enemyFraction = Math.min(1, Math.max(0, f));
+    const a = this._accentHex, b = this._enemyHex, t = this._enemyFraction;
+    const ch = (s: number) => Math.round(((a >> s) & 0xff) + (((b >> s) & 0xff) - ((a >> s) & 0xff)) * t);
+    this.enemyMats.setColorHex((ch(16) << 16) | (ch(8) << 8) | ch(0));
+  }
+
   /** Size the offscreen rain canvas to the viewport aspect, capped to bound the
    *  per-frame Canvas-2D fillText + texture-upload cost (it samples via normalized
    *  UVs, so a sub-native resolution is fine — the CRT pass softens it anyway). */
@@ -382,6 +408,7 @@ export class Engine {
     while (this.world.children.length) this.world.remove(this.world.children[0]);
     this.mats.disposeAll();
     this.mats.setColorHex(this.color.hex);
+    this.enemyMats.disposeAll();
 
     // v1.2 — Reset FoV to aspect-aware default (not hard-coded 72°). Some
     // scenes (tunnel) push FoV during boost; this restores the baseline on
@@ -394,7 +421,7 @@ export class Engine {
 
     const ctx: SceneCtx = {
       scene: this.scene, world: this.world, cam: this.cam,
-      mats: this.mats, rng: this.rng, settings: this.settings,
+      mats: this.mats, enemyMats: this.enemyMats, rng: this.rng, settings: this.settings,
       threat: () => this.threat, storm: () => this.storm,
     };
     const mod = SCENE_REGISTRY[id];
@@ -402,6 +429,7 @@ export class Engine {
     this.currentUpdater = mod.build.call(mod, ctx);
     this.currentScene = id;
     this.updateMatrixEnabled();   // the MATRIX scene force-enables the rain pass
+    this.setEnemyFraction(this._enemyFraction);   // tint the freshly-built enemy subset
     // Capture the scene's chosen fog density as the base the conductor scales.
     const fd = (this.scene.fog as any)?.density;
     if (typeof fd === 'number') this.fogBase = fd;
@@ -491,6 +519,9 @@ export class Engine {
   setColor(c: ResolvedColor) {
     this.color = c;
     this.mats.setColorHex(c.hex);
+    this._accentHex = c.hex;
+    this._enemyHex = this.enemyHexOf(c.hex);
+    this.setEnemyFraction(this._enemyFraction);   // re-tint the enemy subset for the new accent
   }
 
   /**
@@ -536,6 +567,7 @@ export class Engine {
       for (const m of ms) m.dispose?.();
     });
     this.mats.disposeAll();
+    this.enemyMats.disposeAll();
     this.matrixTex?.dispose();
     this.composer.dispose?.();
     this.renderer.dispose();

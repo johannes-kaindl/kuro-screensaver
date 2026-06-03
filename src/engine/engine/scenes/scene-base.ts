@@ -8,6 +8,8 @@ export interface SceneCtx {
   world: THREE.Group;
   cam: THREE.PerspectiveCamera;
   mats: MaterialPool;
+  /** Second pool for the "enemy" infection — scenes tag an infectable subset with it. */
+  enemyMats?: MaterialPool;
   rng: () => number;
   settings: ScreensaverSettings;
   /** Reactive-world signal (0..1), live per frame. Optional — scenes that don't

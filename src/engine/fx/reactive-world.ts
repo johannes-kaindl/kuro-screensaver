@@ -98,6 +98,8 @@ export class ReactiveWorld {
 
     // ── push to subsystems (compose on user settings; calm = gentle, no motion) ──
     e.fogThreatMult = 1 + threat * (calm ? 0.6 : 1.6);
+    // Enemy-colour infection creeps in from INTRUSION (slow colour, OK in calm mode).
+    e.setEnemyFraction(smoothstep(0.25, 0.90, threat));
     e.setCrtThreat(calm ? 0 : threat * 0.35, calm ? 0 : threat * 0.45);
     e.setBloomThreat(1 + storm * 0.4);
     if (this.d.crt) {

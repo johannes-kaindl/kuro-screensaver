@@ -96,9 +96,12 @@ export const VoidScene: SceneModule = {
     interface Ast { mesh: THREE.Mesh; rx: number; ry: number; rz: number }
     const asteroids: Ast[] = [];
     for (let i = 0; i < POOL; i++) {
+      // ~30% of asteroids are "infectable" — their material crossfades to the enemy
+      // colour as the narrative threat rises (the world catching the operator's dread).
+      const pool = (ctx.enemyMats && rng() < 0.3) ? ctx.enemyMats : mats;
       const mesh = new THREE.Mesh(
         pickGeo(),
-        mats.M({ transparent: true, opacity: 0.60 + rng() * 0.30 }),
+        pool.M({ transparent: true, opacity: 0.60 + rng() * 0.30 }),
       );
       mesh.scale.setScalar(SCALE_MIN + rng() * SCALE_SPAN);
       const p = seedInitial();

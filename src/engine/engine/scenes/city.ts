@@ -14,7 +14,7 @@ interface BlinkRef {
   mesh: THREE.Mesh; phase: number; speed: number; hi: number; lo: number;
 }
 
-function buildChunk(grp: THREE.Group, mats: SceneCtx['mats'], seed: number, blinks: BlinkRef[]) {
+function buildChunk(grp: THREE.Group, mats: SceneCtx['mats'], seed: number, blinks: BlinkRef[], enemyMats?: SceneCtx['enemyMats']) {
   const rng = mkRng(seed);
   const half = CL / 2;
 
@@ -75,9 +75,10 @@ function buildChunk(grp: THREE.Group, mats: SceneCtx['mats'], seed: number, blin
           blinks.push({ mesh: bc, phase: rng() * Math.PI * 2, speed: 0.5 + rng() * 2, hi: 0.9, lo: 0.04 });
         }
 
-        // Windows
+        // Windows — ~25% of buildings are "infectable": their windows crossfade to
+        // the enemy colour as the narrative threat rises (a whole building goes red).
         const fl = Math.floor(h / 4.2), wc = Math.floor(w / 3.2);
-        const wm = mats.MSolid(0.9);
+        const wm = ((enemyMats && rng() < 0.25) ? enemyMats : mats).MSolid(0.9);
         for (let f = 0; f < fl; f++) for (let c = 0; c < wc; c++) if (rng() < 0.35) {
           const wx = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.56, 0.09), wm);
           wx.position.set(xp - w / 2 + 0.55 + c * (w / wc), 2 + f * 4.2, zp + (rng() > 0.5 ? d / 2 + 0.04 : -d / 2 - 0.04));
@@ -145,8 +146,8 @@ export const CityScene: SceneModule = {
     const cA = new THREE.Group(), cB = new THREE.Group();
     // Use seeded rng for chunk seeds, but each chunk has its own RNG to keep layouts reproducible
     const baseSeed = (ctx.rng() * 0xffffffff) | 0;
-    buildChunk(cA, mats, baseSeed + 42, blinks);
-    buildChunk(cB, mats, baseSeed + 137, blinks);
+    buildChunk(cA, mats, baseSeed + 42, blinks, ctx.enemyMats);
+    buildChunk(cB, mats, baseSeed + 137, blinks, ctx.enemyMats);
     cA.position.z = -CL / 2;
     cB.position.z = -CL / 2 - CL;
     world.add(cA, cB);
