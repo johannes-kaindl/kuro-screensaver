@@ -657,8 +657,8 @@ export class ScreensaverController {
 
   /** Returns true if the key was handled as a live hotkey. */
   private handleLiveHotkey(e: KeyboardEvent, k: string): boolean {
-    // 1-5 → scene switch
-    if (k >= '1' && k <= '5') {
+    // 1-N → scene switch (digit maps to SCENES index; guard bounds it)
+    if (k >= '1' && k <= '9') {
       const idx = parseInt(k, 10) - 1;
       if (idx < SCENES.length) {
         e.preventDefault(); e.stopPropagation();

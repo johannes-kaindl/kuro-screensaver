@@ -2,7 +2,7 @@
 // Additive merge into legacy DEFAULT_SETTINGS via main.ts.
 
 export interface ScreensaverSettings {
-  defaultScene: 'terrain' | 'city' | 'rift' | 'tunnel' | 'void';
+  defaultScene: 'terrain' | 'city' | 'rift' | 'tunnel' | 'void' | 'matrix';
   speed: 'slow' | 'norm' | 'fast';
   cityAltitude: 'low' | 'mid' | 'high';
   tunnelAutoBoost: boolean;
@@ -212,7 +212,7 @@ export const DEFAULT_SCREENSAVER: ScreensaverSettings = {
 };
 
 export type SceneId = ScreensaverSettings['defaultScene'];
-export const SCENES: SceneId[] = ['terrain', 'city', 'rift', 'tunnel', 'void'];
+export const SCENES: SceneId[] = ['terrain', 'city', 'rift', 'tunnel', 'void', 'matrix'];
 
 // Display labels — used by settings dropdown and control bar.
 // (Internal id stays short for storage / commands; label is presentation.)
@@ -222,6 +222,7 @@ export const SCENE_LABELS: Record<SceneId, string> = {
   rift:    'THE RIFT',
   tunnel:  'TUNNEL',
   void:    'VOID',
+  matrix:  'MATRIX',
 };
 
 export const SPEED_VALUES = { slow: 0.32, norm: 1, fast: 2.8 } as const;

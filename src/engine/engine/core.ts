@@ -15,6 +15,7 @@ import { CityScene }    from './scenes/city';
 import { RiftScene }    from './scenes/rift';
 import { TunnelScene }  from './scenes/tunnel';
 import { VoidScene }    from './scenes/void';
+import { MatrixScene }  from './scenes/matrix';
 import { MatrixRain }   from '../fx/matrix-rain';
 import { MATRIX_SHADER } from '../fx/matrix-pass';
 
@@ -24,6 +25,7 @@ const SCENE_REGISTRY = {
   rift:    RiftScene,
   tunnel:  TunnelScene,
   void:    VoidScene,
+  matrix:  MatrixScene,
 };
 
 // Chromatic aberration shader
@@ -340,6 +342,13 @@ export class Engine {
     this.currentSceneObj = mod;
     this.currentUpdater = mod.build.call(mod, ctx);
     this.currentScene = id;
+    this.updateMatrixEnabled();   // the MATRIX scene force-enables the rain pass
+  }
+
+  /** The matrix rain renders when the fx toggle is on OR the MATRIX scene is active
+   *  (a dedicated pure-rain scene, mirroring native — the screen IS the rain). */
+  private updateMatrixEnabled() {
+    this.matrixPass.enabled = this.settings.fx.matrix.on || this.currentScene === 'matrix';
   }
 
   private hashId(id: string) {
@@ -431,7 +440,7 @@ export class Engine {
     (this.burnPass.uniforms as any).damp.value = 0.5 + 0.47 * s.fx.burnDecay.strength;
     this.chromaPass.enabled = s.fx.chromaticAberration.on;
     this.chromaPass.uniforms.offset.value = s.fx.chromaticAberration.offset / 1000;
-    this.matrixPass.enabled = s.fx.matrix.on;
+    this.updateMatrixEnabled();
     this.setCrtUniforms(s);
   }
 

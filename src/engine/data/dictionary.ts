@@ -27,6 +27,7 @@ export const DICT = {
     rift:    '>> RIFT INCURSION ACTIVE // INVERSION VECTOR ARMED',
     tunnel:  '>> TUNNEL LOCK CONFIRMED // INFIL VECTOR PRIMED',
     void:    '>> VOID DRIFT ACTIVE // DEEP SPACE ANCHOR',
+    matrix:  '>> MATRIX RAIN ENGAGED // DIGITAL DOWNPOUR',
   } as const,
 
   TERMINAL: {
@@ -90,6 +91,7 @@ export const DICT = {
     rift:    ['THE RIFT', 'CHASM', 'INVERSION'],
     tunnel:  ['INFIL', 'TRANSIT', 'BOOST'],
     void:    ['DRIFT', 'BELT', 'SWARM'],
+    matrix:  ['RAIN', 'CASCADE', 'DELUGE'],
   } as const,
 
   FLASH_PHRASES: [
