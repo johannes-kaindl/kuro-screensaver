@@ -29,11 +29,12 @@ plugin). **The headline is a full native rewrite in Metal** — a real, live-ren
 macOS screensaver: no WebView, no pre-rendered video, the whole engine running on
 the GPU. The web build lives on for in-browser play and cross-platform packaging.
 
-**New in v0.4.0:** the web build reaches feature parity with native — analog-CRT
+**New in v0.4.x:** the web build reaches feature parity with native — analog-CRT
 pass (curvature/aperture/NTSC/halation), dynamic banking flight, one-click Looks,
-and a cinematic 5-layer matrix rain rendered in-monitor (bloomed + curved). Native
-gains a flat-HUD toggle (crisp HUD/terminal over the curved scene) and richer,
-better-differentiated preset colours.
+and a cinematic 5-layer matrix rain rendered in-monitor (bloomed + curved), now
+also selectable as its own **MATRIX** scene (v0.4.1). Native gains a flat-HUD
+toggle (crisp HUD/terminal over the curved scene) and richer, better-differentiated
+preset colours.
 
 ---
 
