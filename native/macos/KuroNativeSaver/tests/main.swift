@@ -65,5 +65,14 @@ do {
     check(Palette.preset("nope").id == "toxic-haze", "unknown preset falls back to toxic-haze")
 }
 
+// --- scene registry ---------------------------------------------------------
+// Guards against scene drift (e.g. a scene added to the web SCENE_REGISTRY but not
+// here, or vice versa). Keep in sync with src/engine/engine/core.ts SCENE_REGISTRY.
+do {
+    check(SceneRegistry.ids.count == 6, "6 scenes")
+    check(Set(SceneRegistry.ids).count == SceneRegistry.ids.count, "scene ids unique")
+    check(SceneRegistry.ids.contains("matrix"), "matrix scene registered")
+}
+
 if failures > 0 { print("\n\(failures) FAILURE(S)"); exit(1) }
 print("\nALL PASS (\(failures == 0))")
