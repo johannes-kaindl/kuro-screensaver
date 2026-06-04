@@ -84,7 +84,7 @@ export const TerrainScene: SceneModule = {
     sampleChunk(g2, p2 as THREE.BufferAttribute, logicalB);
 
     return (t: number, _dt: number) => {
-      const spd = SPEED_VALUES[ctx.settings.speed] * 0.2;
+      const spd = (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]) * 0.2;
       t1.position.z += spd; t2.position.z += spd;
       if (t1.position.z > D / 2 + 12) {
         t1.position.z -= D * 2; logicalA -= D * 2;
@@ -95,7 +95,7 @@ export const TerrainScene: SceneModule = {
         sampleChunk(g2, p2 as THREE.BufferAttribute, logicalB);
       }
 
-      const f = fly.sample(t, SPEED_VALUES[ctx.settings.speed] * 0.2 * 60);
+      const f = fly.sample(t, (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]) * 0.2 * 60);
       cam.position.x = f.x; cam.position.y = f.y;
       cam.rotation.set(f.pitch, f.yaw, f.roll);
 

@@ -103,7 +103,7 @@ export const RiftScene: SceneModule = {
     let currentRoll = 0;                   // current Z-rotation contribution from roll
 
     return (t: number, _dt: number) => {
-      const spd = SPEED_VALUES[ctx.settings.speed] * 0.22;
+      const spd = (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]) * 0.22;
       cA.position.z += spd; cB.position.z += spd;
       if (cA.position.z > CHUNK_LEN / 2 + 8) cA.position.z -= CHUNK_LEN * 2;
       if (cB.position.z > CHUNK_LEN / 2 + 8) cB.position.z -= CHUNK_LEN * 2;
@@ -124,7 +124,7 @@ export const RiftScene: SceneModule = {
         if (phase >= 1) {
           rollActive = false;
           currentRoll = 0;
-          nextRollT = t + ROLL_GAP_MIN + Math.random() * (ROLL_GAP_MAX - ROLL_GAP_MIN);
+          nextRollT = t + ROLL_GAP_MIN + ctx.rng() * (ROLL_GAP_MAX - ROLL_GAP_MIN);
         } else {
           // Cosine ease-in-out → smooth start + end, no jolt
           const eased = 0.5 - 0.5 * Math.cos(phase * Math.PI);

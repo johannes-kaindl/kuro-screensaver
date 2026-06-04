@@ -89,7 +89,14 @@ controller.close = async () => {
   await origClose();
 };
 
-void controller.open({ scene, storyScale, reactiveThreat });
+// One-shot event harness — ?event=intrusion|flash|surge fires a single discrete
+// flight/world reaction once the engine is running, so each reaction is tunable in
+// isolation (mirrors ?threat= for the continuous arc).
+const eventParam = params.get('event');
+void controller.open({ scene, storyScale, reactiveThreat }).then(() => {
+  if (eventParam === 'intrusion') controller.engine?.bus.emit({ kind: 'intrusion', intensity: 2.0 });
+  else if (eventParam === 'flash' || eventParam === 'surge') controller.reactiveWorld?.pulse(eventParam);
+});
 
 // DEV-only: expose the controller so the crash-preview render script can
 // trigger playCrash() directly instead of waiting for a full ~8-min shift.

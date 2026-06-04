@@ -141,7 +141,7 @@ export const VoidScene: SceneModule = {
     return (t: number, _dt: number) => {
       const dts = lastT === 0 ? 0.016 : Math.min(0.1, t - lastT);
       lastT = t;
-      const spd = SPEED_VALUES[ctx.settings.speed];
+      const spd = (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]);
 
       // Forward flight — dt-safe step.
       cam.position.z -= spd * 14 * dts;

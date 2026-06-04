@@ -243,7 +243,7 @@ export const TunnelScene: SceneModule = {
     (this as any).state = state;
 
     return (t: number, dt: number) => {
-      const sceneSpeed = SPEED_VALUES[ctx.settings.speed];
+      const sceneSpeed = (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]);
       // ── SPEED CALIBRATION ──
       // ~1 full traversal of the curve in 24 seconds at 'norm' speed.
       // Boost multiplies up to 2.5× → ~10s straight burst.
@@ -306,8 +306,8 @@ export const TunnelScene: SceneModule = {
       cam.fov += (baseFov + boostFov - cam.fov) * 0.07;
       cam.updateProjectionMatrix();
       if (inBoost) {
-        cam.position.x += (Math.random() - 0.5) * 0.025;
-        cam.position.y += (Math.random() - 0.5) * 0.025;
+        cam.position.x += (ctx.rng() - 0.5) * 0.025;
+        cam.position.y += (ctx.rng() - 0.5) * 0.025;
       }
 
       // Beacon pulse

@@ -192,7 +192,7 @@ export const CityScene: SceneModule = {
 
     return (t: number, _dt: number) => {
       const altTarget = ALT_VALUES[ctx.settings.cityAltitude];
-      const spd = SPEED_VALUES[ctx.settings.speed] * 0.24;
+      const spd = (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]) * 0.24;
       cA.position.z += spd; cB.position.z += spd;
       if (cA.position.z > CL / 2 + 8) cA.position.z -= CL * 2;
       if (cB.position.z > CL / 2 + 8) cB.position.z -= CL * 2;
