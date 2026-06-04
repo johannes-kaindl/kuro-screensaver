@@ -38,6 +38,20 @@ enum Script {
         return lines[index % lines.count]
     }
 
+    // Arrival hints emitted right after the warp swap — pairs with the foreshadow so each
+    // location change is both prepared (before) and accompanied (after). Mirror of web.
+    static let sceneArrival: [String: [String]] = [
+        "terrain": ["// surface contact — terrain sweep", "// nap-of-the-earth, holding"],
+        "city":    ["// CHROME district — threading the canyon", "// megacity grid, eyes up"],
+        "rift":    ["// into the rift — walls closing", "// fault corridor, steady"],
+        "tunnel":  ["// conduit locked — hyperdrive", "// in the pipe"],
+        "void":    ["// open space — debris field", "// hard vacuum, scanning"],
+    ]
+    static func arrivalLine(_ scene: String, _ index: Int) -> String? {
+        guard let lines = sceneArrival[scene], !lines.isEmpty else { return nil }
+        return lines[index % lines.count]
+    }
+
     struct Beat { let cmd: String; let resp: [(String, C)] }
     struct Intrusion { let text: String; let followup: String? }
     struct Drafts { let drafts: [String]; let final: String }

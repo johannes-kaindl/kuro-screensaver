@@ -128,21 +128,13 @@ do {
     check(nextPick != prev, "no immediate repeat when alt exists")
 }
 
-// --- CombatDirector: antagonist threshold + no duplicate ------------------------
+// --- CombatDirector: actors gated off (2026-06-05) — no spawn ---------------------
 if let device = MTLCreateSystemDefaultDevice() {
-    func mkHost(_ add: @escaping (Actor) -> Void) -> ActorHost {
-        ActorHost(device: device, add: add, accentRGB: { SIMD3(0, 1, 0) }, enemyRGB: { SIMD3(1, 0, 0.25) })
-    }
-    var n1 = 0
-    let c1 = CombatDirector(seed: 5, bus: EventBus(), host: mkHost { _ in n1 += 1 })
-    c1.update(t: 1, threat: 0.2)
-    check(n1 == 0, "no antagonist below threat 0.35")
-    var n2 = 0
-    let c2 = CombatDirector(seed: 5, bus: EventBus(), host: mkHost { _ in n2 += 1 })
-    c2.update(t: 1, threat: 0.5)
-    check(n2 == 1, "antagonist spawns above threat 0.35")
-    c2.update(t: 1.1, threat: 0.5)
-    check(n2 == 1, "no duplicate antagonist while alive")
+    var n = 0
+    let host = ActorHost(device: device, add: { _ in n += 1 }, accentRGB: { SIMD3(0, 1, 0) }, enemyRGB: { SIMD3(1, 0, 0.25) })
+    let c = CombatDirector(seed: 5, bus: EventBus(), host: host)
+    c.update(t: 1, threat: 0.9)
+    check(n == 0, "combat actors gated off — no spawn (re-enable to test thresholds)")
 } else {
     print("ok   - (combat test skipped — no Metal device)")
 }

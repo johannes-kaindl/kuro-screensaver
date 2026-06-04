@@ -27,7 +27,12 @@ final class CombatDirector {
         rng = LCG(seed: seed ^ Int32(bitPattern: 0x00c0_ffee))
     }
 
+    // Disabled for now (2026-06-05 feedback): drones read as glitches, tracers illegible.
+    // Infrastructure stays; flip on once actors look like real craft.
+    private static let enabled = false
+
     func update(t: Double, threat: Float) {
+        guard CombatDirector.enabled else { return }
         if threat > 0.35 && (antagonist == nil || !(antagonist!.alive)) {
             let a = AntagonistDrone(device: host.device, enemyRGB: host.enemyRGB(), seed: seed) { [weak self] in
                 self?.bus.emit(FlightEvent(kind: .incomingFire, intensity: Double(threat)))

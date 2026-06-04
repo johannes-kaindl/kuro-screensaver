@@ -45,8 +45,9 @@ enum AppSettings {
     static func make() -> (settings: Settings, autoCycle: Bool) {
         var s = Settings()
         let sc = scene
+        // The film opens on a calm ROUTINE scene — never the matrix fx scene.
         s.scene = (sc == "random" || !SceneRegistry.ids.contains(sc))
-            ? (SceneRegistry.ids.randomElement() ?? "terrain") : sc
+            ? (["terrain", "city"].randomElement() ?? "terrain") : sc
         s.presetID = preset
         s.speed = Settings.Speed(rawValue: speed) ?? .norm
         s.cityAltitude = Settings.Altitude(rawValue: cityAltitude) ?? .low

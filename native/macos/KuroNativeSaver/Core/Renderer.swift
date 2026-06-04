@@ -128,7 +128,9 @@ final class Renderer {
         let next = film.sceneAt(phaseCounter, phase: phase, prev: currentFilmScene)
         if next != SceneRegistry.ids[sceneIndex] {
             beginTransition(TransitionProfiles.profileFor(from: SceneRegistry.ids[sceneIndex], to: next)) { [weak self] in
-                self?.pulse(.warp); self?.swapSceneTo(next)
+                guard let s = self else { return }
+                s.pulse(.warp); s.swapSceneTo(next)
+                if let line = Script.arrivalLine(next, s.phaseCounter) { s.hud.terminal.pushLine(line, .hq) }
             }
         }
         currentFilmScene = next
