@@ -53,6 +53,9 @@ final class Renderer {
         self.scene = scene
         self.sceneIndex = SceneRegistry.ids.firstIndex(of: settings.scene) ?? 0
         self.queue = device.makeCommandQueue()!
+        let bus = EventBus()
+        self.bus = bus
+        self.director = FlightDirector(seed: settings.seed ?? freshSeed(), bus: bus)
 
         let lib: MTLLibrary
         do { lib = try device.makeLibrary(source: Shaders.source, options: nil) }
@@ -95,8 +98,9 @@ final class Renderer {
 
     private func swapScene() {
         sceneIndex = (sceneIndex + 1) % SceneRegistry.ids.count
-        let ctx = SceneContext(device: device, rng: LCG(seed: freshSeed()),
+        var ctx = SceneContext(device: device, rng: LCG(seed: freshSeed()),
                                settings: settings, accent: preset.accentRGB)
+        ctx.directorSpeed = { [weak self] in self?.director.speed() ?? 1 }
         scene = SceneRegistry.make(SceneRegistry.ids[sceneIndex], ctx: ctx)
     }
 
@@ -124,14 +128,40 @@ final class Renderer {
     private var lastPhase: ShiftPhase = .routine
     var forcedThreat: Float? = nil          // harness --threat pins the value
     private var stormScalar: Float { Renderer.smoothstep(0.70, 1.0, threat) }
-    private var hesT0: Double = -1          // camera-hesitation envelope start; <0 = inactive
-    private var hesDur: Double = 0
     private var hesWired = false
+    let bus: EventBus
+    private let director: FlightDirector
+    enum PulseKind { case flash, surge }
+    // One-shot additive envelopes layered on the threat-derived mults (NOT threat).
+    private var envelopes: [(t0: Double, dur: Double, bloom: Float, fog: Float)] = []
+    private var envBloomAdd: Float = 0
+    private var envFogAdd: Float = 0
 
     /// Start a lateral camera-hesitation envelope (the operator "noticing something").
     func pulseHesitation(_ dur: Double = 2.2) {
-        guard settings.reactiveWorld, hesT0 < 0 else { return }
-        hesT0 = t; hesDur = max(0.3, dur)
+        guard settings.reactiveWorld else { return }
+        director.enqueue(Manoeuvre(kind: .kick, dur: max(0.3, dur), dir: 0, intensity: 0.55))
+    }
+
+    /// Fire a one-shot world envelope (additive bump on bloom/fog mults). reactiveWorld-gated.
+    func pulse(_ kind: PulseKind) {
+        guard settings.reactiveWorld else { return }
+        switch kind {
+        case .flash: envelopes.append((t0: t, dur: 0.6, bloom: 0.6, fog: 0))
+        case .surge: envelopes.append((t0: t, dur: 1.2, bloom: 0.3, fog: -0.1))
+        }
+    }
+
+    private func advanceEnvelopes() {
+        var bAdd: Float = 0, fAdd: Float = 0
+        envelopes.removeAll { ev in
+            let p = (t - ev.t0) / ev.dur
+            if p >= 1 { return true }
+            let s = sin(Double.pi * p); let env = Float(s * s)
+            bAdd += ev.bloom * env; fAdd += ev.fog * env
+            return false
+        }
+        envBloomAdd = bAdd; envFogAdd = fAdd
     }
 
     private static func smoothstep(_ e0: Float, _ e1: Float, _ x: Float) -> Float {
@@ -188,23 +218,30 @@ final class Renderer {
         // Set the aspect-aware base FOV before update so scenes (tunnel) can
         // adjust it (boost). Uses the last drawn size; 72° on the very first tick.
         scene.camera.fovDegrees = Camera.defaultFovDeg(width: width, height: height)
-        if !hesWired { hud.terminal.onIntrusion = { [weak self] in self?.pulseHesitation() }; hesWired = true }
+        if !hesWired {
+            hud.terminal.onIntrusion = { [weak self] in
+                guard let self, self.settings.reactiveWorld else { return }
+                self.bus.emit(FlightEvent(kind: .intrusion, intensity: 2.2))
+            }
+            hesWired = true
+        }
         let st = settings.reactiveWorld ? stormScalar : 0
         (scene as? TerrainScene)?.storm = st
         (scene as? VoidScene)?.storm = st
         scene.update(t: t, dt: dt)
-        // Camera hesitation: gently steady the lateral weave while a pulse is active
+        // Director: advance its clock, then overlay manoeuvres on the pose the scene
+        // wrote. The 'kick' manoeuvre reproduces the old hesitation brake exactly
         // (scenes re-set camera.position each frame, so this dampens without compounding).
-        if hesT0 >= 0 {
-            let p = (t - hesT0) / hesDur
-            if p >= 1 { hesT0 = -1 }
-            else { let s = sin(Float.pi * Float(p)); scene.camera.position.x *= (1 - 0.55 * s * s) }
-        }
+        director.update(t: t, dt: dt)
+        var cam = scene.camera
+        director.apply(&cam)
+        scene.camera = cam
         glitch.update(t: t)
         if dt > 0 { fps = fps * 0.9 + (1.0 / dt) * 0.1 }
         hud.setFps(fps)
         hud.terminal.update(t: t)
         updateThreat(dt: dt)
+        advanceEnvelopes()
         glitch.intensity = settings.reactiveWorld
             ? min(1, settings.crtIntensity + threat * 0.7) : settings.crtIntensity
         scanDriftY = (scanDriftY + 36 * Float(dt)).truncatingRemainder(dividingBy: 4)
@@ -267,8 +304,8 @@ final class Renderer {
         }
         // Reactive world: the shift's threat closes the fog in + surges the bloom
         // (CRT halation/ntsc + glitch handled in advance + p6 below).
-        fogMul *= 1 + threat * 1.6
-        bloomMul *= 1 + stormScalar * 0.4
+        fogMul *= 1 + threat * 1.6 + envFogAdd
+        bloomMul *= 1 + stormScalar * 0.4 + envBloomAdd
         // Enemy-colour infection: infectable items crossfade accent→enemy with threat.
         let enemyFraction = settings.reactiveWorld ? Renderer.smoothstep(0.25, 0.9, threat) : 0
         let enemyCol = enemyAccent(accent)

@@ -70,6 +70,11 @@ struct SceneContext {
     var rng: LCG
     let settings: Settings
     let accent: SIMD3<Float>
+    /// Director speed multiplier (1 in Brick A; ramps for warp in Brick B). Defaults
+    /// to 1 so the harness / initial-scene construction sites need no change.
+    var directorSpeed: () -> Float = { 1 }
+    /// Effective forward-speed multiplier — scenes read THIS, not settings.speed.multiplier.
+    func speed() -> Float { settings.speed.multiplier * directorSpeed() }
 }
 
 protocol Scene: AnyObject {
