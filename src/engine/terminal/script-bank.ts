@@ -418,3 +418,19 @@ export const GHOSTLINK_TRANSMIT_LINES = (sizeKb: string): readonly string[] => [
 export const GHOSTLINK_INBOUND  = `inbound // ${MENTOR_NAME}`;
 export const GHOSTLINK_TIMEOUT  = 'no response.';
 export const GHOSTLINK_TEARDOWN = 'channel closed.';
+
+// Foreshadow hints for an upcoming scene, keyed by sceneId. Emitted ~6s before the
+// warp (Brick C) so the transition feels motivated. Same lore register as the bank.
+export const SCENE_FORESHADOW: Record<string, string[]> = {
+  terrain: ['// dropping to terrain sweep', '// low-altitude recon vector locked'],
+  city:    ['// proximity alert: megacity grid ahead', '// approach vector — CHROME district'],
+  rift:    ['// fault line detected — descending', '// the floor opens up ahead'],
+  tunnel:  ['// hyperdrive spinning up', '// conduit acquired — punch-through in 3'],
+  void:    ['// debris field on the scope', '// CORP station wreckage ahead'],
+};
+
+/** Deterministic foreshadow line for a scene (index keeps it varied + reproducible). */
+export function foreshadowLine(scene: string, index: number): string | null {
+  const lines = SCENE_FORESHADOW[scene];
+  return lines && lines.length ? lines[index % lines.length] : null;
+}
