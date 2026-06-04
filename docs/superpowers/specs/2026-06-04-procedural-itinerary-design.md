@@ -1,7 +1,15 @@
 # Procedural Itinerary + Narrative Co-Drive — Design (Brick C)
 
 - **Date:** 2026-06-04
-- **Status:** Approved (design), implementation pending
+- **Status:** Implemented (Brick C) — web + native, verified (typecheck + native logic
+  tests + app compile + a live film run: terrain→city→…→void with matching foreshadow
+  lines, e.g. `[HQ→] // CORP station wreckage ahead` arriving at the void scene). Branch
+  `feat/procedural-itinerary`.
+  - **Deviations:** (1) a monotonic `phaseCounter` replaces `(shiftIndex, phase)` indexing
+    — strictly cleaner (foreshadow query == arrival query, no shift bookkeeping), same
+    determinism. (2) Web foreshadow lead scales with `durationScale`; native uses a fixed
+    6 s (no durationScale natively). (3) The screensaver enables `autoCycle.on` (film mode)
+    by default; native's film-mode gate is `autoCycleSec > 0`.
 - **Author:** Johannes + Claude (pair)
 - **Scope:** Brick **C** of the "Procedural Film" roadmap. Builds on A (`FlightDirector`,
   `EventBus`) and B (warp `switchScene` / `beginTransition`).
