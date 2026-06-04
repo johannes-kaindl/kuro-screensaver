@@ -434,3 +434,15 @@ export function foreshadowLine(scene: string, index: number): string | null {
   const lines = SCENE_FORESHADOW[scene];
   return lines && lines.length ? lines[index % lines.length] : null;
 }
+
+// Combat terminal lines keyed by event kind (Brick D). Single-speaker (operator/HQ
+// register); full unit cross-talk is Brick E.
+export const COMBAT_LINES: Record<string, string[]> = {
+  incomingFire: ['// taking fire', '// evasive — rounds inbound', '// hostile lock detected'],
+  unitArrive:   ['// CORP-7 inbound', '// support on station'],
+  unitCrash:    ['// unit down — no chute', '// we lost CORP-7'],
+};
+export function combatLine(kind: string, index: number): string | null {
+  const lines = COMBAT_LINES[kind];
+  return lines && lines.length ? lines[index % lines.length] : null;
+}

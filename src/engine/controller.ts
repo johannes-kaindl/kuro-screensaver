@@ -31,7 +31,7 @@ import { NarrativeRunner, type Phase } from './terminal/narrative';
 import { ReactiveWorld } from './fx/reactive-world';
 import { profileFor } from './modes/transition-profiles';
 import { FilmDirector } from './modes/film-director';
-import { foreshadowLine } from './terminal/script-bank';
+import { foreshadowLine, combatLine } from './terminal/script-bank';
 import { mkRng, freshSeed } from './engine/rng';
 import { CrtSim } from './fx/crt-sim';
 
@@ -304,6 +304,24 @@ export class ScreensaverController {
         settings: s,
         calm: reduceMotion,
         forcedThreat: opts.reactiveThreat,
+      });
+    }
+
+    // Combat actors (Brick D): the engine's CombatDirector emits events on the bus;
+    // react with a camera flinch + bloom flash + a terminal line.
+    if (this.engine) {
+      let combatIdx = 0;
+      this.engine.bus.subscribe('*', (e) => {
+        if (e.kind === 'incomingFire') {
+          if (!reduceMotion) this.engine!.director.enqueue({ kind: 'kick', dur: 0.6, dir: 0, intensity: 0.5 });
+          this.reactiveWorld?.pulse('flash');
+        } else if (e.kind === 'unitCrash') {
+          this.reactiveWorld?.pulse('flash');
+        }
+        if (e.kind === 'incomingFire' || e.kind === 'unitArrive' || e.kind === 'unitCrash') {
+          const line = combatLine(e.kind, combatIdx++);
+          if (line) void this.hud?.addLine(line, 'HQ');
+        }
       });
     }
 
