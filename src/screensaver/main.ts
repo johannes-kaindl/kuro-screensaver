@@ -21,10 +21,13 @@ import { PRESETS } from '../engine/data/presets';
 const params = new URLSearchParams(location.search);
 
 const sceneParam = params.get('scene') ?? 'random';
+// The screensaver film opens on a calm ROUTINE scene — never the matrix fx scene
+// (a functioning CORP terminal wouldn't boot into the rain).
+const START_SCENES: SceneId[] = ['terrain', 'city'];
 const scene: SceneId =
   sceneParam !== 'random' && SCENES.includes(sceneParam as SceneId)
     ? (sceneParam as SceneId)
-    : SCENES[Math.floor(Math.random() * SCENES.length)];
+    : START_SCENES[Math.floor(Math.random() * START_SCENES.length)];
 
 // Color preset — ?preset=<key>, validated against PRESETS. One rendered
 // .saver per preset, so the video pipeline drives this per build.

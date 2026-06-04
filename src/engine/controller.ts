@@ -31,7 +31,7 @@ import { NarrativeRunner, type Phase } from './terminal/narrative';
 import { ReactiveWorld } from './fx/reactive-world';
 import { profileFor } from './modes/transition-profiles';
 import { FilmDirector } from './modes/film-director';
-import { foreshadowLine, combatLine } from './terminal/script-bank';
+import { foreshadowLine, combatLine, arrivalLine } from './terminal/script-bank';
 import { mkRng, freshSeed } from './engine/rng';
 import { CrtSim } from './fx/crt-sim';
 
@@ -816,6 +816,8 @@ export class ScreensaverController {
       this.hud.setMode(DICT.MODE_LABELS[id][0]);
       this.hud.setTri(this.engine.getSceneObj()?.triCount || '----');
       this.hud.flashSceneLabel(id);
+      const arr = arrivalLine(id, this.phaseCounter);   // accompany the location change
+      if (arr) void this.hud.addLine(arr, 'HQ');
       this.s.stats.scenesLoaded = (this.s.stats.scenesLoaded || 0) + 1;
       this.s.stats.perScene[id] = (this.s.stats.perScene[id] || 0) + 1;
       this.saveSettingsDebounced();

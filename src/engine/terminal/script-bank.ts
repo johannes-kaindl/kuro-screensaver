@@ -435,6 +435,20 @@ export function foreshadowLine(scene: string, index: number): string | null {
   return lines && lines.length ? lines[index % lines.length] : null;
 }
 
+// Arrival hints emitted right after the warp swap — pairs with the foreshadow so each
+// location change is both PREPARED (before) and ACCOMPANIED (after).
+export const SCENE_ARRIVAL: Record<string, string[]> = {
+  terrain: ['// surface contact — terrain sweep', '// nap-of-the-earth, holding'],
+  city:    ['// CHROME district — threading the canyon', '// megacity grid, eyes up'],
+  rift:    ['// into the rift — walls closing', '// fault corridor, steady'],
+  tunnel:  ['// conduit locked — hyperdrive', '// in the pipe'],
+  void:    ['// open space — debris field', '// hard vacuum, scanning'],
+};
+export function arrivalLine(scene: string, index: number): string | null {
+  const lines = SCENE_ARRIVAL[scene];
+  return lines && lines.length ? lines[index % lines.length] : null;
+}
+
 // Combat terminal lines keyed by event kind (Brick D). Single-speaker (operator/HQ
 // register); full unit cross-talk is Brick E.
 export const COMBAT_LINES: Record<string, string[]> = {
