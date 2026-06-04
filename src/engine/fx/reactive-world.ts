@@ -66,11 +66,13 @@ export class ReactiveWorld {
     this.d.engine.bus.emit({ kind: 'intrusion', intensity: 1.5 + this.rand() * 1.5 });
   }
 
-  /** Fire a one-shot world envelope (additive bump on bloom/fog mults). calm-gated. */
-  pulse(kind: 'flash' | 'surge') {
+  /** Fire a one-shot world envelope (additive bump on bloom/fog mults). calm-gated.
+   *  'warp' is the scene-transition punch (strong bloom + brief fog clear). */
+  pulse(kind: 'flash' | 'surge' | 'warp') {
     if (this.d.calm) return;
     const t = this.nowT;
     if (kind === 'flash') this.envelopes.push({ t0: t, dur: 0.6, bloom: 0.6, fog: 0 });
+    else if (kind === 'warp') this.envelopes.push({ t0: t, dur: 1.4, bloom: 0.9, fog: -0.2 });
     else this.envelopes.push({ t0: t, dur: 1.2, bloom: 0.3, fog: -0.1 });
   }
 

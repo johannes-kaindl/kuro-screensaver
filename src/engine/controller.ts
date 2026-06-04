@@ -29,6 +29,7 @@ export interface HostPlugin {
 }
 import { NarrativeRunner } from './terminal/narrative';
 import { ReactiveWorld } from './fx/reactive-world';
+import { profileFor } from './modes/transition-profiles';
 import { mkRng, freshSeed } from './engine/rng';
 import { CrtSim } from './fx/crt-sim';
 
@@ -775,34 +776,31 @@ export class ScreensaverController {
   switchScene(id: SceneId) {
     if (!this.engine || !this.hud) return;
     this.audio?.sceneSwitch();
-    // v1.2 — Cross-fade transition (Live-Test 2026-05-13 cool-idea).
-    //   Old behaviour: scene loadScene() was synchronous, the next frame
-    //   showed entirely different geometry — visually a hard cut.
-    //   New: 200ms fade-to-black on the canvas, then load + fade back.
-    //   Total of ~420ms feels like a "TV switching channels" beat without
-    //   disrupting the narrative-terminal pacing or hotkeys.
-    const canvas = this.engine.canvas;
-    canvas.style.transition = 'opacity 200ms ease-out';
-    canvas.style.opacity = '0';
-    window.setTimeout(() => {
+    // Brick B — warp transition (replaces the old fade-to-black cut). The director
+    // accelerates into a warp; the scene swap happens at the peak, hidden under the
+    // streak; then the camera emerges into the new scene (terrain→city descends).
+    const cur = (this.engine.currentScene ?? id) as SceneId;
+    const calm = typeof window !== 'undefined' &&
+      !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    this.engine.beginTransition(profileFor(cur, id, calm), () => {
       if (!this.engine || !this.hud) return;
+      this.reactiveWorld?.pulse('warp');   // bloom punch at the warp peak (hides the rebuild)
       this.engine.loadScene(id);
       this.baseFogDensity = (this.engine.scene.fog as any)?.density ?? 0.01;
       this.applyFogMode();
-      const labels = DICT.MODE_LABELS[id];
-      this.hud.setMode(labels[0]);
+      this.hud.setMode(DICT.MODE_LABELS[id][0]);
       this.hud.setTri(this.engine.getSceneObj()?.triCount || '----');
       this.hud.flashSceneLabel(id);
-      canvas.style.opacity = '1';
       this.s.stats.scenesLoaded = (this.s.stats.scenesLoaded || 0) + 1;
       this.s.stats.perScene[id] = (this.s.stats.perScene[id] || 0) + 1;
       this.saveSettingsDebounced();
       this.rebuildBar();
-    }, 210);
+    });
   }
 
   cycleScene() {
     if (!this.engine) return;
+    if (this.engine.director.inTransition) return;   // don't stack transitions
     const cur = this.engine.currentScene;
     const idx = ALL_SCENES.indexOf(cur as any);
     const next = ALL_SCENES[(idx + 1) % ALL_SCENES.length];

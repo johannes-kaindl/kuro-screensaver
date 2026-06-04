@@ -20,6 +20,7 @@ import { MatrixRain }   from '../fx/matrix-rain';
 import { MATRIX_SHADER } from '../fx/matrix-pass';
 import { EventBus } from '../events/bus';
 import { FlightDirector } from '../modes/flight-director';
+import type { TransitionProfile } from '../modes/transition-profiles';
 import { SPEED_VALUES } from '../data/defaults';
 
 const SCENE_REGISTRY = {
@@ -402,6 +403,11 @@ export class Engine {
     this.matrixTex.needsUpdate = true;
   }
 
+  /** Start a warp transition; the director swaps the scene at the peak via onSwap. */
+  beginTransition(profile: TransitionProfile, onSwap: () => void): void {
+    this.director.beginTransition(profile, this.cam.fov, onSwap);
+  }
+
   loadScene(id: SceneId) {
     // Clear world
     this.world.traverse((o: any) => {
@@ -495,7 +501,11 @@ export class Engine {
       // (pull cam.x toward centre, sin² in/out) — scenes re-set cam.x every frame,
       // so this dampens without compounding. CameraFly untouched.
       this.director.update(this.clockT, dt);
-      this.director.apply(this.cam);
+      if (this.director.inTransition) {
+        if (this.director.applyTransition(this.cam)) this.cam.updateProjectionMatrix();
+      } else {
+        this.director.apply(this.cam);
+      }
 
       if (this.matrixPass.enabled) this.drawMatrixFrame();
       this.crtPass.uniforms.time.value = this.clockT;

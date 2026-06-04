@@ -89,13 +89,21 @@ controller.close = async () => {
   await origClose();
 };
 
-// One-shot event harness — ?event=intrusion|flash|surge fires a single discrete
-// flight/world reaction once the engine is running, so each reaction is tunable in
-// isolation (mirrors ?threat= for the continuous arc).
+// Harness hooks (tuning): ?event=intrusion|flash|surge fires one discrete reaction;
+// ?transition=<from>-<to> opens on <from> then plays one warp transition to <to>
+// (mirrors ?threat= for the continuous arc).
 const eventParam = params.get('event');
-void controller.open({ scene, storyScale, reactiveThreat }).then(() => {
+const transParam = params.get('transition');
+const transFrom = transParam?.split('-')[0];
+const transTo = transParam?.split('-')[1];
+const openScene: SceneId =
+  transFrom && SCENES.includes(transFrom as SceneId) ? (transFrom as SceneId) : scene;
+void controller.open({ scene: openScene, storyScale, reactiveThreat }).then(() => {
   if (eventParam === 'intrusion') controller.engine?.bus.emit({ kind: 'intrusion', intensity: 2.0 });
   else if (eventParam === 'flash' || eventParam === 'surge') controller.reactiveWorld?.pulse(eventParam);
+  if (transTo && SCENES.includes(transTo as SceneId)) {
+    setTimeout(() => controller.switchScene(transTo as SceneId), 1500);
+  }
 });
 
 // DEV-only: expose the controller so the crash-preview render script can
