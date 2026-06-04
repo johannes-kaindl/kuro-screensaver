@@ -6,12 +6,15 @@ import './obsidian-dom-polyfill';
 import { ScreensaverController } from '../engine/controller';
 import { WebHost, type WebHostOptions } from './persistence';
 import { makePluginShim } from './plugin-shim';
+import type { SceneId } from '../engine/data/defaults';
 
 export interface MountOptions extends WebHostOptions {
   /** Element whose click triggers start. Default: document.getElementById('start-btn'). */
   startTrigger?: HTMLElement | null;
   /** Hide this element once the screensaver opens (the boot hint). */
   hideOnStart?: HTMLElement | null;
+  /** Forwarded to controller.open() — lets the demo honour ?scene/?threat URL params. */
+  openOpts?: { scene?: SceneId; storyScale?: number; reactiveThreat?: number };
 }
 
 export function mountScreensaver(opts: MountOptions = {}): ScreensaverController {
@@ -29,7 +32,7 @@ export function mountScreensaver(opts: MountOptions = {}): ScreensaverController
   if (trigger) {
     trigger.addEventListener('click', () => {
       if (hideEl) hideEl.style.display = 'none';
-      void controller.open();
+      void controller.open(opts.openOpts ?? {});
     });
   }
 
