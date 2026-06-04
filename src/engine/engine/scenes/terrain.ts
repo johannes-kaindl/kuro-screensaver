@@ -109,6 +109,16 @@ export const TerrainScene: SceneModule = {
       const ground = Math.max(groundAt(0), groundAt(-12), groundAt(-24));
       cam.position.y = Math.max(f.y, ground + 2.6);
 
+      // Stream dust TOWARD + past the camera so it flies by (the world forward-scrolls,
+      // so the dust must too — otherwise it sits at a constant distance from the POV).
+      const dp = dg.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < dp.count; i++) {
+        let dz = dp.getZ(i) + spd;
+        if (dz > 6) dz -= 210;            // recycle past the camera → back to the far plane
+        dp.setZ(i, dz);
+      }
+      dp.needsUpdate = true;
+
       // Dust drifts laterally; under the narrative PANIC storm it whips + brightens.
       const storm = ctx.storm?.() ?? 0;
       dust.position.x = Math.sin(t * 0.07) * 4 + storm * 12 * Math.sin(t * 3.1);

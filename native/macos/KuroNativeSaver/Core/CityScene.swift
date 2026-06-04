@@ -15,6 +15,7 @@ final class CityScene: Scene {
     private let speedPerSec: Float
     private let altTarget: Float
     private var fly: CameraFly
+    private var dustItem: DrawItem!   // IUO: assigned mid-init (after buildChunk calls)
 
     private static let CL: Float = 320, SW: Float = 22, BS: Float = 22
 
@@ -160,15 +161,22 @@ final class CityScene: Scene {
         for _ in 0..<400 { dv.append((base.nextF() - 0.5) * 80); dv.append(base.nextF() * 40 + 2); dv.append(-(base.nextF() * 240 + 5)) }
         let stars = DrawItem(positions: Geo.buffer(device, sv), indices: nil, count: 700, vertexCount: 700,
                              primitive: .point, opacity: 1.0, isPoint: true, pointSizeWorld: 0.14)
-        let dust = DrawItem(positions: Geo.buffer(device, dv), indices: nil, count: 400, vertexCount: 400,
+        dustItem = DrawItem(positions: Geo.buffer(device, dv), indices: nil, count: 400, vertexCount: 400,
                             primitive: .point, opacity: 0.7, isPoint: true, pointSizeWorld: 0.065)
 
-        items = chunks.flatMap { $0.items } + [stars, dust]
+        items = chunks.flatMap { $0.items } + [stars, dustItem]
     }
 
     func update(t: Double, dt: Double) {
         let tf = Float(t)
         let spd = speedPerSec * Float(dt)
+        // Stream dust past the camera (z) so it flies by instead of hanging at a fixed distance.
+        let dptr = dustItem.positions.contents().bindMemory(to: Float.self, capacity: 400 * 3)
+        for i in 0..<400 {
+            var dz = dptr[i * 3 + 2] + spd
+            if dz > 10 { dz -= 245 }
+            dptr[i * 3 + 2] = dz
+        }
         for i in chunks.indices {
             chunks[i].z += spd
             if chunks[i].z > CityScene.CL / 2 + 8 { chunks[i].z -= CityScene.CL * 2 }

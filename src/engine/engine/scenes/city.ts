@@ -174,14 +174,14 @@ export const CityScene: SceneModule = {
       sil.position.z = -900; world.add(sil);
     }
 
-    // Dust
+    // Dust (streamed toward the camera in the updater — see below)
+    const dustG = new THREE.BufferGeometry();
     {
       const dv: number[] = [];
       const r = ctx.rng;
       for (let i = 0; i < 600; i++) dv.push((r() - 0.5) * 80, r() * 55, -(r() * 700 + 20));
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(dv, 3));
-      world.add(new THREE.Points(g, mats.MP(0.065)));
+      dustG.setAttribute('position', new THREE.Float32BufferAttribute(dv, 3));
+      world.add(new THREE.Points(dustG, mats.MP(0.065)));
     }
 
     cam.position.set(0, ALT_VALUES[settings.cityAltitude], 0);
@@ -194,6 +194,14 @@ export const CityScene: SceneModule = {
       const altTarget = ALT_VALUES[ctx.settings.cityAltitude];
       const spd = (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]) * 0.24;
       cA.position.z += spd; cB.position.z += spd;
+      // Stream dust past the camera (same rate as the city scroll) — no constant-distance hang.
+      const dp = dustG.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < dp.count; i++) {
+        let dz = dp.getZ(i) + spd;
+        if (dz > 10) dz -= 720;
+        dp.setZ(i, dz);
+      }
+      dp.needsUpdate = true;
       if (cA.position.z > CL / 2 + 8) cA.position.z -= CL * 2;
       if (cB.position.z > CL / 2 + 8) cB.position.z -= CL * 2;
 

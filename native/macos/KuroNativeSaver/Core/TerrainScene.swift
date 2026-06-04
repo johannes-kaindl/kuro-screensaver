@@ -164,5 +164,13 @@ final class TerrainScene: Scene {
 
         dust.model = Mathx.translation(SIMD3(sin(tf * 0.07) * 4 + storm * 12 * sin(tf * 3.1), 0, 0))
         dust.pointSizeWorld = 0.13 + storm * 0.13
+        // Stream dust toward + past the camera (z) so it flies by — the world forward-
+        // scrolls, so static dust would sit at a constant distance from the POV.
+        let dptr = dust.positions.contents().bindMemory(to: Float.self, capacity: 500 * 3)
+        for i in 0..<500 {
+            var dz = dptr[i * 3 + 2] + spd
+            if dz > 6 { dz -= 210 }
+            dptr[i * 3 + 2] = dz
+        }
     }
 }
