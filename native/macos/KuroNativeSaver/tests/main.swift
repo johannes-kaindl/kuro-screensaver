@@ -112,5 +112,20 @@ do {
     approx(Double(d.speedMul), 1.0, 1e-6, "speedMul back to 1 after transition")
 }
 
+// --- FilmDirector: deterministic, tier-matched, no immediate repeat ---------------
+do {
+    let f = FilmDirector(seed: 99)
+    let cands: [ShiftPhase: [String]] = [
+        .routine: ["terrain","city"], .intrusion: ["city","rift"], .alarm: ["rift","tunnel"],
+        .panic: ["tunnel","void"], .silence: ["void"]]
+    let a = f.sceneAt(3, phase: .alarm, prev: nil)
+    let b = FilmDirector(seed: 99).sceneAt(3, phase: .alarm, prev: nil)
+    check(a == b, "FilmDirector deterministic")
+    check(cands[.alarm]!.contains(a), "alarm pick in candidates")
+    let prev = f.sceneAt(5, phase: .intrusion, prev: nil)
+    let nextPick = f.sceneAt(5, phase: .intrusion, prev: prev)
+    check(nextPick != prev, "no immediate repeat when alt exists")
+}
+
 if failures > 0 { print("\n\(failures) FAILURE(S)"); exit(1) }
 print("\nALL PASS (\(failures == 0))")
