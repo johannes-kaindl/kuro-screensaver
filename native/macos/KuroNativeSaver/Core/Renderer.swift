@@ -87,6 +87,15 @@ final class Renderer {
         atlas = FontAtlas(device: device)
         text = TextRenderer(device: device, library: lib, atlas: atlas, format: Renderer.hdrFormat)
         textFlat = TextRenderer(device: device, library: lib, atlas: atlas, format: targetFormat)
+        // Combat director (built last: its host closures capture self).
+        self.combat = CombatDirector(seed: settings.seed ?? freshSeed(), bus: bus, host: ActorHost(
+            device: device,
+            add: { [weak self] a in self?.actors.append(a) },
+            accentRGB: { [weak self] in self?.preset.accentRGB ?? SIMD3<Float>(0, 1, 0) },
+            enemyRGB: { [weak self] in
+                guard let s = self else { return SIMD3<Float>(1, 0, 0.25) }
+                return s.enemyAccent(s.preset.accentRGB)
+            }))
         crash.powerOn()   // diegetic CRT power-on (image expands out of a line + flickers)
     }
 
@@ -133,6 +142,18 @@ final class Renderer {
         return Script.foreshadowLine(sc, phaseCounter)
     }
 
+    /// React to a combat event: camera flinch + bloom flash + a terminal line.
+    private func onCombat(_ kind: FlightEventKind) {
+        if kind == .incomingFire {
+            director.enqueue(Manoeuvre(kind: .kick, dur: 0.6, dir: 0, intensity: 0.5))
+            pulse(.flash)
+        } else if kind == .unitCrash {
+            pulse(.flash)
+        }
+        let key = kind == .incomingFire ? "incomingFire" : (kind == .unitArrive ? "unitArrive" : "unitCrash")
+        if let line = Script.combatLine(key, combatIdx) { combatIdx += 1; hud.terminal.pushLine(line, .hq) }
+    }
+
     private func ensureTextures(_ w: Int, _ h: Int) {
         guard w != width || h != height || sceneHDR == nil else { return }
         width = w; height = h
@@ -164,6 +185,10 @@ final class Renderer {
     private var phaseCounter = 0
     private var currentFilmScene: String? = nil
     private var filmWired = false
+    var actors: [Actor] = []
+    private var combat: CombatDirector!
+    private var combatWired = false
+    private var combatIdx = 0
     enum PulseKind { case flash, surge, warp }
     // One-shot additive envelopes layered on the threat-derived mults (NOT threat).
     private var envelopes: [(t0: Double, dur: Double, bloom: Float, fog: Float)] = []
@@ -270,6 +295,12 @@ final class Renderer {
             hud.terminal.sceneForeshadow = { [weak self] np in self?.foreshadowFor(np) }
             filmWired = true
         }
+        if !combatWired {
+            bus.subscribe(.incomingFire) { [weak self] _ in self?.onCombat(.incomingFire) }
+            bus.subscribe(.unitArrive) { [weak self] _ in self?.onCombat(.unitArrive) }
+            bus.subscribe(.unitCrash) { [weak self] _ in self?.onCombat(.unitCrash) }
+            combatWired = true
+        }
         let st = settings.reactiveWorld ? stormScalar : 0
         (scene as? TerrainScene)?.storm = st
         (scene as? VoidScene)?.storm = st
@@ -287,6 +318,8 @@ final class Renderer {
         hud.terminal.update(t: t)
         updateThreat(dt: dt)
         advanceEnvelopes()
+        combat.update(t: t, threat: threat)
+        actors.removeAll { !$0.update(t: t, dt: dt, cam: scene.camera, threat: threat) }
         glitch.intensity = settings.reactiveWorld
             ? min(1, settings.crtIntensity + threat * 0.7) : settings.crtIntensity
         scanDriftY = (scanDriftY + 36 * Float(dt)).truncatingRemainder(dividingBy: 4)
@@ -352,8 +385,8 @@ final class Renderer {
         let enemyFraction = settings.reactiveWorld ? Renderer.smoothstep(0.25, 0.9, threat) : 0
         let enemyCol = enemyAccent(accent)
 
-        for item in (debugBlackScene ? [] : scene.items) {
-            let col = item.infectable ? accent + (enemyCol - accent) * enemyFraction : accent
+        for item in (debugBlackScene ? [] : scene.items + actors.flatMap { $0.items }) {
+            let col = item.colorOverride ?? (item.infectable ? accent + (enemyCol - accent) * enemyFraction : accent)
             var u = SceneUniforms(
                 mvp: viewProj * item.model,
                 modelView: view * item.model,

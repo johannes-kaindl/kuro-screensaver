@@ -78,6 +78,11 @@ final class Terminal {
 
     func visibleLines(max n: Int) -> [Line] { Array(lines.suffix(n)) }
 
+    /// Append a line from outside the beat scheduler (Brick C foreshadow / D combat).
+    func pushLine(_ text: String, _ cat: Cat = .hq) {
+        lines.append(Line(text: prefix(cat) + text, category: cat))
+    }
+
     func promptLine(t: Double) -> String {
         let cursor = Int(t * 1.4) % 2 == 0 ? "█" : " "
         return persona.prompt + " " + typed + cursor
