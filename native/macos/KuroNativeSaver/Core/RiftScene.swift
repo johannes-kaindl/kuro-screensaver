@@ -7,6 +7,7 @@ import Foundation
 
 final class RiftScene: Scene {
     var camera = Camera()
+    var cameraLocked: Bool { true }   // path-locked corridor: no kick overlay (stay in the rift)
     private(set) var items: [DrawItem] = []
     let fogDensity: Float = 0.014
 

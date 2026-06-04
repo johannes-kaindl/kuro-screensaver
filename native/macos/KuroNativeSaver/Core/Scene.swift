@@ -84,3 +84,6 @@ protocol Scene: AnyObject {
     var fogDensity: Float { get }
     func update(t: Double, dt: Double)
 }
+// Corridor scenes (tunnel/rift) override this → true: the camera is path-locked, so the
+// director's kick overlay is skipped (it would break the camera out of the tube).
+extension Scene { var cameraLocked: Bool { false } }

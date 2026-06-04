@@ -312,7 +312,8 @@ final class Renderer {
         // (scenes re-set camera.position each frame, so this dampens without compounding).
         director.update(t: t, dt: dt)
         var cam = scene.camera
-        if director.inTransition { _ = director.applyTransition(&cam) } else { director.apply(&cam) }
+        if director.inTransition { _ = director.applyTransition(&cam) }
+        else if !scene.cameraLocked { director.apply(&cam) }   // skip kick in path-locked corridors
         scene.camera = cam
         glitch.update(t: t)
         if dt > 0 { fps = fps * 0.9 + (1.0 / dt) * 0.1 }

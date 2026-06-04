@@ -154,6 +154,13 @@ final class TerrainScene: Scene {
         let f = fly.update(t: t, forwardSpeed: speedPerSec)
         camera.position = SIMD3(f.x, f.y, 0)
         camera.rotation = SIMD3(f.pitch, f.yaw, f.roll)
+        // Terrain-following: never clip a hill — clamp cam.y above the heightfield under
+        // + just ahead of the camera (≥2.6u clearance). Low over valleys, lifts over ridges.
+        func groundAt(_ wz: Float) -> Float {
+            let useA = abs(wz - posAz) <= Terrain.D / 2
+            return terrainHeight(f.x, wz - (useA ? posAz : posBz) + (useA ? logicalA : logicalB))
+        }
+        camera.position.y = max(f.y, max(groundAt(0), groundAt(-12), groundAt(-24)) + 2.6)
 
         dust.model = Mathx.translation(SIMD3(sin(tf * 0.07) * 4 + storm * 12 * sin(tf * 3.1), 0, 0))
         dust.pointSizeWorld = 0.13 + storm * 0.13

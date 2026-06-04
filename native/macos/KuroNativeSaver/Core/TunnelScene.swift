@@ -63,6 +63,7 @@ private func wrap(_ v: Float) -> Float { let m = v.truncatingRemainder(dividingB
 
 final class TunnelScene: Scene {
     var camera = Camera()
+    var cameraLocked: Bool { true }   // path-locked: no kick overlay (would break the tube)
     private(set) var items: [DrawItem] = []
     let fogDensity: Float = 0.024
 

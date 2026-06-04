@@ -22,7 +22,7 @@ final class VoidScene: Scene {
     private let spvCount = 56
 
     // field constants (void.ts)
-    private let FIELD_W: Float = 44, NOSPAWN: Float = 5.5, BELT_S: Float = 14
+    private let FIELD_W: Float = 44, NOSPAWN: Float = 16, BELT_S: Float = 14
     private let OFFBELT_P: Float = 0.08, FAR: Float = -100, FAR_VAR: Float = 55, BEHIND: Float = 10
     private let FADE_START: Float = 100, FADE_RANGE: Float = 24   // distance-based fade-in (no pop)
 
@@ -65,7 +65,7 @@ final class VoidScene: Scene {
             return ((r.nextF() - 0.5) + (r.nextF() - 0.5)) * 14 * 1.6
         }
         func inTube(_ x: Float, _ y: Float, _ cx: Float, _ cy: Float) -> Bool {
-            let dx = x - cx, dy = y - cy; return dx * dx + dy * dy < 5.5 * 5.5
+            let dx = x - cx, dy = y - cy; return dx * dx + dy * dy < 16 * 16
         }
         func seedInitial() -> SIMD3<Float> {
             for _ in 0..<5 {
@@ -152,7 +152,7 @@ final class VoidScene: Scene {
 
         for i in roids.indices {
             roids[i].rot += roids[i].spin * spinStep
-            if roids[i].pos.z > recycleZ, let p = respawn(camX, camY, camZ) {
+            if roids[i].pos.z > recycleZ, let p = respawn(0, 0, camZ) {   // weave centres on origin
                 roids[i].pos = p
                 roids[i].scale = 0.9 + rng.nextF() * 3.0
                 roids[i].rot = SIMD3(rng.nextF() * .pi, rng.nextF() * .pi, rng.nextF() * .pi)
