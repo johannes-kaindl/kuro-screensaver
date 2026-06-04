@@ -80,6 +80,13 @@ if (matrixOn) host.getSettings().fx.matrix.on = true;
 // The screensaver IS the procedural film: run the phase-driven scene itinerary by
 // default (Brick C film mode). prefers-reduced-motion turns it back off in open().
 host.getSettings().autoCycle.on = true;
+// CRT/weather tuning params (mirror ?threat=) — force an effect so it's judgable alone.
+const ntscP = parseFloat(params.get('ntsc') ?? '');
+if (Number.isFinite(ntscP)) host.getSettings().fx.ntsc = { on: ntscP > 0, amount: ntscP };
+const halP = parseFloat(params.get('halation') ?? '');
+if (Number.isFinite(halP)) host.getSettings().fx.halation = { on: halP > 0, amount: halP };
+const weatherP = params.get('weather');
+if (weatherP) (host.getSettings() as { weather: string }).weather = weatherP;
 
 const controller = new ScreensaverController(makePluginShim(host));
 

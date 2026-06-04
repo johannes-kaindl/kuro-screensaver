@@ -346,7 +346,7 @@ export class ScreensaverController {
             }
           }, 400);
           break;
-        case 'dust':      this.baseFogDensity *= 1.6; break;
+        case 'dust':      this.baseFogDensity *= 2.4; break;
       }
     }
 

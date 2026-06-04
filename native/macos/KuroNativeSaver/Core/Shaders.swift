@@ -162,7 +162,7 @@ enum Shaders {
         if (outside) col = float3(0.0);
 
         // halation: warm phosphor glow bleed around bright areas (extra warm bloom)
-        col += bloomTex.sample(s, uv).rgb * u.p6.y * float3(1.0, 0.55, 0.25);
+        col += bloomTex.sample(s, uv).rgb * u.p6.y * 3.0 * float3(1.0, 0.55, 0.25);
 
         col = aces(col * u.p0.x);               // exposure + tonemap
         col *= u.p2.z;                          // brightness flicker (default 1)
@@ -193,10 +193,10 @@ enum Shaders {
         // NTSC composite shimmer: dot-crawl chroma wiggle + slight luma smear
         float ntsc = u.p6.x;
         if (ntsc > 0.0) {
-            float crawl = sin(in.pos.y * 1.7 + in.pos.x * 0.9 + u.p1.w * 18.0) * ntsc * 0.05;
+            float crawl = sin(in.pos.y * 1.7 + in.pos.x * 0.9 + u.p1.w * 18.0) * ntsc * 0.11;
             col.r += crawl; col.b -= crawl;
             float lum = dot(col, float3(0.299, 0.587, 0.114));
-            col = mix(col, float3(lum), ntsc * 0.12);
+            col = mix(col, float3(lum), ntsc * 0.26);
         }
 
         // aperture grille (energy-preserving cos lobes) — RGB phosphor stripes

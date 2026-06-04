@@ -376,8 +376,8 @@ final class Renderer {
         switch settings.weather {
         case .storm:
             let surge = max(0, sin(tf * 3)) * max(0, sin(tf * 0.7))
-            bloomMul *= 1 + surge * 1.4; fogMul *= 1.25
-        case .dust: fogMul *= 1.6; bloomMul *= 0.85
+            bloomMul *= 1.3 + surge * 1.4; fogMul *= 1.7   // visible storm even at low threat
+        case .dust: fogMul *= 2.4; bloomMul *= 0.8
         case .clear: break
         }
         // Reactive world: the shift's threat closes the fog in + surges the bloom

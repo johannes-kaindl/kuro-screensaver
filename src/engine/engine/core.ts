@@ -94,14 +94,14 @@ const CRT_SHADER = {
                + texture2D(tDiffuse, uv + p2).rgb + texture2D(tDiffuse, uv - p2).rgb
                + texture2D(tDiffuse, uv + vec2(p2.x, -p2.y)).rgb + texture2D(tDiffuse, uv + vec2(-p2.x, p2.y)).rgb;
         g = max(vec3(0.0), g * 0.125 - 0.32);
-        col += g * halation * vec3(1.0, 0.55, 0.25) * 2.2;
+        col += g * halation * vec3(1.0, 0.55, 0.25) * 3.8;
       }
       if (ntsc > 0.0) {
         vec2 pos = vUv * resolution;
-        float crawl = sin(pos.y * 1.7 + pos.x * 0.9 + time * 18.0) * ntsc * 0.05;
+        float crawl = sin(pos.y * 1.7 + pos.x * 0.9 + time * 18.0) * ntsc * 0.11;
         col.r += crawl; col.b -= crawl;
         float lum = dot(col, vec3(0.299, 0.587, 0.114));
-        col = mix(col, vec3(lum), ntsc * 0.12);
+        col = mix(col, vec3(lum), ntsc * 0.26);
       }
       if (aperture > 0.001) {
         float tx = fract(vUv.x * resolution.x / 6.0);
