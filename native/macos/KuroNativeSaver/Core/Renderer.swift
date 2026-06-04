@@ -131,7 +131,7 @@ final class Renderer {
     private var hesWired = false
     let bus: EventBus
     private let director: FlightDirector
-    enum PulseKind { case flash, surge }
+    enum PulseKind { case flash, surge, warp }
     // One-shot additive envelopes layered on the threat-derived mults (NOT threat).
     private var envelopes: [(t0: Double, dur: Double, bloom: Float, fog: Float)] = []
     private var envBloomAdd: Float = 0
@@ -144,12 +144,19 @@ final class Renderer {
     }
 
     /// Fire a one-shot world envelope (additive bump on bloom/fog mults). reactiveWorld-gated.
+    /// 'warp' is the scene-transition punch (strong bloom + brief fog clear).
     func pulse(_ kind: PulseKind) {
         guard settings.reactiveWorld else { return }
         switch kind {
         case .flash: envelopes.append((t0: t, dur: 0.6, bloom: 0.6, fog: 0))
         case .surge: envelopes.append((t0: t, dur: 1.2, bloom: 0.3, fog: -0.1))
+        case .warp:  envelopes.append((t0: t, dur: 1.4, bloom: 0.9, fog: -0.2))
         }
+    }
+
+    /// Start a warp transition; the director swaps the scene at the peak via onSwap.
+    func beginTransition(_ profile: TransitionProfile, onSwap: @escaping () -> Void) {
+        director.beginTransition(profile, baseFov: scene.camera.fovDegrees, onSwap: onSwap)
     }
 
     private func advanceEnvelopes() {
@@ -234,7 +241,7 @@ final class Renderer {
         // (scenes re-set camera.position each frame, so this dampens without compounding).
         director.update(t: t, dt: dt)
         var cam = scene.camera
-        director.apply(&cam)
+        if director.inTransition { _ = director.applyTransition(&cam) } else { director.apply(&cam) }
         scene.camera = cam
         glitch.update(t: t)
         if dt > 0 { fps = fps * 0.9 + (1.0 / dt) * 0.1 }
@@ -246,12 +253,17 @@ final class Renderer {
             ? min(1, settings.crtIntensity + threat * 0.7) : settings.crtIntensity
         scanDriftY = (scanDriftY + 36 * Float(dt)).truncatingRemainder(dividingBy: 4)
 
-        // scene auto-cycle via the crash→reboot transition
+        // scene auto-cycle via a warp transition (Brick B; replaces the crash-cut)
         sceneAge += dt
-        if autoCycleSec > 0 && sceneAge > autoCycleSec && !crash.active {
-            crash.trigger(); sceneAge = 0
+        if autoCycleSec > 0 && sceneAge > autoCycleSec && !director.inTransition {
+            sceneAge = 0
+            let from = SceneRegistry.ids[sceneIndex]
+            let to = SceneRegistry.ids[(sceneIndex + 1) % SceneRegistry.ids.count]
+            beginTransition(TransitionProfiles.profileFor(from: from, to: to)) { [weak self] in
+                self?.pulse(.warp); self?.swapScene()
+            }
         }
-        if crash.update(dt: dt) { swapScene() }
+        _ = crash.update(dt: dt)   // power-on / boot crash visual only — no longer swaps
     }
 
     /// Draw the current state into `target`.
