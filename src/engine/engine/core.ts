@@ -21,6 +21,8 @@ import { MATRIX_SHADER } from '../fx/matrix-pass';
 import { EventBus } from '../events/bus';
 import { FlightDirector } from '../modes/flight-director';
 import type { TransitionProfile } from '../modes/transition-profiles';
+import { CombatDirector } from '../modes/combat-director';
+import type { Actor } from '../modes/actors';
 import { SPEED_VALUES } from '../data/defaults';
 
 const SCENE_REGISTRY = {
@@ -171,6 +173,10 @@ export class Engine {
   bus = new EventBus();
   /** Camera/flight director — overlays manoeuvres + owns the speed multiplier. */
   director!: FlightDirector;
+  /** Combat actors live in their own group (survives loadScene) + a seeded director. */
+  private actorsGroup = new THREE.Group();
+  private actors: Actor[] = [];
+  combat!: CombatDirector;
   private _accentHex = 0x00ff41;  // current accent + its derived enemy hue (HSL +160°)
   private _enemyHex = 0xff0040;
   private _enemyFraction = 0;     // 0 = subset matches accent, 1 = full enemy
@@ -223,6 +229,7 @@ export class Engine {
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.FogExp2(0x000000, 0.01);
     this.world = new THREE.Group(); this.scene.add(this.world);
+    this.scene.add(this.actorsGroup);   // combat actors — NOT cleared by loadScene
     // v1.2 — Aspect-aware FoV (Mobile landscape feedback 2026-05-13):
     //   Jay reported CITY in landscape felt cramped. PerspectiveCamera FoV
     //   is vertical — at a 2:1 landscape ratio a 72° vertical gives a near-
@@ -282,6 +289,11 @@ export class Engine {
     this.seed = settings.seedLock ?? freshSeed();
     this.rng = mkRng(this.seed);
     this.director = new FlightDirector(this.seed, this.bus);
+    this.combat = new CombatDirector(this.seed, this.bus, {
+      add: (a) => { this.actors.push(a); this.actorsGroup.add(a.obj); },
+      accentHex: () => this._accentHex,
+      enemyHex: () => this._enemyHex,
+    });
 
     window.addEventListener('resize', this.onResize);
   }
@@ -505,6 +517,15 @@ export class Engine {
         if (this.director.applyTransition(this.cam)) this.cam.updateProjectionMatrix();
       } else {
         this.director.apply(this.cam);
+      }
+
+      // Combat actors: spawn/retire from threat, update + cull. Persist across scenes.
+      this.combat.update(this.clockT, dt, this.threat);
+      for (let i = this.actors.length - 1; i >= 0; i--) {
+        if (!this.actors[i].update(this.clockT, dt, this.cam, this.threat)) {
+          const a = this.actors[i]; a.obj.parent?.remove(a.obj); a.dispose();
+          this.actors.splice(i, 1);
+        }
       }
 
       if (this.matrixPass.enabled) this.drawMatrixFrame();
