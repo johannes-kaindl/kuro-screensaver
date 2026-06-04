@@ -51,7 +51,7 @@ export const VoidScene: SceneModule = {
     const FIELD_W = 44;      // x half-width
     const BELT_S  = 14;      // belt sigma on y (gauss-like, 3D-volume)
     const OFFBELT_P = 0.08;  // probability for off-belt y (uniform ±25)
-    const NOSPAWN = 5.5;     // cylinder radius around predicted flight path
+    const NOSPAWN = 16;      // clear tube ≥ the camera's full weave envelope (≈±12) + rock size
     const SCALE_MIN = 0.9, SCALE_SPAN = 3.0;  // 0.9-3.9 range
 
     // Y: gauss-like belt with rare wide off-belt outliers (3D volume, not disk).
@@ -82,11 +82,11 @@ export const VoidScene: SceneModule = {
     };
 
     // re-spawn ahead of camera, rejection-sample out of the flight tube.
-    const respawn = (camX: number, camY: number, camZ: number) => {
+    const respawn = (_camX: number, _camY: number, camZ: number) => {
       for (let tries = 0; tries < 5; tries++) {
         const x = (rng() - 0.5) * 2 * FIELD_W;
         const y = sampleBeltY();
-        if (!inFlightTube(x, y, camX, camY))
+        if (!inFlightTube(x, y, 0, 0))   // weave centres on the origin — keep that tube clear
           return { x, y, z: camZ + FAR - rng() * FAR_VAR };
       }
       // skip-frame fallback: push behind recycleZ so we try again next frame

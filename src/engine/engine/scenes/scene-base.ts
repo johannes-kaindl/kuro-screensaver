@@ -27,4 +27,8 @@ export interface SceneModule {
   build(ctx: SceneCtx): SceneUpdater;
   modeLabels: readonly string[];
   triCount: string;
+  /** Corridor scenes (tunnel/rift): the camera is path-locked, so the director's
+   *  kick/manoeuvre overlay is skipped (it would break the camera out of the tube).
+   *  Transitions still own the camera. */
+  cameraLocked?: boolean;
 }

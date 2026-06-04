@@ -64,6 +64,7 @@ function buildWall(grp: THREE.Group, mats: SceneCtx['mats'], side: number, _seed
 }
 
 export const RiftScene: SceneModule = {
+  cameraLocked: true,   // path-locked corridor: no kick overlay (stay in the rift)
   modeLabels: ['THE RIFT', 'CHASM', 'INVERSION'] as const,
   triCount: '~22K',
 

@@ -99,6 +99,16 @@ export const TerrainScene: SceneModule = {
       cam.position.x = f.x; cam.position.y = f.y;
       cam.rotation.set(f.pitch, f.yaw, f.roll);
 
+      // Terrain-following: never let the flight path sink into a hill. Sample the
+      // heightfield under + just ahead of the camera and keep ≥2.6u clearance —
+      // low over valleys, lifts over ridges (proper NOE flight, no clipping).
+      const groundAt = (wz: number): number => {
+        const useT1 = Math.abs(wz - t1.position.z) <= D / 2;
+        return heightAt(cam.position.x, wz - (useT1 ? t1.position.z : t2.position.z) + (useT1 ? logicalA : logicalB));
+      };
+      const ground = Math.max(groundAt(0), groundAt(-12), groundAt(-24));
+      cam.position.y = Math.max(f.y, ground + 2.6);
+
       // Dust drifts laterally; under the narrative PANIC storm it whips + brightens.
       const storm = ctx.storm?.() ?? 0;
       dust.position.x = Math.sin(t * 0.07) * 4 + storm * 12 * Math.sin(t * 3.1);

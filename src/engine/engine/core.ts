@@ -515,8 +515,8 @@ export class Engine {
       this.director.update(this.clockT, dt);
       if (this.director.inTransition) {
         if (this.director.applyTransition(this.cam)) this.cam.updateProjectionMatrix();
-      } else {
-        this.director.apply(this.cam);
+      } else if (!this.currentSceneObj?.cameraLocked) {
+        this.director.apply(this.cam);   // skip the kick overlay in path-locked corridors
       }
 
       // Combat actors: spawn/retire from threat, update + cull. Persist across scenes.

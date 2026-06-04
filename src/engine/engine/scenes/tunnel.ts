@@ -109,6 +109,7 @@ function closeSpine(pts: THREE.Vector3[]): THREE.Vector3[] {
 }
 
 export const TunnelScene: SceneModule = {
+  cameraLocked: true,   // path-locked: no kick overlay (would break out of the tube)
   modeLabels: ['INFIL', 'TRANSIT', 'BOOST'] as const,
   triCount: '~62K',
 
