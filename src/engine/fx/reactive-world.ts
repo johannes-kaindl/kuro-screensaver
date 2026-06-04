@@ -39,6 +39,9 @@ export interface ReactiveWorldDeps {
 
 export class ReactiveWorld {
   private threat = 0;
+  /** One-shot additive envelopes layered on the threat-derived mults (NOT threat). */
+  private envelopes: { t0: number; dur: number; bloom: number; fog: number }[] = [];
+  private nowT = 0;                     // live frame clock (so pulse() needs no arg)
   private relaxing = false;            // fast-relax after a crash/reset
   private lastPhase: Phase = 'ROUTINE';
   private crtIntensityBase: number;
@@ -60,12 +63,21 @@ export class ReactiveWorld {
 
   private onIntrusion() {
     if (this.d.calm) return;
-    this.d.engine.pulseHesitation(1.5 + this.rand() * 1.5);
+    this.d.engine.bus.emit({ kind: 'intrusion', intensity: 1.5 + this.rand() * 1.5 });
   }
 
-  update(_t: number, dt: number) {
+  /** Fire a one-shot world envelope (additive bump on bloom/fog mults). calm-gated. */
+  pulse(kind: 'flash' | 'surge') {
+    if (this.d.calm) return;
+    const t = this.nowT;
+    if (kind === 'flash') this.envelopes.push({ t0: t, dur: 0.6, bloom: 0.6, fog: 0 });
+    else this.envelopes.push({ t0: t, dur: 1.2, bloom: 0.3, fog: -0.1 });
+  }
+
+  update(t: number, dt: number) {
     const e = this.d.engine;
     const calm = !!this.d.calm;
+    this.nowT = t;
 
     // ── target threat ──
     let target: number;
@@ -96,12 +108,22 @@ export class ReactiveWorld {
     e.threat = threat;
     e.storm = storm;
 
+    // ── transient one-shot envelopes (additive on the mults; never raw fog/bloom) ──
+    let bloomAdd = 0, fogAdd = 0;
+    this.envelopes = this.envelopes.filter((ev) => {
+      const p = (t - ev.t0) / ev.dur;
+      if (p >= 1) return false;
+      const s = Math.sin(Math.PI * p), env = s * s;
+      bloomAdd += ev.bloom * env; fogAdd += ev.fog * env;
+      return true;
+    });
+
     // ── push to subsystems (compose on user settings; calm = gentle, no motion) ──
-    e.fogThreatMult = 1 + threat * (calm ? 0.6 : 1.6);
+    e.fogThreatMult = 1 + threat * (calm ? 0.6 : 1.6) + fogAdd;
     // Enemy-colour infection creeps in from INTRUSION (slow colour, OK in calm mode).
     e.setEnemyFraction(smoothstep(0.25, 0.90, threat));
     e.setCrtThreat(calm ? 0 : threat * 0.35, calm ? 0 : threat * 0.45);
-    e.setBloomThreat(1 + storm * 0.4);
+    e.setBloomThreat(1 + storm * 0.4 + bloomAdd);
     if (this.d.crt) {
       this.d.crt.settings.crtSim.intensity = calm
         ? this.crtIntensityBase
@@ -112,6 +134,7 @@ export class ReactiveWorld {
   dispose() {
     const e = this.d.engine;
     e.onFrame = null;
+    this.envelopes = [];
     e.threat = 0; e.storm = 0;
     e.fogThreatMult = 1;
     e.setCrtThreat(0, 0);
