@@ -1,7 +1,15 @@
 # Warp Transitions — Design (Brick B)
 
 - **Date:** 2026-06-04
-- **Status:** Approved (design), implementation pending
+- **Status:** Implemented (Brick B) — web + native, verified (typecheck + native logic
+  tests + app compile + render check of the full terrain→city warp sequence). Branch
+  `feat/warp-transitions`.
+  - **Deviations from plan:** (1) the warp bloom punch is fired via
+    `reactiveWorld.pulse('warp')` / `renderer.pulse(.warp)` from the swap callback (at
+    the warp peak) rather than a director-emitted bus event — simpler, identical effect,
+    still single-writer-clean. (2) calm mode: web honours `prefers-reduced-motion` (short
+    motion-light profile); native has no `reducedMotion` setting yet, so native auto-cycle
+    always uses the full profile — small a11y gap noted for a later native settings pass.
 - **Author:** Johannes + Claude (pair)
 - **Scope:** Brick **B** of the "Procedural Film" roadmap. Builds on Brick A
   (`FlightDirector`, `EventBus`, `speedMul`, `ownsCamera`, transient envelopes).
