@@ -18,6 +18,7 @@ final class VoidScene: Scene {
     private struct Roid { var item: DrawItem; var pos: SIMD3<Float>; var rot: SIMD3<Float>; var scale: Float; var spin: SIMD3<Float>; var baseOpacity: Float }
     private var roids: [Roid] = []
     private let speed: DrawItem
+    var storm: Float = 0            // reactive-world PANIC storm (set by Renderer)
     private let spvCount = 56
 
     // field constants (void.ts)
@@ -162,14 +163,16 @@ final class VoidScene: Scene {
             roids[i].item.model = model(roids[i])
         }
 
-        // speed particles (mutate buffer in place)
+        // speed particles (mutate buffer in place); the PANIC storm widens + enlarges them.
+        let spreadX = 24 * (1 + storm * 0.5), spreadY = 16 * (1 + storm * 0.5)
+        speed.pointSizeWorld = 0.14 + storm * 0.12
         let ptr = speed.positions.contents().bindMemory(to: Float.self, capacity: spvCount * 3)
         for i in 0..<spvCount {
             let zi = i * 3 + 2
             if ptr[zi] > camZ + 2 {
                 ptr[zi] = camZ - 40 - rng.nextF() * 30
-                ptr[i * 3] = (rng.nextF() - 0.5) * 24 + camX
-                ptr[i * 3 + 1] = (rng.nextF() - 0.5) * 16 + camY
+                ptr[i * 3] = (rng.nextF() - 0.5) * spreadX + camX
+                ptr[i * 3 + 1] = (rng.nextF() - 0.5) * spreadY + camY
             }
         }
     }

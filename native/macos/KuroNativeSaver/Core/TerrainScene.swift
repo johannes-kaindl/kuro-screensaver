@@ -38,6 +38,7 @@ final class TerrainScene: Scene {
     private let chunkA: DrawItem
     private let chunkB: DrawItem
     private let dust: DrawItem
+    var storm: Float = 0            // reactive-world PANIC storm (set by Renderer)
     private var logicalA = Terrain.startA
     private var logicalB = Terrain.startB
     private var posAz = Terrain.startA
@@ -154,6 +155,7 @@ final class TerrainScene: Scene {
         camera.position = SIMD3(f.x, f.y, 0)
         camera.rotation = SIMD3(f.pitch, f.yaw, f.roll)
 
-        dust.model = Mathx.translation(SIMD3(sin(tf * 0.07) * 4, 0, 0))
+        dust.model = Mathx.translation(SIMD3(sin(tf * 0.07) * 4 + storm * 12 * sin(tf * 3.1), 0, 0))
+        dust.pointSizeWorld = 0.13 + storm * 0.13
     }
 }

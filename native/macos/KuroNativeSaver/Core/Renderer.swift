@@ -189,6 +189,9 @@ final class Renderer {
         // adjust it (boost). Uses the last drawn size; 72° on the very first tick.
         scene.camera.fovDegrees = Camera.defaultFovDeg(width: width, height: height)
         if !hesWired { hud.terminal.onIntrusion = { [weak self] in self?.pulseHesitation() }; hesWired = true }
+        let st = settings.reactiveWorld ? stormScalar : 0
+        (scene as? TerrainScene)?.storm = st
+        (scene as? VoidScene)?.storm = st
         scene.update(t: t, dt: dt)
         // Camera hesitation: gently steady the lateral weave while a pulse is active
         // (scenes re-set camera.position each frame, so this dampens without compounding).
