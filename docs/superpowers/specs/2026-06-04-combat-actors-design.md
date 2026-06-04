@@ -1,7 +1,17 @@
 # Combat Actors — Design (Brick D)
 
 - **Date:** 2026-06-04
-- **Status:** Approved (design), implementation pending
+- **Status:** Implemented (Brick D) — web + native, verified (typecheck + native logic
+  tests + app compile + a live `?threat=0.9` run: enemy-coloured antagonist drone at the
+  edge of view firing, "taking fire" lines, CORP-7 support arrival). Branch
+  `feat/combat-actors`.
+  - **Deviations:** (1) the hit reaction is camera kick + bloom flash (A primitives), no
+    dedicated CRT tear — kept the spec's "CRT poke" out to avoid a new crt-sim method;
+    can add later. (2) Actor colour: web actors build own materials from accent/enemy hex;
+    native uses a new `DrawItem.colorOverride` (= `enemyAccent(accent)`). (3) Native bodies
+    use `icosahedron(detail:0)` (Geo has no octahedron); tracer is a world-space 2-point
+    line (web: a local-frame cylinder). (4) Combat lines are single-speaker (HQ); unit
+    cross-talk is Brick E.
 - **Author:** Johannes + Claude (pair)
 - **Scope:** Brick **D** of the "Procedural Film" roadmap. Builds on A (`EventBus`,
   `FlightDirector` manoeuvres, transient envelopes), B (warp transitions), C (phase-driven
