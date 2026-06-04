@@ -3,8 +3,11 @@
 // so events never land a frame late. Randomness a handler needs is drawn from the
 // engine's SEEDED rng by the EMITTER (e.g. ReactiveWorld), never Math.random here.
 export type FlightEventKind =
-  | 'intrusion'   // the operator "notices" — migrated from narrative.onIntrusion
-  | 'manoeuvre';  // a director manoeuvre fired (for narrative/world to react to, later)
+  | 'intrusion'    // the operator "notices" — migrated from narrative.onIntrusion
+  | 'manoeuvre'    // a director manoeuvre fired (for narrative/world to react to, later)
+  | 'incomingFire' // antagonist fired a tracer at the camera (Brick D)
+  | 'unitArrive'   // a CORP support unit arrived
+  | 'unitCrash';   // a support unit went down
 
 export interface FlightEvent {
   kind: FlightEventKind;
