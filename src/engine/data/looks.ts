@@ -19,10 +19,10 @@ export interface Look {
 
 export const LOOKS: Record<string, Look> = {
   clean:  { label: 'Clean',           preset: 'kuro',     curvature: 0.0,  aperture: 0.0,  trails: 0.0,  ntsc: 0.0, halation: 0.0,  bloom: 0.6, intensity: 0.0,  matrix: false },
-  heavy:  { label: 'Heavy CRT',       preset: 'phosphor', curvature: 0.22, aperture: 0.45, trails: 0.50, ntsc: 0.6, halation: 0.40, bloom: 1.6, intensity: 0.50, matrix: false },
-  broken: { label: 'Broken Terminal', preset: 'crimson',  curvature: 0.17, aperture: 0.32, trails: 0.42, ntsc: 0.9, halation: 0.50, bloom: 1.4, intensity: 0.85, matrix: false },
-  vapor:  { label: 'Vaporwave',       preset: 'spectre',  curvature: 0.14, aperture: 0.18, trails: 0.70, ntsc: 0.4, halation: 0.60, bloom: 1.9, intensity: 0.20, matrix: false },
-  matrix: { label: 'Matrix',          preset: 'phosphor', curvature: 0.12, aperture: 0.22, trails: 0.45, ntsc: 0.3, halation: 0.35, bloom: 1.4, intensity: 0.25, matrix: true },
+  heavy:  { label: 'Heavy CRT',       preset: 'phosphor', curvature: 0.022, aperture: 0.45, trails: 0.50, ntsc: 0.6, halation: 0.40, bloom: 1.6, intensity: 0.50, matrix: false },
+  broken: { label: 'Broken Terminal', preset: 'crimson',  curvature: 0.017, aperture: 0.32, trails: 0.42, ntsc: 0.9, halation: 0.50, bloom: 1.4, intensity: 0.85, matrix: false },
+  vapor:  { label: 'Vaporwave',       preset: 'spectre',  curvature: 0.014, aperture: 0.18, trails: 0.70, ntsc: 0.4, halation: 0.60, bloom: 1.9, intensity: 0.20, matrix: false },
+  matrix: { label: 'Matrix',          preset: 'phosphor', curvature: 0.012, aperture: 0.22, trails: 0.45, ntsc: 0.3, halation: 0.35, bloom: 1.4, intensity: 0.25, matrix: true },
 };
 
 /** Apply a Look in place onto the live settings (color preset + all CRT knobs). */

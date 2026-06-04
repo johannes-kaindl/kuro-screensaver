@@ -25,7 +25,7 @@ enum AppSettings {
     static var terminalBandHeight: Float { get { store.object(forKey: "TermBand") != nil ? store.float(forKey: "TermBand") : 0.24 } set { store.set(newValue, forKey: "TermBand") } }
     static var bankStrength: Float { get { store.object(forKey: "Bank") != nil ? store.float(forKey: "Bank") : 1 } set { store.set(newValue, forKey: "Bank") } }
     static var bloomScale: Float { get { store.object(forKey: "BloomScale") != nil ? store.float(forKey: "BloomScale") : 1 } set { store.set(newValue, forKey: "BloomScale") } }
-    static var curvature: Float { get { store.object(forKey: "Curvature") != nil ? store.float(forKey: "Curvature") : 0.12 } set { store.set(newValue, forKey: "Curvature") } }
+    static var curvature: Float { get { let v = store.object(forKey: "Curvature") != nil ? store.float(forKey: "Curvature") : 0.012; return min(0.032, v) } set { store.set(newValue, forKey: "Curvature") } }
     static var apertureMask: Float { get { store.object(forKey: "Aperture") != nil ? store.float(forKey: "Aperture") : 0.22 } set { store.set(newValue, forKey: "Aperture") } }
     static var trails: Float { get { store.object(forKey: "Trails") != nil ? store.float(forKey: "Trails") : 0.35 } set { store.set(newValue, forKey: "Trails") } }
     static var terminalScale: Float { get { store.object(forKey: "TermScale") != nil ? store.float(forKey: "TermScale") : 1 } set { store.set(newValue, forKey: "TermScale") } }

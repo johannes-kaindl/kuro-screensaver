@@ -9,6 +9,7 @@ final class ConfigWindowController: NSWindowController {
     private var intensitySlider, curvSlider, maskSlider, bloomSlider, trailsSlider, ntscSlider, halSlider, termSlider, bandSlider, bankSlider: NSSlider!
     private var previewContainer: NSView!
     private var previewView: MetalHostView?
+    private var termGrid: NSGridView!   // Terminal section — rows shown/hidden by layout
 
     private let speeds = [("Langsam", "slow"), ("Normal", "norm"), ("Schnell", "fast")]
     private let alts = [("Niedrig", "low"), ("Mittel", "mid"), ("Hoch", "high")]
@@ -29,12 +30,15 @@ final class ConfigWindowController: NSWindowController {
         self.init(window: win)
         buildUI(win.contentView!)
         rebuildPreview()
-        // Size the window to exactly fit the laid-out content, then centre.
-        win.contentView!.layoutSubtreeIfNeeded()
-        if let root = win.contentView!.subviews.first {
-            win.setContentSize(NSSize(width: root.fittingSize.width + 40, height: root.fittingSize.height + 40))
-        }
+        fitWindow()
         win.center()
+    }
+
+    /// Re-size the window to exactly fit the laid-out content (after rows show/hide).
+    private func fitWindow() {
+        guard let win = window, let cv = win.contentView, let root = cv.subviews.first else { return }
+        cv.layoutSubtreeIfNeeded()
+        win.setContentSize(NSSize(width: root.fittingSize.width + 40, height: root.fittingSize.height + 40))
     }
 
     // ── Auto Layout control factories ───────────────────────────────────────
@@ -110,7 +114,7 @@ final class ConfigWindowController: NSWindowController {
         fogPopup = mkPopup(); fogPopup.addItems(withTitles: fogs.map { $0.0 }); fogPopup.selectItem(at: fogs.firstIndex { $0.1 == AppSettings.fog } ?? 1)
         weatherPopup = mkPopup(); weatherPopup.addItems(withTitles: weathers.map { $0.0 }); weatherPopup.selectItem(at: weathers.firstIndex { $0.1 == AppSettings.weather } ?? 0)
         intensitySlider = mkSlider(Double(AppSettings.intensity), 1)
-        curvSlider = mkSlider(Double(AppSettings.curvature), 0.32)
+        curvSlider = mkSlider(Double(AppSettings.curvature), 0.032)
         maskSlider = mkSlider(Double(AppSettings.apertureMask), 0.6)
         bloomSlider = mkSlider(Double(AppSettings.bloomScale), 2.5)
         trailsSlider = mkSlider(Double(AppSettings.trails), 0.92)
@@ -121,7 +125,7 @@ final class ConfigWindowController: NSWindowController {
         termSlider = mkSlider(Double(AppSettings.terminalScale), 4.8, 0.7)
         bandSlider = mkSlider(Double(AppSettings.terminalBandHeight), 0.5, 0.12)
         bankSlider = mkSlider(Double(AppSettings.bankStrength), 2.0, 0)
-        terminalPopup = mkPopup(); terminalPopup.addItems(withTitles: termLayouts.map { $0.0 })
+        terminalPopup = mkPopup(#selector(terminalChanged)); terminalPopup.addItems(withTitles: termLayouts.map { $0.0 })
         terminalPopup.selectItem(at: termLayouts.firstIndex { $0.1 == AppSettings.terminalLayout } ?? 1)
 
         // Checkboxes.
@@ -143,17 +147,20 @@ final class ConfigWindowController: NSWindowController {
             [lab("Bloom:"), bloomSlider], [lab("Nachleuchten:"), trailsSlider], [lab("NTSC:"), ntscSlider],
             [lab("Halation:"), halSlider],
         ]), flatHudCheck])
-        let secMotion = section("Bewegung & Story", [grid([
-            [lab("Flug-Bank:"), bankSlider], [lab("Terminal:"), terminalPopup],
-            [lab("Terminal-Größe:"), termSlider], [lab("Leisten-Höhe:"), bandSlider],
-        ]), reactiveWorldCheck])
+        let secMotion = section("Bewegung & Story", [grid([[lab("Flug-Bank:"), bankSlider]]), reactiveWorldCheck])
+        termGrid = grid([
+            [lab("Layout:"), terminalPopup],
+            [lab("Größe:"), termSlider],
+            [lab("Leisten-Höhe:"), bandSlider],
+        ])
+        let secTerminal = section("Terminal", [termGrid])
         let secBehavior = section("Anzeige & Automatik", [
             hudCheck, dayNightCheck, soundCheck, cycleCheck,
             grid([[lab("Wechsel:"), cyclePopup], [lab("Auto-Start:"), idlePopup]]), autostartCheck,
         ])
 
         let leftCol = NSStackView(views: [secBild, secCRT]); leftCol.orientation = .vertical; leftCol.spacing = 18; leftCol.alignment = .leading
-        let rightCol = NSStackView(views: [secMotion, secBehavior]); rightCol.orientation = .vertical; rightCol.spacing = 18; rightCol.alignment = .leading
+        let rightCol = NSStackView(views: [secMotion, secTerminal, secBehavior]); rightCol.orientation = .vertical; rightCol.spacing = 18; rightCol.alignment = .leading
         let columns = NSStackView(views: [leftCol, rightCol]); columns.orientation = .horizontal; columns.spacing = 28; columns.alignment = .top
 
         // Action buttons.
@@ -180,6 +187,21 @@ final class ConfigWindowController: NSWindowController {
             actions.widthAnchor.constraint(equalTo: columns.widthAnchor),
             hint.widthAnchor.constraint(equalTo: columns.widthAnchor),
         ])
+        updateTerminalRows()   // initial show/hide of the terminal sub-rows
+    }
+
+    /// Terminal sub-rows depend on the layout: hide Größe when the terminal is off, and
+    /// Leisten-Höhe unless the band ("Leiste") layout is selected.
+    private func updateTerminalRows() {
+        let layout = termLayouts[max(0, terminalPopup.indexOfSelectedItem)].1
+        termGrid.row(at: 1).isHidden = (layout == "off")
+        termGrid.row(at: 2).isHidden = (layout != "stripdark")
+    }
+
+    @objc private func terminalChanged() {
+        changed()              // persist + rebuild preview + mark Look "custom"
+        updateTerminalRows()
+        fitWindow()
     }
 
     /// A manual tweak of any slider/checkbox → the combo no longer matches a

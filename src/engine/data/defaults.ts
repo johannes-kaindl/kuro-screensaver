@@ -160,7 +160,7 @@ export const DEFAULT_SCREENSAVER: ScreensaverSettings = {
     chromaticAberration: { on: false, offset: 1.5 },
     noiseBursts:         { on: false, freq: 0.5 },
     powerOn:             { on: true },
-    curvature:           { on: true,  amount: 0.12 },
+    curvature:           { on: true,  amount: 0.012 },
     aperture:            { on: true,  strength: 0.22 },
     ntsc:                { on: false, amount: 0.0 },
     halation:            { on: true,  amount: 0.15 },

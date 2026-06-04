@@ -33,7 +33,7 @@ struct Settings {
     var terminalBandHeight: Float = 0.24          // band layout: fraction of screen height it occupies
     var bloomScale: Float = 1       // multiplier on the per-preset bloom strength (0 = off)
     var fog: Fog = .auto
-    var curvature: Float = 0.12     // CRT screen barrel curvature (0 = flat)
+    var curvature: Float = 0.012    // CRT screen barrel curvature (0 = flat; gentle by design)
     var apertureMask: Float = 0.22  // RGB phosphor grille strength (0 = off)
     var trails: Float = 0.35        // phosphor persistence decay (0 = off, ~0.9 = long)
     var terminalScale: Float = 1    // terminal text size multiplier
