@@ -33,6 +33,7 @@ enum AppSettings {
     static var halation: Float { get { store.object(forKey: "Halation") != nil ? store.float(forKey: "Halation") : 0.15 } set { store.set(newValue, forKey: "Halation") } }
     static var dayNight: Bool { get { bool("DayNight", false) } set { store.set(newValue, forKey: "DayNight") } }
     static var matrix: Bool { get { bool("Matrix", false) } set { store.set(newValue, forKey: "Matrix") } }
+    static var reactiveWorld: Bool { get { bool("ReactiveWorld", true) } set { store.set(newValue, forKey: "ReactiveWorld") } }
     static var weather: String { get { str("Weather", "clear") } set { setStr("Weather", newValue) } }
     static var sound: Bool { get { bool("Sound", false) } set { store.set(newValue, forKey: "Sound") } }
     static var autoCycle: Bool { get { bool("AutoCycle", true) } set { store.set(newValue, forKey: "AutoCycle") } }
@@ -64,6 +65,7 @@ enum AppSettings {
         s.halation = halation
         s.dayNight = dayNight
         s.matrix = matrix
+        s.reactiveWorld = reactiveWorld
         s.weather = Settings.Weather(rawValue: weather) ?? .clear
         return (s, autoCycle)
     }

@@ -22,6 +22,7 @@ final class Terminal {
     private var phaseEndsAt: Double = -1
 
     // Reactive-world signal (read by ReactiveWorld in Renderer each frame).
+    var onIntrusion: (() -> Void)?     // fired when an intrusion event lands → camera hesitation
     var currentPhase: ShiftPhase { phase }
     func phaseProgress(_ t: Double) -> Double {
         let span = phaseEndsAt - phaseStartedAt
@@ -193,6 +194,7 @@ final class Terminal {
         if rng.nextF() < 0.22 { beatMentor(.intrusion); return }
         if rng.nextF() < 0.6 {
             let ev = pick(Script.intrusionsQuotes + Script.intrusionsFragments)
+            onIntrusion?()
             queue.append(.line(ev.text, .quotes))
             if let f = ev.followup { queue.append(.wait(0.5)); queue.append(.line(f, .quotes)) }
             queue.append(.wait(rngIn(0.9, 2.1)))

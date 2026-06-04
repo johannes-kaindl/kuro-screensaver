@@ -82,6 +82,7 @@ final class VoidScene: Scene {
             let opacity = 0.60 + r.nextF() * 0.30
             let it = DrawItem(positions: t.pos, indices: t.idx, count: t.ic, vertexCount: t.vc,
                               primitive: .line, opacity: opacity)
+            it.infectable = r.nextF() < 0.3   // ~30% crossfade to the enemy colour with threat
             let scale = 0.9 + r.nextF() * 3.0
             let pos = seedInitial()
             let rot = SIMD3(r.nextF() * .pi, r.nextF() * .pi, r.nextF() * .pi)

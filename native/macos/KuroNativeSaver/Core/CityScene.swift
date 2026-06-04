@@ -137,6 +137,7 @@ final class CityScene: Scene {
                 if a.isEmpty { continue }
                 let it = DrawItem(positions: Geo.buffer(device, a), indices: nil, count: a.count / 3,
                                   vertexCount: a.count / 3, primitive: .triangle, opacity: 0.9)
+                it.infectable = r.nextF() < 0.3   // some window buckets crossfade to enemy with threat
                 its.append(it)
                 buckets.append(Bucket(item: it, phase: r.nextF() * 2 * .pi, speed: 0.15 + r.nextF() * 3.5, hi: 0.9, lo: 0.03))
             }

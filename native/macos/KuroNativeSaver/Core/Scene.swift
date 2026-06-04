@@ -48,6 +48,7 @@ final class DrawItem {
     var opacity: Float
     var isPoint: Bool
     var pointSizeWorld: Float
+    var infectable = false          // reactive world: crossfades accent→enemy with threat
 
     init(positions: MTLBuffer, indices: MTLBuffer?, count: Int, vertexCount: Int,
          primitive: MTLPrimitiveType, model: matrix_float4x4 = matrix_identity_float4x4,

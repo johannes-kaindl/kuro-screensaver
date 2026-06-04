@@ -124,10 +124,42 @@ final class Renderer {
     private var lastPhase: ShiftPhase = .routine
     var forcedThreat: Float? = nil          // harness --threat pins the value
     private var stormScalar: Float { Renderer.smoothstep(0.70, 1.0, threat) }
+    private var hesT0: Double = -1          // camera-hesitation envelope start; <0 = inactive
+    private var hesDur: Double = 0
+    private var hesWired = false
+
+    /// Start a lateral camera-hesitation envelope (the operator "noticing something").
+    func pulseHesitation(_ dur: Double = 2.2) {
+        guard settings.reactiveWorld, hesT0 < 0 else { return }
+        hesT0 = t; hesDur = max(0.3, dur)
+    }
 
     private static func smoothstep(_ e0: Float, _ e1: Float, _ x: Float) -> Float {
         let t = min(1, max(0, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t)
     }
+    /// Accent's HSL hue +160° → a vivid contrasting "enemy" colour (mirrors web enemyHexOf).
+    private func enemyAccent(_ rgb: SIMD3<Float>) -> SIMD3<Float> {
+        let r = rgb.x, g = rgb.y, b = rgb.z
+        let mx = max(r, max(g, b)), mn = min(r, min(g, b)), d = mx - mn
+        var h: Float = 0
+        if d > 1e-5 {
+            if mx == r { h = (g - b) / d + (g < b ? 6 : 0) }
+            else if mx == g { h = (b - r) / d + 2 }
+            else { h = (r - g) / d + 4 }
+            h /= 6
+        }
+        let l = min(0.6, max(0.45, (mx + mn) / 2)), s: Float = 0.85
+        h = (h + 160.0 / 360.0).truncatingRemainder(dividingBy: 1)
+        let c = (1 - abs(2 * l - 1)) * s
+        let hh = h * 6
+        let x = c * (1 - abs(hh.truncatingRemainder(dividingBy: 2) - 1))
+        var o = SIMD3<Float>(0, 0, 0)
+        if hh < 1 { o = SIMD3(c, x, 0) } else if hh < 2 { o = SIMD3(x, c, 0) }
+        else if hh < 3 { o = SIMD3(0, c, x) } else if hh < 4 { o = SIMD3(0, x, c) }
+        else if hh < 5 { o = SIMD3(x, 0, c) } else { o = SIMD3(c, 0, x) }
+        return o + SIMD3(repeating: l - c / 2)
+    }
+
     private func updateThreat(dt: Double) {
         guard settings.reactiveWorld else { threat = 0; return }
         if let f = forcedThreat { threat = min(1, max(0, f)); return }
@@ -156,7 +188,15 @@ final class Renderer {
         // Set the aspect-aware base FOV before update so scenes (tunnel) can
         // adjust it (boost). Uses the last drawn size; 72° on the very first tick.
         scene.camera.fovDegrees = Camera.defaultFovDeg(width: width, height: height)
+        if !hesWired { hud.terminal.onIntrusion = { [weak self] in self?.pulseHesitation() }; hesWired = true }
         scene.update(t: t, dt: dt)
+        // Camera hesitation: gently steady the lateral weave while a pulse is active
+        // (scenes re-set camera.position each frame, so this dampens without compounding).
+        if hesT0 >= 0 {
+            let p = (t - hesT0) / hesDur
+            if p >= 1 { hesT0 = -1 }
+            else { let s = sin(Float.pi * Float(p)); scene.camera.position.x *= (1 - 0.55 * s * s) }
+        }
         glitch.update(t: t)
         if dt > 0 { fps = fps * 0.9 + (1.0 / dt) * 0.1 }
         hud.setFps(fps)
@@ -226,12 +266,16 @@ final class Renderer {
         // (CRT halation/ntsc + glitch handled in advance + p6 below).
         fogMul *= 1 + threat * 1.6
         bloomMul *= 1 + stormScalar * 0.4
+        // Enemy-colour infection: infectable items crossfade accent→enemy with threat.
+        let enemyFraction = settings.reactiveWorld ? Renderer.smoothstep(0.25, 0.9, threat) : 0
+        let enemyCol = enemyAccent(accent)
 
         for item in (debugBlackScene ? [] : scene.items) {
+            let col = item.infectable ? accent + (enemyCol - accent) * enemyFraction : accent
             var u = SceneUniforms(
                 mvp: viewProj * item.model,
                 modelView: view * item.model,
-                color: SIMD4(accent, item.opacity),
+                color: SIMD4(col, item.opacity),
                 params: SIMD4(scene.fogDensity * fogMul, item.pointSizeWorld, pointScale,
                               item.isPoint ? 1 : 0))
             enc.setVertexBuffer(item.positions, offset: 0, index: 0)
