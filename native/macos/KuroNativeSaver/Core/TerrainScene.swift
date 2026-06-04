@@ -48,7 +48,7 @@ final class TerrainScene: Scene {
     init(ctx: SceneContext) {
         let device = ctx.device
         // web: spd = SPEED_VALUES[speed] * 0.2 per frame @60fps → *12 per second.
-        speedPerSec = ctx.settings.speed.multiplier * 12
+        speedPerSec = ctx.speed() * 12
         fly = CameraFly(seed: (ctx.settings.seed ?? freshSeed()) &+ 4242,
                         latAmp: 12, vertAmp: 2.6, vertBase: 6.5, pitchBase: -0.2, bankScale: ctx.settings.bankStrength)
 

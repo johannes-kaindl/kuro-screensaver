@@ -91,7 +91,7 @@ final class TunnelScene: Scene {
     init(ctx: SceneContext) {
         let device = ctx.device
         autoBoost = ctx.settings.tunnelAutoBoost
-        sceneSpeed = ctx.settings.speed.multiplier
+        sceneSpeed = ctx.speed()
         var r = ctx.rng
 
         // --- build spine (random walk of straight/curve segments) ---

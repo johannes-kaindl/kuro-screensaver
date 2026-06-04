@@ -27,7 +27,7 @@ final class RiftScene: Scene {
 
     init(ctx: SceneContext) {
         let device = ctx.device
-        speedPerSec = ctx.settings.speed.multiplier * 0.22 * 60   // web: *0.22 per frame@60
+        speedPerSec = ctx.speed() * 0.22 * 60   // web: *0.22 per frame@60
 
         camera.position = SIMD3(0, 8, 0)
         camera.rotation = SIMD3(-0.06, 0, 0)

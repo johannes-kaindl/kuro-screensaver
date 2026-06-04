@@ -28,7 +28,7 @@ final class CityScene: Scene {
 
     init(ctx: SceneContext) {
         let device = ctx.device
-        speedPerSec = ctx.settings.speed.multiplier * 0.24 * 60   // web *0.24 per frame@60
+        speedPerSec = ctx.speed() * 0.24 * 60   // web *0.24 per frame@60
         altTarget = ctx.settings.cityAltitude.value
         // banking weave down the corridor (latAmp keeps it between the buildings ~±30)
         fly = CameraFly(seed: (ctx.settings.seed ?? freshSeed()) &+ 5151,
