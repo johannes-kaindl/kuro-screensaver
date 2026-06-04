@@ -34,6 +34,7 @@ enum AppSettings {
     static var dayNight: Bool { get { bool("DayNight", false) } set { store.set(newValue, forKey: "DayNight") } }
     static var matrix: Bool { get { bool("Matrix", false) } set { store.set(newValue, forKey: "Matrix") } }
     static var reactiveWorld: Bool { get { bool("ReactiveWorld", true) } set { store.set(newValue, forKey: "ReactiveWorld") } }
+    static var wallpaperOnBattery: Bool { get { bool("WallpaperOnBattery", false) } set { store.set(newValue, forKey: "WallpaperOnBattery") } }
     static var weather: String { get { str("Weather", "clear") } set { setStr("Weather", newValue) } }
     static var sound: Bool { get { bool("Sound", false) } set { store.set(newValue, forKey: "Sound") } }
     static var autoCycle: Bool { get { bool("AutoCycle", true) } set { store.set(newValue, forKey: "AutoCycle") } }
