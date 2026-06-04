@@ -18,6 +18,9 @@ import { VoidScene }    from './scenes/void';
 import { MatrixScene }  from './scenes/matrix';
 import { MatrixRain }   from '../fx/matrix-rain';
 import { MATRIX_SHADER } from '../fx/matrix-pass';
+import { EventBus } from '../events/bus';
+import { FlightDirector } from '../modes/flight-director';
+import { SPEED_VALUES } from '../data/defaults';
 
 const SCENE_REGISTRY = {
   terrain: TerrainScene,
@@ -163,8 +166,10 @@ export class Engine {
   private _crtHalAdd = 0;         // threat add on halation/ntsc; set by setCrtThreat
   private _crtNtscAdd = 0;
   private _crtBaseOn = false;     // any base CRT sub-effect enabled by the user
-  private _hesT0 = -1;            // camera-hesitation envelope start (clockT); <0 = inactive
-  private _hesDur = 0;
+  /** Discrete-event channel shared by conductor, scenes and (later) terminal. */
+  bus = new EventBus();
+  /** Camera/flight director — overlays manoeuvres + owns the speed multiplier. */
+  director!: FlightDirector;
   private _accentHex = 0x00ff41;  // current accent + its derived enemy hue (HSL +160°)
   private _enemyHex = 0xff0040;
   private _enemyFraction = 0;     // 0 = subset matches accent, 1 = full enemy
@@ -275,6 +280,7 @@ export class Engine {
 
     this.seed = settings.seedLock ?? freshSeed();
     this.rng = mkRng(this.seed);
+    this.director = new FlightDirector(this.seed, this.bus);
 
     window.addEventListener('resize', this.onResize);
   }
@@ -344,9 +350,7 @@ export class Engine {
   /** Conductor: start a lateral camera-hesitation envelope (the operator "noticing").
    *  No-op if one is already active. Applied in the tick after the scene update. */
   pulseHesitation(durationSec: number) {
-    if (this._hesT0 >= 0) return;
-    this._hesT0 = this.clockT;
-    this._hesDur = Math.max(0.3, durationSec);
+    this.director.enqueue({ kind: 'kick', dur: Math.max(0.3, durationSec), dir: 0, intensity: 0.55 });
   }
 
   /** HSL hue +160° → a vivid contrasting "enemy" hue for the infection crossfade. */
@@ -423,6 +427,7 @@ export class Engine {
       scene: this.scene, world: this.world, cam: this.cam,
       mats: this.mats, enemyMats: this.enemyMats, rng: this.rng, settings: this.settings,
       threat: () => this.threat, storm: () => this.storm,
+      speed: () => SPEED_VALUES[this.settings.speed] * this.director.speed(),
     };
     const mod = SCENE_REGISTRY[id];
     this.currentSceneObj = mod;
@@ -485,17 +490,12 @@ export class Engine {
         this.cam.updateProjectionMatrix();
       }
 
-      // Camera hesitation: while a pulse is active, gently steady the lateral weave
-      // (pull cam.x toward centre) so the flight "notices something". Scenes re-set
-      // cam.x every frame, so this dampens without compounding. CameraFly untouched.
-      if (this._hesT0 >= 0) {
-        const p = (this.clockT - this._hesT0) / this._hesDur;
-        if (p >= 1) { this._hesT0 = -1; }
-        else {
-          const s = Math.sin(Math.PI * p); const env = s * s;   // sin²: smooth in/out
-          this.cam.position.x *= (1 - 0.55 * env);
-        }
-      }
+      // Director: advance its clock, then overlay manoeuvres on the pose the scene
+      // wrote. The 'kick' manoeuvre reproduces the old hesitation brake exactly
+      // (pull cam.x toward centre, sin² in/out) — scenes re-set cam.x every frame,
+      // so this dampens without compounding. CameraFly untouched.
+      this.director.update(this.clockT, dt);
+      this.director.apply(this.cam);
 
       if (this.matrixPass.enabled) this.drawMatrixFrame();
       this.crtPass.uniforms.time.value = this.clockT;

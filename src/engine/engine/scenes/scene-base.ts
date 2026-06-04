@@ -16,6 +16,9 @@ export interface SceneCtx {
    *  read it are unaffected. `storm` is the high-threat payoff scalar. */
   threat?: () => number;
   storm?: () => number;
+  /** Effective forward-speed multiplier = SPEED_VALUES[settings.speed] × director.
+   *  Scenes should read this instead of the enum directly (enables warp ramps). */
+  speed?: () => number;
 }
 
 export type SceneUpdater = (t: number, dt: number) => void;
