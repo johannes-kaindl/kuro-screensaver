@@ -96,5 +96,21 @@ do {
     check(ca.position.x < 1.0, "kick dampened cam.x")
 }
 
+// --- FlightDirector warp transition: stage clock, ramp C1, swap-once ------------
+do {
+    let d = FlightDirector(seed: 7)
+    var swaps = 0
+    let p = TransitionProfile(windupDur: 0.5, warpDur: 1.0, emergeDur: 0.5,
+                              warpSpeed: 6, fovPush: 30)
+    d.beginTransition(p, baseFov: 72) { swaps += 1 }
+    check(d.inTransition, "inTransition true after begin")
+    var maxSpeed: Float = 0
+    for _ in 0..<100 { d.update(t: 0, dt: 0.02); maxSpeed = max(maxSpeed, d.speedMul) }  // 2.0s total
+    check(swaps == 1, "swap fired exactly once")
+    check(maxSpeed > 5.5 && maxSpeed <= 6.0, "speedMul ramped to ~warpSpeed")
+    check(!d.inTransition, "inTransition false after total duration")
+    approx(Double(d.speedMul), 1.0, 1e-6, "speedMul back to 1 after transition")
+}
+
 if failures > 0 { print("\n\(failures) FAILURE(S)"); exit(1) }
 print("\nALL PASS (\(failures == 0))")
