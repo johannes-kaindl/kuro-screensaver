@@ -49,6 +49,7 @@ final class DrawItem {
     var isPoint: Bool
     var pointSizeWorld: Float
     var infectable = false          // reactive world: crossfades accent→enemy with threat
+    var colorOverride: SIMD3<Float>? = nil   // combat actors: a fixed colour (e.g. enemy)
 
     init(positions: MTLBuffer, indices: MTLBuffer?, count: Int, vertexCount: Int,
          primitive: MTLPrimitiveType, model: matrix_float4x4 = matrix_identity_float4x4,

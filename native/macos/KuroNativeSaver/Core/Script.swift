@@ -26,6 +26,18 @@ enum Script {
         return lines[index % lines.count]
     }
 
+    // Combat terminal lines keyed by event kind (Brick D). Single-speaker; full unit
+    // cross-talk is Brick E. Mirror of web COMBAT_LINES.
+    static let combatLines: [String: [String]] = [
+        "incomingFire": ["// taking fire", "// evasive — rounds inbound", "// hostile lock detected"],
+        "unitArrive":   ["// CORP-7 inbound", "// support on station"],
+        "unitCrash":    ["// unit down — no chute", "// we lost CORP-7"],
+    ]
+    static func combatLine(_ kind: String, _ index: Int) -> String? {
+        guard let lines = combatLines[kind], !lines.isEmpty else { return nil }
+        return lines[index % lines.count]
+    }
+
     struct Beat { let cmd: String; let resp: [(String, C)] }
     struct Intrusion { let text: String; let followup: String? }
     struct Drafts { let drafts: [String]; let final: String }
