@@ -18,109 +18,168 @@ final class ConfigWindowController: NSWindowController {
     private let idleMins: [Double] = [1, 2, 5, 10, 15]
     private let termLayouts = [("Aus", "off"), ("Unten", "strip"), ("Leiste (unten)", "stripdark"), ("Fenster (Lisa)", "window")]
 
+    // Aligned label width across all field rows + a consistent control width.
+    private let labelW: CGFloat = 118
+    private let controlW: CGFloat = 188
+
     convenience init() {
-        let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 620, height: 884),
+        let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 760, height: 820),
                            styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
-        win.title = "Kuro Screensaver"; win.center()
+        win.title = "Kuro Screensaver"
         self.init(window: win)
         buildUI(win.contentView!)
         rebuildPreview()
+        // Size the window to exactly fit the laid-out content, then centre.
+        win.contentView!.layoutSubtreeIfNeeded()
+        if let root = win.contentView!.subviews.first {
+            win.setContentSize(NSSize(width: root.fittingSize.width + 40, height: root.fittingSize.height + 40))
+        }
+        win.center()
     }
 
-    private func lbl(_ s: String, _ x: CGFloat, _ y: CGFloat) -> NSTextField {
-        let l = NSTextField(labelWithString: s); l.frame = NSRect(x: x, y: y, width: 108, height: 18); return l
+    // ── Auto Layout control factories ───────────────────────────────────────
+    private func mkPopup(_ action: Selector = #selector(changed), stretch: Bool = false) -> NSPopUpButton {
+        let p = NSPopUpButton(); p.target = self; p.action = action
+        p.translatesAutoresizingMaskIntoConstraints = false
+        if stretch { p.setContentHuggingPriority(.defaultLow, for: .horizontal) }
+        else { p.widthAnchor.constraint(equalToConstant: controlW).isActive = true }
+        return p
     }
-    private func popup(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat = 178) -> NSPopUpButton {
-        let p = NSPopUpButton(frame: NSRect(x: x, y: y, width: w, height: 26)); p.target = self; p.action = #selector(changed); return p
-    }
-    private func slider(_ x: CGFloat, _ y: CGFloat, _ v: Double, _ maxV: Double, _ minV: Double = 0, _ w: CGFloat = 178) -> NSSlider {
+    private func mkSlider(_ v: Double, _ maxV: Double, _ minV: Double = 0) -> NSSlider {
         let s = NSSlider(value: v, minValue: minV, maxValue: maxV, target: self, action: #selector(changed))
-        s.frame = NSRect(x: x, y: y, width: w, height: 22); return s
+        s.translatesAutoresizingMaskIntoConstraints = false
+        s.widthAnchor.constraint(equalToConstant: controlW).isActive = true
+        return s
     }
-    private func chk(_ t: String, _ x: CGFloat, _ y: CGFloat, _ on: Bool, _ act: Selector) -> NSButton {
+    private func mkCheck(_ t: String, _ on: Bool, _ act: Selector = #selector(changed)) -> NSButton {
         let b = NSButton(checkboxWithTitle: t, target: self, action: act)
-        b.frame = NSRect(x: x, y: y, width: 250, height: 22); b.state = on ? .on : .off; return b
+        b.state = on ? .on : .off; b.translatesAutoresizingMaskIntoConstraints = false
+        return b
+    }
+    private func lab(_ s: String) -> NSTextField {
+        let l = NSTextField(labelWithString: s)
+        l.alignment = .right; l.textColor = .secondaryLabelColor
+        return l
+    }
+    /// Aligned label+control rows. NSGridView sizes the label column to the widest
+    /// label + handles row spacing — robust, self-sizing (no fragile frame math).
+    private func grid(_ rows: [[NSView]]) -> NSGridView {
+        let g = NSGridView(views: rows)
+        g.translatesAutoresizingMaskIntoConstraints = false
+        g.rowSpacing = 9; g.columnSpacing = 10
+        if g.numberOfColumns > 0 { g.column(at: 0).xPlacement = .trailing }
+        return g
+    }
+    /// A section: a quiet uppercased header + its content (grids / checkboxes), stacked.
+    private func section(_ title: String, _ content: [NSView]) -> NSStackView {
+        let header = NSTextField(labelWithString: title.uppercased())
+        header.font = .systemFont(ofSize: 11, weight: .semibold); header.textColor = .secondaryLabelColor
+        let v = NSStackView(views: [header] + content)
+        v.orientation = .vertical; v.spacing = 9; v.alignment = .leading
+        return v
+    }
+    /// A single horizontal label+control row (the full-width Look picker).
+    private func hrow(_ text: String, _ control: NSView) -> NSStackView {
+        let l = lab(text); l.translatesAutoresizingMaskIntoConstraints = false
+        l.widthAnchor.constraint(equalToConstant: labelW).isActive = true
+        let h = NSStackView(views: [l, control]); h.orientation = .horizontal; h.spacing = 10; h.alignment = .centerY
+        return h
     }
 
     private func buildUI(_ cv: NSView) {
-        previewContainer = NSView(frame: NSRect(x: 20, y: 580, width: 580, height: 282))
+        // Live preview thumbnail.
+        previewContainer = NSView()
+        previewContainer.translatesAutoresizingMaskIntoConstraints = false
         previewContainer.wantsLayer = true
         previewContainer.layer?.backgroundColor = NSColor.black.cgColor
         previewContainer.layer?.cornerRadius = 6; previewContainer.layer?.masksToBounds = true
-        cv.addSubview(previewContainer)
+        previewContainer.heightAnchor.constraint(equalToConstant: 232).isActive = true
 
-        // === Look bar (full width, just below the preview): one-click vibe presets ===
-        lookPopup = popup(132, 550, 458)
-        lookPopup.action = #selector(lookChanged)
+        // Look — prominent one-click vibe presets, full width under the preview.
+        lookPopup = mkPopup(#selector(lookChanged), stretch: true)
         lookPopup.addItems(withTitles: ["Eigene"] + Looks.all.map { $0.label })
         lookPopup.selectItem(at: (Looks.all.firstIndex { $0.id == AppSettings.look }).map { $0 + 1 } ?? 0)
-        cv.addSubview(lbl("Look:", 20, 552)); cv.addSubview(lookPopup)
+        let lookRow = hrow("Look:", lookPopup)
 
-        // === left column ===
-        scenePopup = popup(132, 506); scenePopup.addItems(withTitles: ["random"] + SceneRegistry.ids); scenePopup.selectItem(withTitle: AppSettings.scene)
-        presetPopup = popup(132, 474); presetPopup.addItems(withTitles: Palette.presets.map { $0.label })
+        // Popups + sliders.
+        scenePopup = mkPopup(); scenePopup.addItems(withTitles: ["random"] + SceneRegistry.ids); scenePopup.selectItem(withTitle: AppSettings.scene)
+        presetPopup = mkPopup(); presetPopup.addItems(withTitles: Palette.presets.map { $0.label })
         if let i = Palette.presets.firstIndex(where: { $0.id == AppSettings.preset }) { presetPopup.selectItem(at: i) }
-        speedPopup = popup(132, 442); speedPopup.addItems(withTitles: speeds.map { $0.0 }); speedPopup.selectItem(at: speeds.firstIndex { $0.1 == AppSettings.speed } ?? 1)
-        altPopup = popup(132, 410); altPopup.addItems(withTitles: alts.map { $0.0 }); altPopup.selectItem(at: alts.firstIndex { $0.1 == AppSettings.cityAltitude } ?? 0)
-        fogPopup = popup(132, 378); fogPopup.addItems(withTitles: fogs.map { $0.0 }); fogPopup.selectItem(at: fogs.firstIndex { $0.1 == AppSettings.fog } ?? 1)
-        weatherPopup = popup(132, 346); weatherPopup.addItems(withTitles: weathers.map { $0.0 }); weatherPopup.selectItem(at: weathers.firstIndex { $0.1 == AppSettings.weather } ?? 0)
-        intensitySlider = slider(132, 314, Double(AppSettings.intensity), 1)
-        curvSlider = slider(132, 282, Double(AppSettings.curvature), 0.32)
-        maskSlider = slider(132, 250, Double(AppSettings.apertureMask), 0.6)
-        bloomSlider = slider(132, 218, Double(AppSettings.bloomScale), 2.5)
-        trailsSlider = slider(132, 186, Double(AppSettings.trails), 0.92)
-        ntscSlider = slider(132, 154, Double(AppSettings.ntsc), 1)
-        halSlider = slider(132, 122, Double(AppSettings.halation), 0.6)
-
-        [lbl("Szene:", 20, 508), lbl("Farbe:", 20, 476), lbl("Tempo:", 20, 444), lbl("Stadt-Höhe:", 20, 412),
-         lbl("Sichtweite:", 20, 380), lbl("Wetter:", 20, 348), lbl("CRT-Glitch:", 20, 316), lbl("Krümmung:", 20, 284),
-         lbl("Lochmaske:", 20, 252), lbl("Bloom:", 20, 220), lbl("Nachleuchten:", 20, 188),
-         lbl("NTSC:", 20, 156), lbl("Halation:", 20, 124)].forEach { cv.addSubview($0) }
-        [scenePopup!, presetPopup!, speedPopup!, altPopup!, fogPopup!, weatherPopup!].forEach { cv.addSubview($0) }
-        [intensitySlider!, curvSlider!, maskSlider!, bloomSlider!, trailsSlider!, ntscSlider!, halSlider!].forEach { cv.addSubview($0) }
-
-        // === right column ===
-        hudCheck = chk("HUD (Instrumente)", 340, 508, AppSettings.showHud, #selector(changed))
-        dayNightCheck = chk("Tag/Nacht-Zyklus", 340, 482, AppSettings.dayNight, #selector(changed))
-        soundCheck = chk("Ton (Atmosphäre)", 340, 456, AppSettings.sound, #selector(changed))
-        cycleCheck = chk("Szenen automatisch wechseln", 340, 430, AppSettings.autoCycle, #selector(changed))
-        cyclePopup = popup(445, 396, 155); cyclePopup.addItems(withTitles: ["30 Sek", "1 Min", "2 Min", "5 Min"]); cyclePopup.selectItem(at: cycleMins.firstIndex(of: AppSettings.cycleMinutes) ?? 0)
-        idlePopup = popup(445, 362, 155); idlePopup.addItems(withTitles: idleMins.map { "\(Int($0)) Min" }); idlePopup.selectItem(at: idleMins.firstIndex(of: AppSettings.idleMinutes) ?? 2)
-        termSlider = slider(445, 330, Double(AppSettings.terminalScale), 4.8, 0.7, 155)
-        autostartCheck = chk("Bei Inaktivität automatisch starten (Login)", 340, 296, LoginItem.isEnabled, #selector(toggleAutostart))
-        autostartCheck.frame.size.width = 280
-        flatHudCheck = chk("HUD flach (über Monitor, statt gekrümmt)", 340, 272, AppSettings.flatHud, #selector(changed))
-        flatHudCheck.frame.size.width = 280
-        reactiveWorldCheck = chk("Welt reagiert auf die Story (Nebel/CRT/Eskalation)", 340, 246, AppSettings.reactiveWorld, #selector(changed))
-        reactiveWorldCheck.frame.size.width = 300
-
-        [hudCheck!, dayNightCheck!, soundCheck!, cycleCheck!, autostartCheck!, flatHudCheck!, reactiveWorldCheck!].forEach { cv.addSubview($0) }
-        cv.addSubview(lbl("Wechsel:", 340, 398)); cv.addSubview(cyclePopup)
-        cv.addSubview(lbl("Auto-Start:", 340, 364)); cv.addSubview(idlePopup)
-        cv.addSubview(lbl("Terminal-Größe:", 340, 332)); cv.addSubview(termSlider)
-
-        terminalPopup = popup(425, 188, 175)
-        terminalPopup.addItems(withTitles: termLayouts.map { $0.0 })
+        speedPopup = mkPopup(); speedPopup.addItems(withTitles: speeds.map { $0.0 }); speedPopup.selectItem(at: speeds.firstIndex { $0.1 == AppSettings.speed } ?? 1)
+        altPopup = mkPopup(); altPopup.addItems(withTitles: alts.map { $0.0 }); altPopup.selectItem(at: alts.firstIndex { $0.1 == AppSettings.cityAltitude } ?? 0)
+        fogPopup = mkPopup(); fogPopup.addItems(withTitles: fogs.map { $0.0 }); fogPopup.selectItem(at: fogs.firstIndex { $0.1 == AppSettings.fog } ?? 1)
+        weatherPopup = mkPopup(); weatherPopup.addItems(withTitles: weathers.map { $0.0 }); weatherPopup.selectItem(at: weathers.firstIndex { $0.1 == AppSettings.weather } ?? 0)
+        intensitySlider = mkSlider(Double(AppSettings.intensity), 1)
+        curvSlider = mkSlider(Double(AppSettings.curvature), 0.32)
+        maskSlider = mkSlider(Double(AppSettings.apertureMask), 0.6)
+        bloomSlider = mkSlider(Double(AppSettings.bloomScale), 2.5)
+        trailsSlider = mkSlider(Double(AppSettings.trails), 0.92)
+        ntscSlider = mkSlider(Double(AppSettings.ntsc), 1)
+        halSlider = mkSlider(Double(AppSettings.halation), 0.6)
+        cyclePopup = mkPopup(); cyclePopup.addItems(withTitles: ["30 Sek", "1 Min", "2 Min", "5 Min"]); cyclePopup.selectItem(at: cycleMins.firstIndex(of: AppSettings.cycleMinutes) ?? 0)
+        idlePopup = mkPopup(); idlePopup.addItems(withTitles: idleMins.map { "\(Int($0)) Min" }); idlePopup.selectItem(at: idleMins.firstIndex(of: AppSettings.idleMinutes) ?? 2)
+        termSlider = mkSlider(Double(AppSettings.terminalScale), 4.8, 0.7)
+        bandSlider = mkSlider(Double(AppSettings.terminalBandHeight), 0.5, 0.12)
+        bankSlider = mkSlider(Double(AppSettings.bankStrength), 2.0, 0)
+        terminalPopup = mkPopup(); terminalPopup.addItems(withTitles: termLayouts.map { $0.0 })
         terminalPopup.selectItem(at: termLayouts.firstIndex { $0.1 == AppSettings.terminalLayout } ?? 1)
-        cv.addSubview(lbl("Terminal:", 340, 190)); cv.addSubview(terminalPopup)
-        bandSlider = slider(445, 156, Double(AppSettings.terminalBandHeight), 0.5, 0.12, 155)
-        cv.addSubview(lbl("Leisten-Höhe:", 340, 158)); cv.addSubview(bandSlider)
-        bankSlider = slider(445, 122, Double(AppSettings.bankStrength), 2.0, 0, 155)
-        cv.addSubview(lbl("Flug-Bank:", 340, 124)); cv.addSubview(bankSlider)
 
+        // Checkboxes.
+        hudCheck = mkCheck("HUD (Instrumente)", AppSettings.showHud)
+        dayNightCheck = mkCheck("Tag/Nacht-Zyklus", AppSettings.dayNight)
+        soundCheck = mkCheck("Ton (Atmosphäre)", AppSettings.sound)
+        cycleCheck = mkCheck("Szenen automatisch wechseln", AppSettings.autoCycle)
+        autostartCheck = mkCheck("Bei Inaktivität automatisch starten", LoginItem.isEnabled, #selector(toggleAutostart))
+        flatHudCheck = mkCheck("HUD flach (über Monitor, statt gekrümmt)", AppSettings.flatHud)
+        reactiveWorldCheck = mkCheck("Welt reagiert auf die Story (Nebel/CRT)", AppSettings.reactiveWorld)
+
+        // Sections, grouped into two columns.
+        let secBild = section("Bild", [grid([
+            [lab("Szene:"), scenePopup], [lab("Farbe:"), presetPopup], [lab("Tempo:"), speedPopup],
+            [lab("Stadt-Höhe:"), altPopup], [lab("Sichtweite:"), fogPopup], [lab("Wetter:"), weatherPopup],
+        ])])
+        let secCRT = section("CRT-Effekte", [grid([
+            [lab("CRT-Glitch:"), intensitySlider], [lab("Krümmung:"), curvSlider], [lab("Lochmaske:"), maskSlider],
+            [lab("Bloom:"), bloomSlider], [lab("Nachleuchten:"), trailsSlider], [lab("NTSC:"), ntscSlider],
+            [lab("Halation:"), halSlider],
+        ]), flatHudCheck])
+        let secMotion = section("Bewegung & Story", [grid([
+            [lab("Flug-Bank:"), bankSlider], [lab("Terminal:"), terminalPopup],
+            [lab("Terminal-Größe:"), termSlider], [lab("Leisten-Höhe:"), bandSlider],
+        ]), reactiveWorldCheck])
+        let secBehavior = section("Anzeige & Automatik", [
+            hudCheck, dayNightCheck, soundCheck, cycleCheck,
+            grid([[lab("Wechsel:"), cyclePopup], [lab("Auto-Start:"), idlePopup]]), autostartCheck,
+        ])
+
+        let leftCol = NSStackView(views: [secBild, secCRT]); leftCol.orientation = .vertical; leftCol.spacing = 18; leftCol.alignment = .leading
+        let rightCol = NSStackView(views: [secMotion, secBehavior]); rightCol.orientation = .vertical; rightCol.spacing = 18; rightCol.alignment = .leading
+        let columns = NSStackView(views: [leftCol, rightCol]); columns.orientation = .horizontal; columns.spacing = 28; columns.alignment = .top
+
+        // Action buttons.
         let startBtn = NSButton(title: "Vollbild starten", target: self, action: #selector(startFullscreen))
-        startBtn.frame = NSRect(x: 340, y: 234, width: 128, height: 36); startBtn.bezelStyle = .rounded; startBtn.keyEquivalent = "\r"
-        cv.addSubview(startBtn)
+        startBtn.bezelStyle = .rounded; startBtn.keyEquivalent = "\r"
         let wallBtn = NSButton(title: "Als Hintergrund", target: self, action: #selector(setAsWallpaper))
-        wallBtn.frame = NSRect(x: 474, y: 234, width: 126, height: 36); wallBtn.bezelStyle = .rounded
+        wallBtn.bezelStyle = .rounded
         wallBtn.toolTip = "Den Live-Render mit den aktuellen Einstellungen als animierten Desktop-Hintergrund setzen (hinter den Icons). Entfernen über das ▦-Menü in der Menüleiste."
-        cv.addSubview(wallBtn)
+        let actions = NSStackView(views: [NSView(), startBtn, wallBtn]); actions.orientation = .horizontal; actions.spacing = 12
 
-        let hint = NSTextField(labelWithString: "Vorschau läuft live. Im Vollbild beendet jede Eingabe den Screensaver. Krümmung + Lochmaske + Nachleuchten geben den echten CRT-Look.")
-        hint.frame = NSRect(x: 20, y: 70, width: 580, height: 42)
+        let hint = NSTextField(wrappingLabelWithString: "Vorschau läuft live. Im Vollbild beendet jede Eingabe den Screensaver. Als Hintergrund setzt den Live-Render hinter die Desktop-Icons.")
         hint.textColor = .secondaryLabelColor; hint.font = .systemFont(ofSize: 11)
-        hint.maximumNumberOfLines = 2; hint.lineBreakMode = .byWordWrapping
-        cv.addSubview(hint)
+
+        let root = NSStackView(views: [previewContainer, lookRow, columns, actions, hint])
+        root.orientation = .vertical; root.spacing = 14; root.alignment = .leading
+        root.translatesAutoresizingMaskIntoConstraints = false
+        cv.addSubview(root)
+        NSLayoutConstraint.activate([
+            root.topAnchor.constraint(equalTo: cv.topAnchor, constant: 20),
+            root.leadingAnchor.constraint(equalTo: cv.leadingAnchor, constant: 20),
+            // `columns` drives the width; the full-width rows match it (avoids circularity).
+            previewContainer.widthAnchor.constraint(equalTo: columns.widthAnchor),
+            lookRow.widthAnchor.constraint(equalTo: columns.widthAnchor),
+            actions.widthAnchor.constraint(equalTo: columns.widthAnchor),
+            hint.widthAnchor.constraint(equalTo: columns.widthAnchor),
+        ])
     }
 
     /// A manual tweak of any slider/checkbox → the combo no longer matches a
