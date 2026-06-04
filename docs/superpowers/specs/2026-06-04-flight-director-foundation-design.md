@@ -1,7 +1,14 @@
 # Flight Director Foundation — Design (Brick A)
 
 - **Date:** 2026-06-04
-- **Status:** Approved (design), implementation pending
+- **Status:** Implemented (Brick A) — web + native, verified (typecheck + native logic
+  tests + app compile + render check). Branch `feat/flight-director-foundation`.
+  - **Deviations from plan:** (1) the rift barrel-roll stays inline (now seeded via
+    `ctx.rng()`) rather than re-expressed as a director `roll` manoeuvre — deferred to
+    Brick B, as the plan scoped. (2) The native `--event` harness hook was not added
+    (the web `?event=` + the existing native `--threat` cover tuning; the harness's
+    single-frame capture makes one-shot events awkward). The `roll`/`dive`/`climb`/`bank`
+    manoeuvre kinds exist and are unit-tested, ready for Brick B.
 - **Author:** Johannes + Claude (pair)
 - **Scope:** Brick **A** of the "Procedural Film" roadmap. Skeleton + wiring only.
 
