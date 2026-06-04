@@ -74,5 +74,27 @@ do {
     check(SceneRegistry.ids.contains("matrix"), "matrix scene registered")
 }
 
+// --- FlightDirector: envelope math (mirrors src/engine/modes/flight-director.ts) --
+// sin²(πp): value AND slope are 0 at both ends, peak 1 at the middle → no roll snap.
+do {
+    approx(Double(FlightDirector.envelope(0.0)), 0.0, 1e-12, "env(0)=0")
+    approx(Double(FlightDirector.envelope(1.0)), 0.0, 1e-12, "env(1)=0")
+    approx(Double(FlightDirector.envelope(0.5)), 1.0, 1e-9,  "env(0.5)=1")
+    check(FlightDirector.envelope(0.001) < 1e-3, "env slope→0 at start")
+    check(FlightDirector.envelope(0.999) < 1e-3, "env slope→0 at end")
+}
+
+// --- FlightDirector: same seed ⇒ identical kick result (the regenerating film) ----
+do {
+    let a = FlightDirector(seed: 1337); let b = FlightDirector(seed: 1337)
+    a.enqueue(Manoeuvre(kind: .kick, dur: 1.0, dir: 0, intensity: 0.55))
+    b.enqueue(Manoeuvre(kind: .kick, dur: 1.0, dir: 0, intensity: 0.55))
+    var ca = Camera(); ca.position.x = 1
+    var cb = Camera(); cb.position.x = 1
+    for _ in 0..<10 { a.update(t: 0, dt: 0.05); a.apply(&ca); b.update(t: 0, dt: 0.05); b.apply(&cb) }
+    approx(Double(ca.position.x), Double(cb.position.x), 1e-12, "director deterministic x")
+    check(ca.position.x < 1.0, "kick dampened cam.x")
+}
+
 if failures > 0 { print("\n\(failures) FAILURE(S)"); exit(1) }
 print("\nALL PASS (\(failures == 0))")
