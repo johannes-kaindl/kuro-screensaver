@@ -19,8 +19,9 @@ struct Look {
 
 enum Looks {
     static let all: [Look] = [
-        // Crisp + modern: barely-there tube, no glitch, neutral phosphor.
-        Look(id: "clean",  label: "Sauber",            preset: "kuro",     curvature: 0.04, apertureMask: 0.06, trails: 0.10, ntsc: 0.0, halation: 0.05, bloomScale: 0.8, intensity: 0.10, matrix: false),
+        // Sauber: a clean, crisp render — every degradation effect off (flat, no grille,
+        // no smear/glitch/bleed), only a touch of bloom so wireframes still glow.
+        Look(id: "clean",  label: "Sauber",            preset: "kuro",     curvature: 0.0,  apertureMask: 0.0,  trails: 0.0,  ntsc: 0.0, halation: 0.0,  bloomScale: 0.45, intensity: 0.0,  matrix: false),
         // The full vintage tube: heavy curve, visible grille, green glow.
         Look(id: "heavy",  label: "Voll-CRT",          preset: "phosphor", curvature: 0.22, apertureMask: 0.45, trails: 0.50, ntsc: 0.6, halation: 0.40, bloomScale: 1.4, intensity: 0.50, matrix: false),
         // Damaged signal: frequent glitches, strong NTSC shimmer, crimson.

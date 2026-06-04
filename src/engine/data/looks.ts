@@ -18,7 +18,7 @@ export interface Look {
 }
 
 export const LOOKS: Record<string, Look> = {
-  clean:  { label: 'Clean',           preset: 'kuro',     curvature: 0.04, aperture: 0.06, trails: 0.10, ntsc: 0.0, halation: 0.05, bloom: 0.9, intensity: 0.10, matrix: false },
+  clean:  { label: 'Clean',           preset: 'kuro',     curvature: 0.0,  aperture: 0.0,  trails: 0.0,  ntsc: 0.0, halation: 0.0,  bloom: 0.6, intensity: 0.0,  matrix: false },
   heavy:  { label: 'Heavy CRT',       preset: 'phosphor', curvature: 0.22, aperture: 0.45, trails: 0.50, ntsc: 0.6, halation: 0.40, bloom: 1.6, intensity: 0.50, matrix: false },
   broken: { label: 'Broken Terminal', preset: 'crimson',  curvature: 0.17, aperture: 0.32, trails: 0.42, ntsc: 0.9, halation: 0.50, bloom: 1.4, intensity: 0.85, matrix: false },
   vapor:  { label: 'Vaporwave',       preset: 'spectre',  curvature: 0.14, aperture: 0.18, trails: 0.70, ntsc: 0.4, halation: 0.60, bloom: 1.9, intensity: 0.20, matrix: false },
@@ -40,5 +40,5 @@ export function applyLook(s: ScreensaverSettings, key: string): void {
   s.fx.bloom     = { on: true, strength: L.bloom };
   s.fx.matrix    = { on: L.matrix, density: s.fx.matrix.density };
   s.crtSim.intensity = L.intensity;
-  if (L.intensity > 0.001) s.crtSim.on = true;
+  s.crtSim.on = L.intensity > 0.001;   // Clean (intensity 0) turns the glitch sim OFF
 }

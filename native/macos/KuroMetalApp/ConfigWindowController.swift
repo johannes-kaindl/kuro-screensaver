@@ -268,7 +268,7 @@ final class ConfigWindowController: NSWindowController {
     /// wallpaper's ▦ menu-bar item ("Hintergrund beenden").
     @objc private func setAsWallpaper(_ sender: NSButton) {
         persist()
-        LoginItem.enableWallpaper()
+        (NSApp.delegate as? AppDelegate)?.setWallpaperFromConfig()
         let orig = sender.title
         sender.title = "Gesetzt ✓"
         sender.isEnabled = false

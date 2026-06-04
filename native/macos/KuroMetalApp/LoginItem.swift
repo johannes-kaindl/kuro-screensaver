@@ -19,7 +19,10 @@ enum LoginItem {
         FileManager.default.fileExists(atPath: plistURL(label).path)
     }
 
-    static func enable(_ label: String, args: [String], keepAlive: Bool) {
+    /// Write (+ optionally start now) a login agent. `bootstrapNow == false` only
+    /// installs the plist (it loads at the next login) — used when the caller already
+    /// hosts the process in-proc and just wants login persistence (no double launch).
+    static func enable(_ label: String, args: [String], keepAlive: Bool, bootstrapNow: Bool = true) {
         let exe = Bundle.main.executablePath ?? CommandLine.arguments[0]
         let plist: [String: Any] = [
             "Label": label,
@@ -34,8 +37,8 @@ enum LoginItem {
         if let data = try? PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0) {
             try? data.write(to: url)
         }
-        launchctl("bootout", "gui/\(getuid())/\(label)")
-        launchctl("bootstrap", "gui/\(getuid())", url.path)
+        launchctl("bootout", "gui/\(getuid())/\(label)")          // clear any running instance
+        if bootstrapNow { launchctl("bootstrap", "gui/\(getuid())", url.path) }
     }
 
     static func disable(_ label: String) {
@@ -50,7 +53,7 @@ enum LoginItem {
 
     // ── wallpaper (desktop background) ─────────────────────────────────────
     static var wallpaperEnabled: Bool { isEnabled(wallpaperLabel) }
-    static func enableWallpaper() { enable(wallpaperLabel, args: ["--wallpaper"], keepAlive: true) }
+    static func enableWallpaper(bootstrapNow: Bool = true) { enable(wallpaperLabel, args: ["--wallpaper"], keepAlive: true, bootstrapNow: bootstrapNow) }
     static func disableWallpaper() { disable(wallpaperLabel) }
 
     private static func launchctl(_ args: String...) {

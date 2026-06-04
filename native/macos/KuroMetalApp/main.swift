@@ -115,6 +115,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// "Als Hintergrund" from the config window: host the wallpaper IN-PROCESS (so there
+    /// is no separate-process flash) and persist it for the next login WITHOUT launching
+    /// a second instance now. Re-applies the latest settings if already hosting.
+    func setWallpaperFromConfig() {
+        if power == nil { startWallpaper() }     // first time: windows + power + status item + screen observer
+        else { buildWallpaperWindows(); applyPowerPolicy() }   // re-apply with the new settings
+        LoginItem.enableWallpaper(bootstrapNow: false)
+        NSApp.setActivationPolicy(.accessory)
+    }
+
     private func setupWallpaperStatusItem() {
         let item = NSStatusItem.local()
         item.button?.title = "▦"
