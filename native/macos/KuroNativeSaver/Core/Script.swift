@@ -11,6 +11,21 @@ enum ShiftPhase { case routine, intrusion, alarm, panic, silence }
 
 enum Script {
     typealias C = Terminal.Cat
+
+    // Foreshadow hints for an upcoming scene, keyed by sceneId (Brick C). Emitted ~6s
+    // before the warp so the transition feels motivated. Mirror of web SCENE_FORESHADOW.
+    static let sceneForeshadow: [String: [String]] = [
+        "terrain": ["// dropping to terrain sweep", "// low-altitude recon vector locked"],
+        "city":    ["// proximity alert: megacity grid ahead", "// approach vector — CHROME district"],
+        "rift":    ["// fault line detected — descending", "// the floor opens up ahead"],
+        "tunnel":  ["// hyperdrive spinning up", "// conduit acquired — punch-through in 3"],
+        "void":    ["// debris field on the scope", "// CORP station wreckage ahead"],
+    ]
+    static func foreshadowLine(_ scene: String, _ index: Int) -> String? {
+        guard let lines = sceneForeshadow[scene], !lines.isEmpty else { return nil }
+        return lines[index % lines.count]
+    }
+
     struct Beat { let cmd: String; let resp: [(String, C)] }
     struct Intrusion { let text: String; let followup: String? }
     struct Drafts { let drafts: [String]; let final: String }
