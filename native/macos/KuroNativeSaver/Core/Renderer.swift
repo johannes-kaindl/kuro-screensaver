@@ -56,6 +56,7 @@ final class Renderer {
         let bus = EventBus()
         self.bus = bus
         self.director = FlightDirector(seed: settings.seed ?? freshSeed(), bus: bus)
+        self.film = FilmDirector(seed: settings.seed ?? freshSeed())
 
         let lib: MTLLibrary
         do { lib = try device.makeLibrary(source: Shaders.source, options: nil) }
@@ -96,12 +97,40 @@ final class Renderer {
     /// Debug: freeze a crash-collapse amount for single-frame verification.
     func debugForceCrash(_ amount: Float) { crash.debugSet(collapse: amount) }
 
-    private func swapScene() {
-        sceneIndex = (sceneIndex + 1) % SceneRegistry.ids.count
+    private func swapSceneTo(_ id: String) {
+        if let idx = SceneRegistry.ids.firstIndex(of: id) { sceneIndex = idx }
         var ctx = SceneContext(device: device, rng: LCG(seed: freshSeed()),
                                settings: settings, accent: preset.accentRGB)
         ctx.directorSpeed = { [weak self] in self?.director.speed() ?? 1 }
         scene = SceneRegistry.make(SceneRegistry.ids[sceneIndex], ctx: ctx)
+    }
+
+    /// native film-mode gate (no autoCycle.on setting; autoCycleSec>0 means "film on").
+    private var filmMode: Bool { autoCycleSec > 0 }
+
+    /// Phase began: warp to the film's scene for this phase (film mode only).
+    private func onFilmPhase(_ phase: ShiftPhase) {
+        guard filmMode else { return }
+        if currentFilmScene == nil {                       // first phase: adopt the opened scene
+            currentFilmScene = SceneRegistry.ids[sceneIndex]
+            phaseCounter += 1
+            return
+        }
+        let next = film.sceneAt(phaseCounter, phase: phase, prev: currentFilmScene)
+        if next != SceneRegistry.ids[sceneIndex] {
+            beginTransition(TransitionProfiles.profileFor(from: SceneRegistry.ids[sceneIndex], to: next)) { [weak self] in
+                self?.pulse(.warp); self?.swapSceneTo(next)
+            }
+        }
+        currentFilmScene = next
+        phaseCounter += 1
+    }
+
+    /// Foreshadow line for the upcoming phase's scene (matches the arrival query).
+    private func foreshadowFor(_ nextPhase: ShiftPhase) -> String? {
+        guard filmMode else { return nil }
+        let sc = film.sceneAt(phaseCounter, phase: nextPhase, prev: currentFilmScene)
+        return Script.foreshadowLine(sc, phaseCounter)
     }
 
     private func ensureTextures(_ w: Int, _ h: Int) {
@@ -131,6 +160,10 @@ final class Renderer {
     private var hesWired = false
     let bus: EventBus
     private let director: FlightDirector
+    private let film: FilmDirector
+    private var phaseCounter = 0
+    private var currentFilmScene: String? = nil
+    private var filmWired = false
     enum PulseKind { case flash, surge, warp }
     // One-shot additive envelopes layered on the threat-derived mults (NOT threat).
     private var envelopes: [(t0: Double, dur: Double, bloom: Float, fog: Float)] = []
@@ -232,6 +265,11 @@ final class Renderer {
             }
             hesWired = true
         }
+        if !filmWired {
+            hud.terminal.onPhaseEnter = { [weak self] p in self?.onFilmPhase(p) }
+            hud.terminal.sceneForeshadow = { [weak self] np in self?.foreshadowFor(np) }
+            filmWired = true
+        }
         let st = settings.reactiveWorld ? stormScalar : 0
         (scene as? TerrainScene)?.storm = st
         (scene as? VoidScene)?.storm = st
@@ -253,17 +291,9 @@ final class Renderer {
             ? min(1, settings.crtIntensity + threat * 0.7) : settings.crtIntensity
         scanDriftY = (scanDriftY + 36 * Float(dt)).truncatingRemainder(dividingBy: 4)
 
-        // scene auto-cycle via a warp transition (Brick B; replaces the crash-cut)
-        sceneAge += dt
-        if autoCycleSec > 0 && sceneAge > autoCycleSec && !director.inTransition {
-            sceneAge = 0
-            let from = SceneRegistry.ids[sceneIndex]
-            let to = SceneRegistry.ids[(sceneIndex + 1) % SceneRegistry.ids.count]
-            beginTransition(TransitionProfiles.profileFor(from: from, to: to)) { [weak self] in
-                self?.pulse(.warp); self?.swapScene()
-            }
-        }
-        _ = crash.update(dt: dt)   // power-on / boot crash visual only — no longer swaps
+        // Scene changes are phase-driven (Brick C: onFilmPhase warps at each phase
+        // boundary in film mode). crash.update stays for the boot power-on only.
+        _ = crash.update(dt: dt)
     }
 
     /// Draw the current state into `target`.

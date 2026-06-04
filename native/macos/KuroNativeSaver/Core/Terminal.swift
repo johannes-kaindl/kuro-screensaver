@@ -23,6 +23,9 @@ final class Terminal {
 
     // Reactive-world signal (read by ReactiveWorld in Renderer each frame).
     var onIntrusion: (() -> Void)?     // fired when an intrusion event lands → camera hesitation
+    var onPhaseEnter: ((ShiftPhase) -> Void)?        // Brick C: phase begins → film warps
+    var sceneForeshadow: ((ShiftPhase) -> String?)?  // resolve foreshadow line for the next phase
+    private var foreshadowed = false
     var currentPhase: ShiftPhase { phase }
     func phaseProgress(_ t: Double) -> Double {
         let span = phaseEndsAt - phaseStartedAt
@@ -54,6 +57,12 @@ final class Terminal {
 
     func update(t: Double) {
         if phaseEndsAt < 0 { enterPhase(.routine, t: t) }
+        if !foreshadowed && phaseEndsAt > 0 && t >= phaseEndsAt - 6 {   // Brick C: foreshadow next scene
+            foreshadowed = true
+            if let line = sceneForeshadow?(Terminal.nextPhase(phase)) {
+                lines.append(Line(text: prefix(.hq) + line, category: .hq))
+            }
+        }
         if t >= phaseEndsAt, queue.isEmpty, actionStart < 0 { advancePhase(t) }
 
         if actionStart < 0 {
@@ -148,9 +157,18 @@ final class Terminal {
         case .routine, .intrusion: return 1; case .alarm: return 1.11; case .panic: return 1.28; case .silence: return 0.59
         }
     }
+    static func nextPhase(_ p: ShiftPhase) -> ShiftPhase {
+        switch p {
+        case .routine: return .intrusion; case .intrusion: return .alarm
+        case .alarm: return .panic; case .panic: return .silence; case .silence: return .routine
+        }
+    }
+
     private func enterPhase(_ p: ShiftPhase, t: Double) {
         phase = p; phaseStartedAt = t; phaseEndsAt = t + dur(p); queue.removeAll(); actionStart = -1; restUntil = t
         cps = 26.3 / Double(persona.trait.baseSpeed) * phaseSpeed(p)
+        foreshadowed = false
+        onPhaseEnter?(p)
     }
     private func advancePhase(_ t: Double) {
         switch phase {
