@@ -109,8 +109,12 @@ final class ConfigWindowController: NSWindowController {
         cv.addSubview(lbl("Flug-Bank:", 340, 124)); cv.addSubview(bankSlider)
 
         let startBtn = NSButton(title: "Vollbild starten", target: self, action: #selector(startFullscreen))
-        startBtn.frame = NSRect(x: 340, y: 234, width: 260, height: 36); startBtn.bezelStyle = .rounded; startBtn.keyEquivalent = "\r"
+        startBtn.frame = NSRect(x: 340, y: 234, width: 128, height: 36); startBtn.bezelStyle = .rounded; startBtn.keyEquivalent = "\r"
         cv.addSubview(startBtn)
+        let wallBtn = NSButton(title: "Als Hintergrund", target: self, action: #selector(setAsWallpaper))
+        wallBtn.frame = NSRect(x: 474, y: 234, width: 126, height: 36); wallBtn.bezelStyle = .rounded
+        wallBtn.toolTip = "Den Live-Render mit den aktuellen Einstellungen als animierten Desktop-Hintergrund setzen (hinter den Icons). Entfernen über das ▦-Menü in der Menüleiste."
+        cv.addSubview(wallBtn)
 
         let hint = NSTextField(labelWithString: "Vorschau läuft live. Im Vollbild beendet jede Eingabe den Screensaver. Krümmung + Lochmaske + Nachleuchten geben den echten CRT-Look.")
         hint.frame = NSRect(x: 20, y: 70, width: 580, height: 42)
@@ -197,5 +201,20 @@ final class ConfigWindowController: NSWindowController {
 
     @objc private func startFullscreen() {
         (NSApp.delegate as? AppDelegate)?.startScreensaver(returnToConfig: true)
+    }
+
+    /// Set the current configuration as the animated desktop background. Persists the
+    /// settings, then boots (+ login-installs) a separate `--wallpaper` process that
+    /// reads them. Clicking again re-applies the latest settings. Remove it via the
+    /// wallpaper's ▦ menu-bar item ("Hintergrund beenden").
+    @objc private func setAsWallpaper(_ sender: NSButton) {
+        persist()
+        LoginItem.enableWallpaper()
+        let orig = sender.title
+        sender.title = "Gesetzt ✓"
+        sender.isEnabled = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
+            sender.title = orig; sender.isEnabled = true
+        }
     }
 }

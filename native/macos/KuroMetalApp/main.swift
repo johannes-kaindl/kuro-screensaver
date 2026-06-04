@@ -127,10 +127,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         batt.state = AppSettings.wallpaperOnBattery ? .on : .off
         menu.addItem(batt)
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Hintergrund beenden", action: #selector(menuQuit), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Hintergrund beenden", action: #selector(quitWallpaper), keyEquivalent: ""))
         menu.items.forEach { $0.target = self }
         item.menu = menu
         statusItem = item
+    }
+
+    /// Remove the wallpaper: disable the KeepAlive LaunchAgent first (else launchd would
+    /// immediately relaunch the process), then terminate.
+    @objc private func quitWallpaper() {
+        LoginItem.disableWallpaper()
+        NSApp.terminate(nil)
     }
 
     @objc private func toggleWallpaperLogin(_ sender: NSMenuItem) {
