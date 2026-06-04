@@ -41,6 +41,10 @@ const PHASE_DURATION: Record<Phase, [number, number]> = {
   SILENCE:    [25, 45],
 };
 
+const NEXT_PHASE: Record<Phase, Phase> = {
+  ROUTINE: 'INTRUSION', INTRUSION: 'ALARM', ALARM: 'PANIC', PANIC: 'SILENCE', SILENCE: 'ROUTINE',
+};
+
 export interface NarrativeRunnerDeps {
   hud: Hud;
   /** Span receiving the operator's typed input (no handle, no cursor). */
@@ -57,6 +61,10 @@ export interface NarrativeRunnerDeps {
   onShiftEnd?: (clearScreen: () => void) => Promise<void>;
   /** Fired when an intrusion event lands — drives the reactive-world camera hesitation. */
   onIntrusion?: () => void;
+  /** Fired when a phase begins — the film warps to this phase's scene (Brick C). */
+  onPhaseEnter?: (phase: Phase) => void;
+  /** Resolve a foreshadow line for the NEXT phase's scene (null = none). */
+  sceneForeshadow?: (nextPhase: Phase) => string | null;
 }
 
 export class NarrativeRunner {
@@ -133,6 +141,7 @@ export class NarrativeRunner {
     this.generation++;
     const myGen = this.generation;
     this.phase = p;
+    this.d.onPhaseEnter?.(p);
     const [lo, hi] = PHASE_DURATION[p];
     this.phaseStartedAt = Date.now();
     this.phaseEndsAt = this.phaseStartedAt + (lo + Math.random() * (hi - lo)) * 1000 * this.durationScale;
@@ -142,16 +151,20 @@ export class NarrativeRunner {
 
   private scheduleTransition() {
     const wait = Math.max(2000, this.phaseEndsAt - Date.now());
+    const gen = this.generation;
+    // Foreshadow the upcoming scene ~6s before the phase boundary (Brick C).
+    // Scale the lead with durationScale so it works at any film speed.
+    const lead = 6000 * this.durationScale;
+    if (wait > lead + 1500) {
+      this.timers.push(window.setTimeout(() => {
+        if (!this.alive || this.generation !== gen) return;
+        const line = this.d.sceneForeshadow?.(NEXT_PHASE[this.phase]);
+        if (line) void this.d.hud.addLine(line, 'HQ');
+      }, wait - lead));
+    }
     this.timers.push(window.setTimeout(() => {
       if (!this.alive) return;
-      const next: Record<Phase, Phase> = {
-        ROUTINE:   'INTRUSION',
-        INTRUSION: 'ALARM',
-        ALARM:     'PANIC',
-        PANIC:     'SILENCE',
-        SILENCE:   'ROUTINE',
-      };
-      if (next[this.phase] === 'ROUTINE') {
+      if (NEXT_PHASE[this.phase] === 'ROUTINE') {
         // Reset between shifts — fresh persona, brief blank moment
         this.silentReset(() => {
           this.persona = makePersona(Math.random);
@@ -159,7 +172,7 @@ export class NarrativeRunner {
           this.enterPhase('ROUTINE');
         });
       } else {
-        this.enterPhase(next[this.phase]);
+        this.enterPhase(NEXT_PHASE[this.phase]);
       }
     }, wait));
   }

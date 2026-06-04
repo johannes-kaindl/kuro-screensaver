@@ -27,9 +27,11 @@ export interface HostPlugin {
   saveData: (data: any) => Promise<void>;
   app?: { workspace?: { getActiveFile?: () => { basename?: string } | null } };
 }
-import { NarrativeRunner } from './terminal/narrative';
+import { NarrativeRunner, type Phase } from './terminal/narrative';
 import { ReactiveWorld } from './fx/reactive-world';
 import { profileFor } from './modes/transition-profiles';
+import { FilmDirector } from './modes/film-director';
+import { foreshadowLine } from './terminal/script-bank';
 import { mkRng, freshSeed } from './engine/rng';
 import { CrtSim } from './fx/crt-sim';
 
@@ -50,6 +52,9 @@ export class ScreensaverController {
   crt: CrtSim | null = null;
 
   private autoCycleTimer = 0;
+  private film: FilmDirector | null = null;
+  private phaseCounter = 0;
+  private currentFilmScene: SceneId | null = null;
   private idleTimer = 0;
   private lastActivity = 0;
   private dayNightT0 = 0;
@@ -274,6 +279,7 @@ export class ScreensaverController {
     // Narrative terminal: instantiate runner that drives the bottom terminal
     // through a CORP operator's shift (routine → intrusion → alarm → panic → reset).
     if (s.narrativeTerminal && s.hud.terminal && !this.state.embed) {
+      this.film = new FilmDirector(this.engine!.seed);
       this.narrative = new NarrativeRunner({
         hud: this.hud,
         promptInputEl: this.hud.promptInputEl,
@@ -281,6 +287,9 @@ export class ScreensaverController {
         // End of shift → diegetic CRT crash, then reboot into a fresh shift.
         onShiftEnd: (clearScreen) =>
           this.crt?.playCrash(clearScreen) ?? Promise.resolve(),
+        // Brick C: the narrative phase arc drives the film's scene itinerary.
+        onPhaseEnter: (phase) => this.onFilmPhase(phase),
+        sceneForeshadow: (nextPhase) => this.foreshadowFor(nextPhase),
       }, mkRng(freshSeed()), opts.storyScale);
       this.narrative.start();
     }
@@ -298,10 +307,8 @@ export class ScreensaverController {
       });
     }
 
-    // Auto-cycle
-    if (s.autoCycle.on && !this.state.embed) {
-      this.autoCycleTimer = window.setInterval(() => this.cycleScene(), s.autoCycle.intervalMin * 60_000);
-    }
+    // Scene changes are now phase-driven (Brick C): the FilmDirector warps at each
+    // narrative phase boundary when autoCycle.on (= film mode). No interval timer.
 
     // Weather: fold the fog override into baseFogDensity so it composes with fogMode +
     // the day-night cycle (the engine is the single fog writer: fogBase × fogThreatMult).
@@ -796,6 +803,27 @@ export class ScreensaverController {
       this.saveSettingsDebounced();
       this.rebuildBar();
     });
+  }
+
+  /** Phase began: warp to the film's scene for this phase (film mode = autoCycle.on). */
+  private onFilmPhase(phase: Phase) {
+    if (!this.engine || !this.film || !this.s.autoCycle?.on) return;
+    if (this.currentFilmScene === null) {               // first phase: adopt the opened scene, no warp
+      this.currentFilmScene = this.engine.currentScene as SceneId;
+      this.phaseCounter++;
+      return;
+    }
+    const next = this.film.sceneAt(this.phaseCounter, phase, this.currentFilmScene);
+    if (next !== this.engine.currentScene) this.switchScene(next);
+    this.currentFilmScene = next;
+    this.phaseCounter++;
+  }
+
+  /** Foreshadow line for the upcoming phase's scene (matches the arrival query). */
+  private foreshadowFor(nextPhase: Phase): string | null {
+    if (!this.engine || !this.film || !this.s.autoCycle?.on) return null;
+    const sc = this.film.sceneAt(this.phaseCounter, nextPhase, this.currentFilmScene);
+    return foreshadowLine(sc, this.phaseCounter);
   }
 
   cycleScene() {

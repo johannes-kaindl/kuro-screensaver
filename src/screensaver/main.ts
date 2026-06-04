@@ -74,6 +74,9 @@ const host = new WebHost({
 // merged settings (deepMerge has already run in the WebHost constructor).
 host.getSettings().sound.master = audioOn;
 if (matrixOn) host.getSettings().fx.matrix.on = true;
+// The screensaver IS the procedural film: run the phase-driven scene itinerary by
+// default (Brick C film mode). prefers-reduced-motion turns it back off in open().
+host.getSettings().autoCycle.on = true;
 
 const controller = new ScreensaverController(makePluginShim(host));
 
