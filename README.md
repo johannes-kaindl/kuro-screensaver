@@ -29,12 +29,15 @@ plugin). **The headline is a full native rewrite in Metal** — a real, live-ren
 macOS screensaver: no WebView, no pre-rendered video, the whole engine running on
 the GPU. The web build lives on for in-browser play and cross-platform packaging.
 
-**New in v0.4.x:** the web build reaches feature parity with native — analog-CRT
-pass (curvature/aperture/NTSC/halation), dynamic banking flight, one-click Looks,
-and a cinematic 5-layer matrix rain rendered in-monitor (bloomed + curved), now
-also selectable as its own **MATRIX** scene (v0.4.1). Native gains a flat-HUD
-toggle (crisp HUD/terminal over the curved scene) and richer, better-differentiated
-preset colours.
+**New in v0.6.0 — the world reacts to the story.** As the operator's shift escalates
+(`ROUTINE → INTRUSION → ALARM → PANIC`), the 3D world tightens with it: the fog closes
+in, the CRT degrades, the camera hesitates when something is noticed, a storm builds,
+and an "enemy" colour bleeds into the geometry — a subtle build that pays off near
+PANIC and is released by the crash. On web + native.
+
+Earlier (v0.4.x): web↔native feature parity — analog-CRT pass, dynamic banking flight,
+one-click Looks, a cinematic 5-layer matrix rain (also a selectable **MATRIX** scene),
+plus a native flat-HUD toggle and richer preset colours.
 
 ---
 
