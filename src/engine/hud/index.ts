@@ -595,7 +595,7 @@ export class Hud {
    * CMD lines render instantly (the operator already typed them live at the
    * prompt — re-typing in the scrollback would be redundant).
    */
-  addLine(txt: string, category: LineCategory = 'STATUS'): Promise<void> {
+  addLine(txt: string, category: LineCategory = 'STATUS', speaker?: string): Promise<void> {
     if (!this.settings.hud.terminal) return Promise.resolve();
 
     // Append new line at bottom (next to prompt) — full opacity.
@@ -625,7 +625,9 @@ export class Hud {
       }
     }
 
-    const prefix = Hud.PREFIX[category];
+    // Brick E: a speaker callsign overrides the category prefix (e.g. "[UNIT-A] "),
+    // so multi-speaker radio chatter keeps the category's colour but shows who's talking.
+    const prefix = speaker ? `[${speaker}] ` : Hud.PREFIX[category];
 
     // CMD lines: instant render. The operator already typed it at the prompt
     // (with full personality), so the scrollback entry is just the log.

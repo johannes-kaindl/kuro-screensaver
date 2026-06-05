@@ -96,6 +96,7 @@ final class Renderer {
                 guard let s = self else { return SIMD3<Float>(1, 0, 0.25) }
                 return s.enemyAccent(s.preset.accentRGB)
             }))
+        chatter = ChatterDirector(seed: settings.seed ?? freshSeed())   // Brick E radio chatter
         crash.powerOn()   // diegetic CRT power-on (image expands out of a line + flickers)
     }
 
@@ -152,8 +153,16 @@ final class Renderer {
         } else if kind == .unitCrash {
             pulse(.flash)
         }
+        // Brick E: multi-speaker radio chatter replaces the single-speaker combat line.
         let key = kind == .incomingFire ? "incomingFire" : (kind == .unitArrive ? "unitArrive" : "unitCrash")
-        if let line = Script.combatLine(key, combatIdx) { combatIdx += 1; hud.terminal.pushLine(line, .hq) }
+        chatter.fire(key, t: t)
+    }
+
+    private func phaseKey(_ p: ShiftPhase) -> String {
+        switch p {
+        case .routine: return "ROUTINE"; case .intrusion: return "INTRUSION"
+        case .alarm: return "ALARM"; case .panic: return "PANIC"; case .silence: return "SILENCE"
+        }
     }
 
     private func ensureTextures(_ w: Int, _ h: Int) {
@@ -190,7 +199,7 @@ final class Renderer {
     var actors: [Actor] = []
     private var combat: CombatDirector!
     private var combatWired = false
-    private var combatIdx = 0
+    private var chatter = ChatterDirector(seed: 0)   // re-seeded in init
     enum PulseKind { case flash, surge, warp }
     // One-shot additive envelopes layered on the threat-derived mults (NOT threat).
     private var envelopes: [(t0: Double, dur: Double, bloom: Float, fog: Float)] = []
@@ -293,7 +302,11 @@ final class Renderer {
             hesWired = true
         }
         if !filmWired {
-            hud.terminal.onPhaseEnter = { [weak self] p in self?.onFilmPhase(p) }
+            hud.terminal.onPhaseEnter = { [weak self] p in
+                guard let s = self else { return }
+                s.chatter.fire("phase:\(s.phaseKey(p))", t: s.t)   // Brick E phase chatter
+                s.onFilmPhase(p)
+            }
             hud.terminal.sceneForeshadow = { [weak self] np in self?.foreshadowFor(np) }
             filmWired = true
         }
@@ -319,6 +332,7 @@ final class Renderer {
         if dt > 0 { fps = fps * 0.9 + (1.0 / dt) * 0.1 }
         hud.setFps(fps)
         hud.terminal.update(t: t)
+        chatter.update(t: t, terminal: hud.terminal)   // Brick E: flush due chatter lines
         updateThreat(dt: dt)
         advanceEnvelopes()
         combat.update(t: t, threat: threat)

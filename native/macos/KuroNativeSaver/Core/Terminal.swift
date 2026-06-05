@@ -78,9 +78,12 @@ final class Terminal {
 
     func visibleLines(max n: Int) -> [Line] { Array(lines.suffix(n)) }
 
-    /// Append a line from outside the beat scheduler (Brick C foreshadow / D combat).
-    func pushLine(_ text: String, _ cat: Cat = .hq) {
-        lines.append(Line(text: prefix(cat) + text, category: cat))
+    /// Append a line from outside the beat scheduler (Brick C foreshadow / D combat /
+    /// E chatter). A speaker callsign overrides the category prefix (e.g. "[UNIT-A] ").
+    func pushLine(_ text: String, _ cat: Cat = .hq, speaker: String? = nil) {
+        let pre = speaker.map { "[\($0)] " } ?? prefix(cat)
+        lines.append(Line(text: pre + text, category: cat))
+        if lines.count > 60 { lines.removeFirst(lines.count - 60) }
     }
 
     func promptLine(t: Double) -> String {

@@ -31,7 +31,8 @@ import { NarrativeRunner, type Phase } from './terminal/narrative';
 import { ReactiveWorld } from './fx/reactive-world';
 import { profileFor } from './modes/transition-profiles';
 import { FilmDirector } from './modes/film-director';
-import { foreshadowLine, combatLine, arrivalLine } from './terminal/script-bank';
+import { foreshadowLine, arrivalLine } from './terminal/script-bank';
+import { ChatterDirector } from './modes/chatter-director';
 import { mkRng, freshSeed } from './engine/rng';
 import { CrtSim } from './fx/crt-sim';
 
@@ -48,6 +49,7 @@ export class ScreensaverController {
   hud: Hud | null = null;
   audio: AudioLayer | null = null;
   narrative: NarrativeRunner | null = null;
+  private chatter: ChatterDirector | null = null;
   reactiveWorld: ReactiveWorld | null = null;
   crt: CrtSim | null = null;
 
@@ -288,7 +290,8 @@ export class ScreensaverController {
         onShiftEnd: (clearScreen) =>
           this.crt?.playCrash(clearScreen) ?? Promise.resolve(),
         // Brick C: the narrative phase arc drives the film's scene itinerary.
-        onPhaseEnter: (phase) => this.onFilmPhase(phase),
+        // Brick E: each phase change can also trigger multi-speaker radio chatter.
+        onPhaseEnter: (phase) => { this.chatter?.fire(`phase:${phase}`); this.onFilmPhase(phase); },
         sceneForeshadow: (nextPhase) => this.foreshadowFor(nextPhase),
       }, mkRng(freshSeed()), opts.storyScale);
       this.narrative.start();
@@ -310,7 +313,8 @@ export class ScreensaverController {
     // Combat actors (Brick D): the engine's CombatDirector emits events on the bus;
     // react with a camera flinch + bloom flash + a terminal line.
     if (this.engine) {
-      let combatIdx = 0;
+      // Brick E: multi-speaker radio chatter replaces the single-speaker combat line.
+      this.chatter = new ChatterDirector(this.engine.seed, this.hud!);
       this.engine.bus.subscribe('*', (e) => {
         if (e.kind === 'incomingFire') {
           if (!reduceMotion) this.engine!.director.enqueue({ kind: 'kick', dur: 0.6, dir: 0, intensity: 0.5 });
@@ -319,8 +323,7 @@ export class ScreensaverController {
           this.reactiveWorld?.pulse('flash');
         }
         if (e.kind === 'incomingFire' || e.kind === 'unitArrive' || e.kind === 'unitCrash') {
-          const line = combatLine(e.kind, combatIdx++);
-          if (line) void this.hud?.addLine(line, 'HQ');
+          this.chatter?.fire(e.kind);
         }
       });
     }
