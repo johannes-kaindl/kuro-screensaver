@@ -44,6 +44,9 @@ final class TerrainScene: Scene {
     private var posAz = Terrain.startA
     private var posBz = Terrain.startB
     private var fly: CameraFly
+    private var courseT0: Double = 0
+    private var courseDir: Float = 1
+    private var courseRng = LCG(seed: 1)
 
     init(ctx: SceneContext) {
         let device = ctx.device
@@ -54,6 +57,9 @@ final class TerrainScene: Scene {
 
         camera.position = SIMD3(0, 6, 0)
         camera.rotation = SIMD3(-0.22, 0, 0)
+        courseRng = LCG(seed: (ctx.settings.seed ?? freshSeed()) &+ 909)
+        courseT0 = 8 + Double(courseRng.nextF()) * 10
+        courseDir = courseRng.nextF() < 0.5 ? -1 : 1
 
         // --- grid local coords (shared topology for both chunks) ---
         let sw = Terrain.SEG_W, sl = Terrain.SEG_L
@@ -152,13 +158,19 @@ final class TerrainScene: Scene {
         chunkB.model = Mathx.translation(SIMD3(0, 0, posBz))
 
         let f = fly.update(t: t, forwardSpeed: speedPerSec)
-        camera.position = SIMD3(f.x, f.y, 0)
-        camera.rotation = SIMD3(f.pitch, f.yaw, f.roll)
+        // Long banked course-change layered on the weave — reads as a sweeping turn.
+        var cs: Float = 0
+        let cel = t - courseT0, courseDur = 12.0
+        if cel >= 0 && cel < courseDur { let s = sin(Float.pi * Float(cel / courseDur)); cs = s * s }
+        else if cel >= courseDur { courseT0 = t + 10 + Double(courseRng.nextF()) * 14; courseDir = courseRng.nextF() < 0.5 ? -1 : 1 }
+        let camX = f.x + courseDir * 38 * cs
+        camera.position = SIMD3(camX, f.y, 0)
+        camera.rotation = SIMD3(f.pitch, f.yaw + courseDir * 0.22 * cs, f.roll + courseDir * 0.18 * cs)
         // Terrain-following: never clip a hill — clamp cam.y above the heightfield under
         // + just ahead of the camera (≥2.6u clearance). Low over valleys, lifts over ridges.
         func groundAt(_ wz: Float) -> Float {
             let useA = abs(wz - posAz) <= Terrain.D / 2
-            return terrainHeight(f.x, wz - (useA ? posAz : posBz) + (useA ? logicalA : logicalB))
+            return terrainHeight(camX, wz - (useA ? posAz : posBz) + (useA ? logicalA : logicalB))
         }
         camera.position.y = max(f.y, max(groundAt(0), groundAt(-12), groundAt(-24)) + 2.6)
 

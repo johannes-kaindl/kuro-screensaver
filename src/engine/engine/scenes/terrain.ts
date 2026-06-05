@@ -28,6 +28,9 @@ export const TerrainScene: SceneModule = {
     cam.position.set(0, 6, 0); cam.rotation.set(-0.22, 0, 0);
     scene.fog = new THREE.FogExp2(0x000000, 0.012);
     const fly = new CameraFly(Math.floor(rng() * 2e9), 12, 2.6, 6.5, -0.2, ctx.settings.bankStrength);
+    // Sweeping course-change state (seeded one-direction banked arc, eased in/out).
+    const COURSE_AMP = 38, COURSE_DUR = 12;
+    let courseT0 = 8 + rng() * 10, courseDir = rng() < 0.5 ? -1 : 1;
 
     // Width 280 chosen so even at FOV 72° + camera y=6 the lateral edges sit well
     // beyond the visible cone — no horizon-edge artifacts. Lateral seg count scaled
@@ -96,8 +99,15 @@ export const TerrainScene: SceneModule = {
       }
 
       const f = fly.sample(t, (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]) * 0.2 * 60);
-      cam.position.x = f.x; cam.position.y = f.y;
-      cam.rotation.set(f.pitch, f.yaw, f.roll);
+      // Long banked course-change layered on the weave — reads as a sweeping turn over
+      // the open terrain (the ground still scrolls from -Z, but nothing contradicts it).
+      let cs = 0;
+      const cel = t - courseT0;
+      if (cel >= 0 && cel < COURSE_DUR) { const s = Math.sin(Math.PI * (cel / COURSE_DUR)); cs = s * s; }
+      else if (cel >= COURSE_DUR) { courseT0 = t + 10 + rng() * 14; courseDir = rng() < 0.5 ? -1 : 1; }
+      cam.position.x = f.x + courseDir * COURSE_AMP * cs;
+      cam.position.y = f.y;
+      cam.rotation.set(f.pitch, f.yaw + courseDir * 0.22 * cs, f.roll + courseDir * 0.18 * cs);
 
       // Terrain-following: never let the flight path sink into a hill. Sample the
       // heightfield under + just ahead of the camera and keep ≥2.6u clearance —
