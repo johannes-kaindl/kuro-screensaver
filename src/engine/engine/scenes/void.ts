@@ -139,9 +139,7 @@ function buildFlythrough(ctx: SceneCtx, opts: FlythroughOpts): SceneUpdater {
 
     // Course: frequent, pronounced heading changes so the flight reads as CURVING, not
     // strafing. (You move sideways by turning the nose, not by sliding the body sideways.)
-    const steer = ctx.steerX?.() ?? 0;
-    if (steer !== 0) { headTarget += steer * 1.6 * dts; nextTurnT = t + 6; }   // manual steer (?steer=1)
-    else if (t > nextTurnT) {
+    if (t > nextTurnT) {
       headTarget += (rng() < 0.5 ? -1 : 1) * (0.5 + rng() * 0.9);
       nextTurnT = t + 8 + rng() * 12;
     }
@@ -156,8 +154,7 @@ function buildFlythrough(ctx: SceneCtx, opts: FlythroughOpts): SceneUpdater {
     const f = fly.sample(t, spd * 14);
     cam.position.set(camPath.x + right.x * f.x * 0.3, f.y, camPath.z + right.z * f.x * 0.3);
     const turnRate = (heading - prevHeading) / Math.max(1e-4, dts);
-    const bank = Math.max(-0.6, Math.min(0.6, -turnRate * 2.6));   // clamp so steering can't over-roll
-    cam.rotation.set(f.pitch, heading + f.yaw * 0.3, f.roll + bank);
+    cam.rotation.set(f.pitch, heading + f.yaw * 0.3, f.roll - turnRate * 2.6);
 
     // Rotation + recycle (heading frame: ahead = (pos - camPath)·fwd).
     for (const a of asteroids) {

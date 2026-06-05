@@ -90,26 +90,6 @@ if (weatherP) (host.getSettings() as { weather: string }).weather = weatherP;
 
 const controller = new ScreensaverController(makePluginShim(host));
 
-// Manual-steer test tool — ?steer=1 lets the arrow keys initiate curves in the
-// curve-capable scenes (void heading / terrain + rift banked lean). Web/dev only.
-if (params.get('steer') != null) {
-  const set = (v: number) => { if (controller.engine) controller.engine.steerX = v; };
-  const isArrow = (k: string) => k === 'ArrowLeft' || k === 'ArrowRight';
-  // Register on `document` in the CAPTURE phase, BEFORE controller.open() installs
-  // its own capture-phase "any key closes the screensaver" handler. stopImmediate-
-  // Propagation() then keeps the arrow keys from ever reaching that exit handler —
-  // otherwise the first ArrowRight tears down the engine (black screen).
-  document.addEventListener('keydown', (e) => {
-    if (!isArrow(e.key)) return;
-    set(e.key === 'ArrowLeft' ? -1 : 1);
-    e.preventDefault();
-    e.stopImmediatePropagation();
-  }, { capture: true });
-  document.addEventListener('keyup', (e) => {
-    if (isArrow(e.key)) { set(0); e.stopImmediatePropagation(); }
-  }, { capture: true });
-}
-
 // In a native host (macOS .app / Windows .scr), the engine's close button (×)
 // must quit the whole app. Otherwise close() only tears down the overlay and
 // leaves a black window with no way out. Bridge close() to the native host;

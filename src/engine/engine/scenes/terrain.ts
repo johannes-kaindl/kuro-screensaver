@@ -30,7 +30,7 @@ export const TerrainScene: SceneModule = {
     const fly = new CameraFly(Math.floor(rng() * 2e9), 12, 2.6, 6.5, -0.2, ctx.settings.bankStrength);
     // Sweeping course-change state (seeded one-direction banked arc, eased in/out).
     const COURSE_AMP = 38, COURSE_DUR = 12;
-    let courseT0 = 8 + rng() * 10, courseDir = rng() < 0.5 ? -1 : 1, manualLean = 0;
+    let courseT0 = 8 + rng() * 10, courseDir = rng() < 0.5 ? -1 : 1;
 
     // Width 280 chosen so even at FOV 72° + camera y=6 the lateral edges sit well
     // beyond the visible cone — no horizon-edge artifacts. Lateral seg count scaled
@@ -105,11 +105,9 @@ export const TerrainScene: SceneModule = {
       const cel = t - courseT0;
       if (cel >= 0 && cel < COURSE_DUR) { const s = Math.sin(Math.PI * (cel / COURSE_DUR)); cs = s * s; }
       else if (cel >= COURSE_DUR) { courseT0 = t + 10 + rng() * 14; courseDir = rng() < 0.5 ? -1 : 1; }
-      manualLean += ((ctx.steerX?.() ?? 0) - manualLean) * 0.05;   // arrow-key steer (?steer=1)
-      const leanX = courseDir * cs + manualLean;
-      cam.position.x = f.x + leanX * COURSE_AMP;
+      cam.position.x = f.x + courseDir * COURSE_AMP * cs;
       cam.position.y = f.y;
-      cam.rotation.set(f.pitch, f.yaw + leanX * 0.22, f.roll + leanX * 0.18);
+      cam.rotation.set(f.pitch, f.yaw + courseDir * 0.22 * cs, f.roll + courseDir * 0.18 * cs);
 
       // Terrain-following: never let the flight path sink into a hill. Sample the
       // heightfield under + just ahead of the camera and keep ≥2.6u clearance —
