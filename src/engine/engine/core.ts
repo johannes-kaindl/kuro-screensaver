@@ -179,6 +179,8 @@ export class Engine {
   private actorsGroup = new THREE.Group();
   private actors: Actor[] = [];
   combat!: CombatDirector;
+  /** Manual steer (-1 left … +1 right) — arrow-key curve test tool (?steer=1). */
+  steerX = 0;
   private _accentHex = 0x00ff41;  // current accent + its derived enemy hue (HSL +160°)
   private _enemyHex = 0xff0040;
   private _enemyFraction = 0;     // 0 = subset matches accent, 1 = full enemy
@@ -448,6 +450,7 @@ export class Engine {
       mats: this.mats, enemyMats: this.enemyMats, rng: this.rng, settings: this.settings,
       threat: () => this.threat, storm: () => this.storm,
       speed: () => SPEED_VALUES[this.settings.speed] * this.director.speed(),
+      steerX: () => this.steerX,
     };
     const mod = SCENE_REGISTRY[id];
     this.currentSceneObj = mod;

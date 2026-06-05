@@ -19,6 +19,8 @@ export interface SceneCtx {
   /** Effective forward-speed multiplier = SPEED_VALUES[settings.speed] × director.
    *  Scenes should read this instead of the enum directly (enables warp ramps). */
   speed?: () => number;
+  /** Manual steer (-1 left … +1 right) for the arrow-key curve test tool. */
+  steerX?: () => number;
 }
 
 export type SceneUpdater = (t: number, dt: number) => void;
