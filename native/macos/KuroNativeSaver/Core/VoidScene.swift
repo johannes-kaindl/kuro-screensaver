@@ -158,19 +158,20 @@ final class VoidScene: Scene {
         // Course: occasionally pick a new heading; ease toward it (Void truly translates
         // through world-static rocks → a real heading change reads convincingly).
         if t > nextTurnT {
-            headTarget += (rng.nextF() < 0.5 ? -1 : 1) * (0.4 + rng.nextF() * 0.6)
-            nextTurnT = t + 16 + Double(rng.nextF()) * 20
+            headTarget += (rng.nextF() < 0.5 ? -1 : 1) * (0.5 + rng.nextF() * 0.9)
+            nextTurnT = t + 8 + Double(rng.nextF()) * 12
         }
         prevHeading = heading
-        heading += (headTarget - heading) * (1 - exp(-dtf / 4))
+        heading += (headTarget - heading) * (1 - exp(-dtf / 2.6))
         let fwd = SIMD3<Float>(sin(heading), 0, -cos(heading))
         let right = SIMD3<Float>(cos(heading), 0, sin(heading))
 
         camPath += fwd * (spdMul * 14 * dtf)
         let f = fly.update(t: t, forwardSpeed: spdMul * 14)
-        camera.position = SIMD3(camPath.x + right.x * f.x, f.y, camPath.z + right.z * f.x)
+        // Lateral weave kept small (it WAS the strafe); the heading is the real lateral motion.
+        camera.position = SIMD3(camPath.x + right.x * f.x * 0.3, f.y, camPath.z + right.z * f.x * 0.3)
         let turnRate = (heading - prevHeading) / max(1e-4, dtf)
-        camera.rotation = SIMD3(f.pitch, heading + f.yaw, f.roll - turnRate * 2.0)
+        camera.rotation = SIMD3(f.pitch, heading + f.yaw * 0.3, f.roll - turnRate * 2.6)
 
         let spinStep = spdMul * dtf * 60   // web spin is per-frame*spd; normalize to 60fps
 

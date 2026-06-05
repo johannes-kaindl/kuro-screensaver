@@ -137,22 +137,24 @@ function buildFlythrough(ctx: SceneCtx, opts: FlythroughOpts): SceneUpdater {
     lastT = t;
     const spd = (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]);
 
-    // Course: occasionally pick a new heading; ease toward it (sweeping arc).
+    // Course: frequent, pronounced heading changes so the flight reads as CURVING, not
+    // strafing. (You move sideways by turning the nose, not by sliding the body sideways.)
     if (t > nextTurnT) {
-      headTarget += (rng() < 0.5 ? -1 : 1) * (0.4 + rng() * 0.6);
-      nextTurnT = t + 16 + rng() * 20;
+      headTarget += (rng() < 0.5 ? -1 : 1) * (0.5 + rng() * 0.9);
+      nextTurnT = t + 8 + rng() * 12;
     }
     prevHeading = heading;
-    heading += (headTarget - heading) * (1 - Math.exp(-dts / 4));
+    heading += (headTarget - heading) * (1 - Math.exp(-dts / 2.6));
     fwd.set(Math.sin(heading), 0, -Math.cos(heading));
     right.set(Math.cos(heading), 0, Math.sin(heading));
 
     camPath.addScaledVector(fwd, spd * 14 * dts);
 
+    // Lateral weave kept small (it WAS the strafe); the heading is the real lateral motion.
     const f = fly.sample(t, spd * 14);
-    cam.position.set(camPath.x + right.x * f.x, f.y, camPath.z + right.z * f.x);
+    cam.position.set(camPath.x + right.x * f.x * 0.3, f.y, camPath.z + right.z * f.x * 0.3);
     const turnRate = (heading - prevHeading) / Math.max(1e-4, dts);
-    cam.rotation.set(f.pitch, heading + f.yaw, f.roll - turnRate * 2.0);
+    cam.rotation.set(f.pitch, heading + f.yaw * 0.3, f.roll - turnRate * 2.6);
 
     // Rotation + recycle (heading frame: ahead = (pos - camPath)·fwd).
     for (const a of asteroids) {
