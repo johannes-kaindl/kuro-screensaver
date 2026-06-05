@@ -9,7 +9,8 @@ import Foundation
 final class VoidScene: Scene {
     var camera = Camera()
     private(set) var items: [DrawItem] = []
-    let fogDensity: Float = 0.0045   // a bit further view distance (was 0.006)
+    private let debris: Bool
+    var fogDensity: Float { debris ? 0.006 : 0.0045 }   // wreckage variant: denser haze
 
     private let spdMul: Float
     private var rng: LCG
@@ -29,7 +30,8 @@ final class VoidScene: Scene {
     private let OFFBELT_P: Float = 0.08, FAR: Float = -100, FAR_VAR: Float = 55, BEHIND: Float = 10
     private let FADE_START: Float = 100, FADE_RANGE: Float = 24   // distance-based fade-in (no pop)
 
-    init(ctx: SceneContext) {
+    init(ctx: SceneContext, debris: Bool = false) {
+        self.debris = debris
         let device = ctx.device
         spdMul = ctx.speed()
         fly = CameraFly(seed: (ctx.settings.seed ?? freshSeed()) &+ 6262,
@@ -49,14 +51,27 @@ final class VoidScene: Scene {
         }
         var irr = Geo.icosahedron(detail: 1)
         for i in irr.pos.indices { irr.pos[i] *= (0.62 + r.nextF() * 0.55) }
-        let tpls = [
-            tpl(Geo.icosahedron(detail: 2)),
-            tpl(Geo.icosahedron(detail: 1)),
-            tpl(Geo.icosahedron(detail: 0)),
-            tpl(Geo.dodecahedron()),
-            tpl(irr),
-        ]
-        let cumW: [Float] = [0.20, 0.52, 0.70, 0.85, 1.00]
+        let tpls: [Tpl]
+        let cumW: [Float]
+        if debris {
+            tpls = [
+                tpl(Geo.box(1.5, 1.0, 0.06)),    // hull panel
+                tpl(Geo.box(0.7, 1.8, 0.06)),    // tall panel
+                tpl(Geo.box(0.13, 0.13, 3.0)),   // strut / girder
+                tpl(Geo.icosahedron(detail: 0)), // angular chunk
+            ]
+            cumW = [0.30, 0.52, 0.74, 1.00]
+        } else {
+            tpls = [
+                tpl(Geo.icosahedron(detail: 2)),
+                tpl(Geo.icosahedron(detail: 1)),
+                tpl(Geo.icosahedron(detail: 0)),
+                tpl(Geo.dodecahedron()),
+                tpl(irr),
+            ]
+            cumW = [0.20, 0.52, 0.70, 0.85, 1.00]
+        }
+        let tum: Float = debris ? 2.2 : 1   // erratic wreckage tumble
         func pickTpl() -> Tpl {
             let x = r.nextF()
             for i in 0..<cumW.count where x < cumW[i] { return tpls[i] }
@@ -90,7 +105,7 @@ final class VoidScene: Scene {
             let scale = 0.9 + r.nextF() * 3.0
             let pos = seedInitial()
             let rot = SIMD3(r.nextF() * .pi, r.nextF() * .pi, r.nextF() * .pi)
-            let spin = SIMD3((r.nextF() - 0.5) * 0.024, (r.nextF() - 0.5) * 0.024, (r.nextF() - 0.5) * 0.020)
+            let spin = SIMD3((r.nextF() - 0.5) * 0.024 * tum, (r.nextF() - 0.5) * 0.024 * tum, (r.nextF() - 0.5) * 0.020 * tum)
             roids.append(Roid(item: it, pos: pos, rot: rot, scale: scale, spin: spin, baseOpacity: opacity))
         }
 

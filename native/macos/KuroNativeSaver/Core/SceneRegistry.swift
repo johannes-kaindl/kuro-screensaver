@@ -5,12 +5,13 @@
 import Foundation
 
 enum SceneRegistry {
-    static let ids = ["terrain", "city", "rift", "tunnel", "void", "matrix"]
+    static let ids = ["terrain", "city", "rift", "tunnel", "void", "wreckage", "matrix"]
 
     static func make(_ id: String, ctx: SceneContext) -> Scene {
         switch id {
         case "rift": return RiftScene(ctx: ctx)
         case "void": return VoidScene(ctx: ctx)
+        case "wreckage": return VoidScene(ctx: ctx, debris: true)
         case "tunnel": return TunnelScene(ctx: ctx)
         case "city": return CityScene(ctx: ctx)
         case "matrix": return MatrixScene(ctx: ctx)

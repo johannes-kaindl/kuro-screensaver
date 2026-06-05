@@ -25,6 +25,17 @@ enum Geo {
         return idx
     }
 
+    /// Wireframe box (8 corners, 12 edges) — used for wreckage panels/struts.
+    static func box(_ w: Float, _ h: Float, _ d: Float) -> (pos: [SIMD3<Float>], idx: [UInt32]) {
+        let x = w / 2, y = h / 2, z = d / 2
+        let pos: [SIMD3<Float>] = [
+            SIMD3(-x, -y, -z), SIMD3(x, -y, -z), SIMD3(x, y, -z), SIMD3(-x, y, -z),
+            SIMD3(-x, -y,  z), SIMD3(x, -y,  z), SIMD3(x, y,  z), SIMD3(-x, y,  z),
+        ]
+        let idx: [UInt32] = [0,1, 1,2, 2,3, 3,0,  4,5, 5,6, 6,7, 7,4,  0,4, 1,5, 2,6, 3,7]
+        return (pos, idx)
+    }
+
     /// Unit icosahedron, subdivided `detail` times, returned as (positions, lineIndices)
     /// where lineIndices are the unique triangle edges (wireframe). radius 1.
     static func icosahedron(detail: Int) -> (pos: [SIMD3<Float>], idx: [UInt32]) {

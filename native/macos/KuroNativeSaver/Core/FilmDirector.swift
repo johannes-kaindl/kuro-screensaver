@@ -11,8 +11,8 @@ final class FilmDirector {
         .routine:   ["terrain", "city"],
         .intrusion: ["city", "rift"],
         .alarm:     ["rift", "tunnel"],
-        .panic:     ["tunnel", "void"],
-        .silence:   ["void"],
+        .panic:     ["tunnel", "void", "wreckage"],
+        .silence:   ["void", "wreckage"],
     ]
 
     /// Deterministic scene for the given monotonic index + phase, avoiding prev.
