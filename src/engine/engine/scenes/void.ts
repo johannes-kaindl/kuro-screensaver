@@ -123,16 +123,10 @@ function buildFlythrough(ctx: SceneCtx, opts: FlythroughOpts): SceneUpdater {
   let lastT = 0;
   // Heading state — the camera truly translates through world-static geometry, so a real
   // course change reads convincingly. camPath = the flown base path (xz); weave rides on top.
-  let heading = 0, nextTurnT = 12 + rng() * 10;
-  // Roll-LED coordinated turn: the camera banks FIRST, the heading follows the bank (you
-  // turn because you're banked), and it rolls out as the turn completes. The lead-in roll
-  // is the cue that says "going into a curve" before the field swings — without it a
-  // heading change in the structureless field just reads as a swivel + strafe.
-  let turnDir = 0, turnRemaining = 0, bankSmooth = 0;
+  let heading = 0, headTarget = 0, nextTurnT = 18 + rng() * 22, prevHeading = 0;
   const camPath = new THREE.Vector3(0, 0, 0);
   const fwd = new THREE.Vector3(0, 0, -1), right = new THREE.Vector3(1, 0, 0);
   const tmp = new THREE.Vector3();
-  const LAT_MAX = 64;   // rocks past this lateral offset recycle ahead → forward tube stays dense through a turn
   // Debris-dodge state (Brick D-next).
   let hazardActive = false, hazardSide = 1, hazardVert = 1, nextHazardT = 8 + rng() * 8;
   let dodgeX = 0, dodgeY = 0;
@@ -153,19 +147,16 @@ function buildFlythrough(ctx: SceneCtx, opts: FlythroughOpts): SceneUpdater {
     lastT = t;
     const spd = (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]);
 
-    // Roll-led coordinated turn (see decl). On a trigger, commit to a turn direction +
-    // amount; the bank eases in first, the heading rate tracks the bank, and the turn
-    // "uses up" its remaining angle so the bank rolls back out at the end.
+    // Course: occasional eased heading changes. Rocks recycle only when they fall BEHIND,
+    // so laterally-drifting rocks stream past with natural parallax — that parallax is the
+    // cue that sells a curve in open space (over-recycling them ahead made it read as a
+    // block rotating = swivel + strafe; reverted to the 6b2df3d approach).
     if (t > nextTurnT) {
-      turnDir = rng() < 0.5 ? -1 : 1;
-      turnRemaining = 0.8 + rng() * 0.9;
-      nextTurnT = t + 7 + rng() * 8;
+      headTarget += (rng() < 0.5 ? -1 : 1) * (0.5 + rng() * 0.9);
+      nextTurnT = t + 8 + rng() * 12;
     }
-    const bankTarget = turnRemaining > 0.03 ? turnDir * 0.6 : 0;
-    bankSmooth += (bankTarget - bankSmooth) * (1 - Math.exp(-dts / 0.5));
-    const turnStep = bankSmooth * 0.75 * dts;        // heading rate ∝ current bank (wider arc)
-    heading += turnStep;
-    turnRemaining = Math.max(0, turnRemaining - Math.abs(turnStep));
+    prevHeading = heading;
+    heading += (headTarget - heading) * (1 - Math.exp(-dts / 2.6));
     fwd.set(Math.sin(heading), 0, -Math.cos(heading));
     right.set(Math.cos(heading), 0, Math.sin(heading));
 
@@ -196,11 +187,10 @@ function buildFlythrough(ctx: SceneCtx, opts: FlythroughOpts): SceneUpdater {
     dodgeY += (dodgeTY - dodgeY) * (1 - Math.exp(-dts / 0.32));
 
     const f = fly.sample(t, spd * 14);
-    // Suppress the lateral weave mid-turn — the weave alone reads as strafe; let the bank own it.
-    const weaveScale = 0.12 * (1 - Math.min(1, Math.abs(bankSmooth) / 0.6) * 0.85);
-    const latOff = f.x * weaveScale + dodgeX;
+    const latOff = f.x * 0.3 + dodgeX;
     cam.position.set(camPath.x + right.x * latOff, f.y + dodgeY, camPath.z + right.z * latOff);
-    cam.rotation.set(f.pitch, heading + f.yaw * 0.3, f.roll - bankSmooth - dodgeX * 0.05);
+    const turnRate = (heading - prevHeading) / Math.max(1e-4, dts);
+    cam.rotation.set(f.pitch, heading + f.yaw * 0.3, f.roll - turnRate * 2.6 - dodgeX * 0.05);
 
     // Rotation + recycle (heading frame: along = (pos-camPath)·fwd, lateral = ·right).
     for (const a of asteroids) {
@@ -208,10 +198,9 @@ function buildFlythrough(ctx: SceneCtx, opts: FlythroughOpts): SceneUpdater {
       a.mesh.rotation.y += a.ry * spd;
       a.mesh.rotation.z += a.rz * spd;
       tmp.copy(a.mesh.position).sub(camPath);
-      // Recycle rocks that fell behind OR drifted too far to the side. The lateral test is
-      // what makes turning work: a heading change sweeps old rocks sideways, and recycling
-      // them ahead in the NEW heading keeps the forward tube dense (no fly-out-of-field).
-      if ((tmp.dot(fwd) < -BEHIND || Math.abs(tmp.dot(right)) > LAT_MAX) && respawnAhead(tmp)) {
+      // Recycle ONLY when a rock falls behind — laterally-drifting rocks must stream past
+      // with natural parallax (teleporting them ahead made the field rotate as a block).
+      if (tmp.dot(fwd) < -BEHIND && respawnAhead(tmp)) {
         a.mesh.position.copy(tmp);
         a.mesh.scale.setScalar(SCALE_MIN + rng() * SCALE_SPAN);
         a.mesh.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);

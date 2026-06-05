@@ -18,11 +18,8 @@ final class VoidScene: Scene {
 
     private struct Roid { var item: DrawItem; var pos: SIMD3<Float>; var rot: SIMD3<Float>; var scale: Float; var spin: SIMD3<Float>; var baseOpacity: Float }
     private var roids: [Roid] = []
-    private var heading: Float = 0
-    // Roll-LED coordinated turn (see void.ts): bank first, heading follows the bank, roll out
-    // as the turn completes — the lead-in roll is what reads as "curve" not "swivel + strafe".
-    private var turnDir: Float = 0, turnRemaining: Float = 0, bankSmooth: Float = 0
-    private var nextTurnT: Double = 14
+    private var heading: Float = 0, headTarget: Float = 0, prevHeading: Float = 0
+    private var nextTurnT: Double = 20
     private var camPath = SIMD3<Float>(0, 0, 0)
     private let speed: DrawItem
     var storm: Float = 0            // reactive-world PANIC storm (set by Renderer)
@@ -40,7 +37,6 @@ final class VoidScene: Scene {
     // field constants (void.ts)
     private let FIELD_W: Float = 44, NOSPAWN: Float = 16, BELT_S: Float = 14
     private let OFFBELT_P: Float = 0.08, FAR: Float = -100, FAR_VAR: Float = 55, BEHIND: Float = 10
-    private let LAT_MAX: Float = 64   // rocks past this lateral offset recycle ahead → tube stays dense through a turn
     private let FADE_START: Float = 100, FADE_RANGE: Float = 24   // distance-based fade-in (no pop)
 
     init(ctx: SceneContext, debris: Bool = false) {
@@ -175,18 +171,15 @@ final class VoidScene: Scene {
 
     func update(t: Double, dt: Double) {
         let dtf = Float(dt)
-        // Course: occasionally pick a new heading; ease toward it (Void truly translates
-        // through world-static rocks → a real heading change reads convincingly).
+        // Course: occasional eased heading changes. Rocks recycle only when they fall behind,
+        // so laterally-drifting rocks stream past with natural parallax — that's the cue that
+        // sells a curve in open space (over-recycling them ahead read as a block rotating).
         if t > nextTurnT {
-            turnDir = rng.nextF() < 0.5 ? -1 : 1
-            turnRemaining = 0.8 + rng.nextF() * 0.9
-            nextTurnT = t + 7 + Double(rng.nextF()) * 8
+            headTarget += (rng.nextF() < 0.5 ? -1 : 1) * (0.5 + rng.nextF() * 0.9)
+            nextTurnT = t + 8 + Double(rng.nextF()) * 12
         }
-        let bankTarget: Float = turnRemaining > 0.03 ? turnDir * 0.6 : 0
-        bankSmooth += (bankTarget - bankSmooth) * (1 - exp(-dtf / 0.5))
-        let turnStep = bankSmooth * 0.75 * dtf        // heading rate ∝ current bank (wider arc)
-        heading += turnStep
-        turnRemaining = max(0, turnRemaining - abs(turnStep))
+        prevHeading = heading
+        heading += (headTarget - heading) * (1 - exp(-dtf / 2.6))
         let fwd = SIMD3<Float>(sin(heading), 0, -cos(heading))
         let right = SIMD3<Float>(cos(heading), 0, sin(heading))
 
@@ -220,21 +213,19 @@ final class VoidScene: Scene {
         dodgeY += (dodgeTY - dodgeY) * (1 - exp(-dtf / 0.32))
 
         let f = fly.update(t: t, forwardSpeed: spdMul * 14)
-        // Suppress the lateral weave mid-turn — the weave alone reads as strafe; let the bank own it.
-        let weaveScale = 0.12 * (1 - min(1, abs(bankSmooth) / 0.6) * 0.85)
-        let latOff = f.x * weaveScale + dodgeX
+        let latOff = f.x * 0.3 + dodgeX
         camera.position = SIMD3(camPath.x + right.x * latOff, f.y + dodgeY, camPath.z + right.z * latOff)
-        camera.rotation = SIMD3(f.pitch, heading + f.yaw * 0.3, f.roll - bankSmooth - dodgeX * 0.05)
+        let turnRate = (heading - prevHeading) / max(1e-4, dtf)
+        camera.rotation = SIMD3(f.pitch, heading + f.yaw * 0.3, f.roll - turnRate * 2.6 - dodgeX * 0.05)
 
         let spinStep = spdMul * dtf * 60   // web spin is per-frame*spd; normalize to 60fps
 
         for i in roids.indices {
             roids[i].rot += roids[i].spin * spinStep
             let ahead = simd_dot(roids[i].pos - camPath, fwd)       // forward distance along heading
-            let lateral = simd_dot(roids[i].pos - camPath, right)   // sideways offset from the path
-            // Recycle rocks behind OR drifted too far to the side; the lateral test keeps the
-            // forward tube dense through a turn (web parity — no fly-out-of-field).
-            if (ahead < -BEHIND || abs(lateral) > LAT_MAX), let p = respawnAhead(fwd, right) {
+            // Recycle ONLY when a rock falls behind — laterally-drifting rocks stream past with
+            // natural parallax (teleporting them ahead made the field rotate as a block = strafe).
+            if ahead < -BEHIND, let p = respawnAhead(fwd, right) {
                 roids[i].pos = p
                 roids[i].scale = 0.9 + rng.nextF() * 3.0
                 roids[i].rot = SIMD3(rng.nextF() * .pi, rng.nextF() * .pi, rng.nextF() * .pi)
