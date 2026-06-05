@@ -17,6 +17,9 @@ final class VoidScene: Scene {
 
     private struct Roid { var item: DrawItem; var pos: SIMD3<Float>; var rot: SIMD3<Float>; var scale: Float; var spin: SIMD3<Float>; var baseOpacity: Float }
     private var roids: [Roid] = []
+    private var heading: Float = 0, headTarget: Float = 0, prevHeading: Float = 0
+    private var nextTurnT: Double = 20
+    private var camPath = SIMD3<Float>(0, 0, 0)
     private let speed: DrawItem
     var storm: Float = 0            // reactive-world PANIC storm (set by Renderer)
     private let spvCount = 56
@@ -125,40 +128,47 @@ final class VoidScene: Scene {
         if rng.nextF() < OFFBELT_P { return (rng.nextF() - 0.5) * 50 }
         return ((rng.nextF() - 0.5) + (rng.nextF() - 0.5)) * BELT_S * 1.6
     }
-    private func inTube(_ x: Float, _ y: Float, _ cx: Float, _ cy: Float) -> Bool {
-        let dx = x - cx, dy = y - cy; return dx * dx + dy * dy < NOSPAWN * NOSPAWN
-    }
-    private func respawn(_ cx: Float, _ cy: Float, _ cz: Float) -> SIMD3<Float>? {
+    private func respawnAhead(_ fwd: SIMD3<Float>, _ right: SIMD3<Float>) -> SIMD3<Float>? {
         for _ in 0..<5 {
-            let x = (rng.nextF() - 0.5) * 2 * FIELD_W
-            let y = sampleBeltY()
-            if !inTube(x, y, cx, cy) { return SIMD3(x, y, cz + FAR - rng.nextF() * FAR_VAR) }
+            let lat = (rng.nextF() - 0.5) * 2 * FIELD_W, y = sampleBeltY()
+            if lat * lat + y * y < NOSPAWN * NOSPAWN { continue }   // keep the path tube clear
+            let d = -FAR + rng.nextF() * FAR_VAR                    // ahead along the heading
+            return SIMD3(camPath.x + fwd.x * d + right.x * lat, y, camPath.z + fwd.z * d + right.z * lat)
         }
         return nil
     }
 
     func update(t: Double, dt: Double) {
         let dtf = Float(dt)
-        // camera flythrough: forward on z, banking weave through the belt
-        camera.position.z -= spdMul * 14 * dtf
-        let f = fly.update(t: t, forwardSpeed: spdMul * 14)
-        camera.position.x = f.x
-        camera.position.y = f.y
-        camera.rotation = SIMD3(f.pitch, f.yaw, f.roll)
+        // Course: occasionally pick a new heading; ease toward it (Void truly translates
+        // through world-static rocks → a real heading change reads convincingly).
+        if t > nextTurnT {
+            headTarget += (rng.nextF() < 0.5 ? -1 : 1) * (0.4 + rng.nextF() * 0.6)
+            nextTurnT = t + 16 + Double(rng.nextF()) * 20
+        }
+        prevHeading = heading
+        heading += (headTarget - heading) * (1 - exp(-dtf / 4))
+        let fwd = SIMD3<Float>(sin(heading), 0, -cos(heading))
+        let right = SIMD3<Float>(cos(heading), 0, sin(heading))
 
-        let camX = camera.position.x, camY = camera.position.y, camZ = camera.position.z
-        let recycleZ = camZ + BEHIND
+        camPath += fwd * (spdMul * 14 * dtf)
+        let f = fly.update(t: t, forwardSpeed: spdMul * 14)
+        camera.position = SIMD3(camPath.x + right.x * f.x, f.y, camPath.z + right.z * f.x)
+        let turnRate = (heading - prevHeading) / max(1e-4, dtf)
+        camera.rotation = SIMD3(f.pitch, heading + f.yaw, f.roll - turnRate * 2.0)
+
         let spinStep = spdMul * dtf * 60   // web spin is per-frame*spd; normalize to 60fps
 
         for i in roids.indices {
             roids[i].rot += roids[i].spin * spinStep
-            if roids[i].pos.z > recycleZ, let p = respawn(0, 0, camZ) {   // weave centres on origin
+            let ahead = simd_dot(roids[i].pos - camPath, fwd)   // forward distance along heading
+            if ahead < -BEHIND, let p = respawnAhead(fwd, right) {
                 roids[i].pos = p
                 roids[i].scale = 0.9 + rng.nextF() * 3.0
                 roids[i].rot = SIMD3(rng.nextF() * .pi, rng.nextF() * .pi, rng.nextF() * .pi)
             }
             // distance-based fade-in so they don't pop into view at the far plane
-            let dist = camZ - roids[i].pos.z
+            let dist = -simd_dot(roids[i].pos - camPath, fwd)
             roids[i].item.opacity = roids[i].baseOpacity * max(0, min(1, (FADE_START - dist) / FADE_RANGE))
             roids[i].item.model = model(roids[i])
         }
@@ -168,11 +178,12 @@ final class VoidScene: Scene {
         speed.pointSizeWorld = 0.14 + storm * 0.12
         let ptr = speed.positions.contents().bindMemory(to: Float.self, capacity: spvCount * 3)
         for i in 0..<spvCount {
-            let zi = i * 3 + 2
-            if ptr[zi] > camZ + 2 {
-                ptr[zi] = camZ - 40 - rng.nextF() * 30
-                ptr[i * 3] = (rng.nextF() - 0.5) * spreadX + camX
-                ptr[i * 3 + 1] = (rng.nextF() - 0.5) * spreadY + camY
+            let ahead = (ptr[i * 3] - camPath.x) * fwd.x + (ptr[i * 3 + 2] - camPath.z) * fwd.z
+            if ahead < -2 {
+                let d = 40 + rng.nextF() * 30, lat = (rng.nextF() - 0.5) * spreadX
+                ptr[i * 3]     = camPath.x + fwd.x * d + right.x * lat
+                ptr[i * 3 + 1] = (rng.nextF() - 0.5) * spreadY + f.y
+                ptr[i * 3 + 2] = camPath.z + fwd.z * d + right.z * lat
             }
         }
     }

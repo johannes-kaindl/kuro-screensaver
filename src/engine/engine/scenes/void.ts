@@ -81,17 +81,6 @@ export const VoidScene: SceneModule = {
       return { x: side * (NOSPAWN + 1.5 + rng() * 10), y: sampleBeltY(), z: seedZ() };
     };
 
-    // re-spawn ahead of camera, rejection-sample out of the flight tube.
-    const respawn = (_camX: number, _camY: number, camZ: number) => {
-      for (let tries = 0; tries < 5; tries++) {
-        const x = (rng() - 0.5) * 2 * FIELD_W;
-        const y = sampleBeltY();
-        if (!inFlightTube(x, y, 0, 0))   // weave centres on the origin — keep that tube clear
-          return { x, y, z: camZ + FAR - rng() * FAR_VAR };
-      }
-      // skip-frame fallback: push behind recycleZ so we try again next frame
-      return null;
-    };
 
     interface Ast { mesh: THREE.Mesh; rx: number; ry: number; rz: number }
     const asteroids: Ast[] = [];
@@ -138,50 +127,74 @@ export const VoidScene: SceneModule = {
     // dt from core is in ms; convert via t-diff (clockT is in seconds).
     const fly = new CameraFly(Math.floor(rng() * 2e9), 6, 3, 0, 0, ctx.settings.bankStrength);
     let lastT = 0;
+    // Heading state — Void truly translates through world-static rocks, so a real course
+    // change reads convincingly. camPath = the flown base path (xz); weave rides on top.
+    let heading = 0, headTarget = 0, nextTurnT = 18 + rng() * 22, prevHeading = 0;
+    const camPath = new THREE.Vector3(0, 0, 0);
+    const fwd = new THREE.Vector3(0, 0, -1), right = new THREE.Vector3(1, 0, 0);
+    const tmp = new THREE.Vector3();
+
+    // Respawn a rock ahead along the heading, clear of the flight tube (perpendicular).
+    const respawnAhead = (out: THREE.Vector3): boolean => {
+      for (let tries = 0; tries < 5; tries++) {
+        const lat = (rng() - 0.5) * 2 * FIELD_W, y = sampleBeltY();
+        if (lat * lat + y * y < NOSPAWN * NOSPAWN) continue;   // keep the path tube clear
+        const d = -FAR + rng() * FAR_VAR;                      // 68..113 ahead along fwd
+        out.set(camPath.x + fwd.x * d + right.x * lat, y, camPath.z + fwd.z * d + right.z * lat);
+        return true;
+      }
+      return false;
+    };
+
     return (t: number, _dt: number) => {
       const dts = lastT === 0 ? 0.016 : Math.min(0.1, t - lastT);
       lastT = t;
       const spd = (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]);
 
-      // Forward flight — dt-safe step.
-      cam.position.z -= spd * 14 * dts;
+      // Course: occasionally pick a new heading; ease toward it (sweeping arc).
+      if (t > nextTurnT) {
+        headTarget += (rng() < 0.5 ? -1 : 1) * (0.4 + rng() * 0.6);
+        nextTurnT = t + 16 + rng() * 20;
+      }
+      prevHeading = heading;
+      heading += (headTarget - heading) * (1 - Math.exp(-dts / 4));
+      fwd.set(Math.sin(heading), 0, -Math.cos(heading));
+      right.set(Math.cos(heading), 0, Math.sin(heading));
 
-      // Banking weave through the belt (forward-on-z kept above).
+      // Forward flight along the heading.
+      camPath.addScaledVector(fwd, spd * 14 * dts);
+
+      // Weave in the heading frame; body yaw = heading + cosmetic weave; bank from turn rate.
       const f = fly.sample(t, spd * 14);
-      cam.position.x = f.x; cam.position.y = f.y;
-      cam.rotation.set(f.pitch, f.yaw, f.roll);
+      cam.position.set(camPath.x + right.x * f.x, f.y, camPath.z + right.z * f.x);
+      const turnRate = (heading - prevHeading) / Math.max(1e-4, dts);
+      cam.rotation.set(f.pitch, heading + f.yaw, f.roll - turnRate * 2.0);
 
-      // Asteroid rotation + recycle.
-      const camX = cam.position.x;
-      const camY = cam.position.y;
-      const camZ = cam.position.z;
-      const recycleZ = camZ + BEHIND;
+      // Asteroid rotation + recycle (heading frame: ahead = (pos - camPath)·fwd).
       for (const a of asteroids) {
         a.mesh.rotation.x += a.rx * spd;
         a.mesh.rotation.y += a.ry * spd;
         a.mesh.rotation.z += a.rz * spd;
-        if (a.mesh.position.z > recycleZ) {
-          const p = respawn(camX, camY, camZ);
-          if (p) {
-            a.mesh.position.set(p.x, p.y, p.z);
-            a.mesh.scale.setScalar(SCALE_MIN + rng() * SCALE_SPAN);
-            a.mesh.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
-          }
-          // else: rejection failed 5x — leave asteroid at last pos, retry next frame
+        tmp.copy(a.mesh.position).sub(camPath);
+        if (tmp.dot(fwd) < -BEHIND && respawnAhead(tmp)) {
+          a.mesh.position.copy(tmp);
+          a.mesh.scale.setScalar(SCALE_MIN + rng() * SCALE_SPAN);
+          a.mesh.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
         }
       }
 
-      // Speed particles cycle past camera; the PANIC storm widens their spread.
+      // Speed particles stream past along the heading; PANIC storm widens their spread.
       const storm = ctx.storm?.() ?? 0;
       const spreadX = 24 * (1 + storm * 0.5), spreadY = 16 * (1 + storm * 0.5);
       const spa = speedPts.geometry.attributes.position as THREE.BufferAttribute;
       const arr = spa.array as Float32Array;
       for (let i = 0; i < SPV; i++) {
-        const zi = i * 3 + 2;
-        if (arr[zi] > camZ + 2) {
-          arr[zi] = camZ - 40 - rng() * 30;
-          arr[i * 3]     = (rng() - 0.5) * spreadX + cam.position.x;
-          arr[i * 3 + 1] = (rng() - 0.5) * spreadY + cam.position.y;
+        const ahead = (arr[i * 3] - camPath.x) * fwd.x + (arr[i * 3 + 2] - camPath.z) * fwd.z;
+        if (ahead < -2) {
+          const d = 40 + rng() * 30, lat = (rng() - 0.5) * spreadX;
+          arr[i * 3]     = camPath.x + fwd.x * d + right.x * lat;
+          arr[i * 3 + 1] = (rng() - 0.5) * spreadY + f.y;
+          arr[i * 3 + 2] = camPath.z + fwd.z * d + right.z * lat;
         }
       }
       spa.needsUpdate = true;
