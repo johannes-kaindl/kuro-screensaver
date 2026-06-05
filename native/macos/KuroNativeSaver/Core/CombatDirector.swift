@@ -27,9 +27,9 @@ final class CombatDirector {
         rng = LCG(seed: seed ^ Int32(bitPattern: 0x00c0_ffee))
     }
 
-    // Disabled for now (2026-06-05 feedback): drones read as glitches, tracers illegible.
-    // Infrastructure stays; flip on once actors look like real craft.
-    private static let enabled = false
+    // Re-enabled 2026-06-05: actors rebuilt as box-craft with clear silhouettes (interceptor
+    // vs corvette), banking not tumbling, bright bolt that flies at the camera (+ muzzle flash).
+    private static let enabled = true
 
     func update(t: Double, threat: Float) {
         guard CombatDirector.enabled else { return }

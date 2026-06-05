@@ -5,10 +5,10 @@ import { mkRng } from '../engine/rng';
 import type { EventBus } from '../events/bus';
 import { AntagonistDrone, SupportUnit, type Actor } from './actors';
 
-// Disabled for now (2026-06-05 feedback): the drones read as glitches, not aircraft,
-// and the tracers aren't legible ("taking fire" with nothing visible). The whole
-// actor/event infrastructure stays; flip this on once actors look like real craft.
-const COMBAT_ACTORS_ENABLED = false;
+// Re-enabled 2026-06-05: actors rebuilt as box-craft with clear silhouettes (interceptor
+// vs corvette), banking instead of tumbling, and a bright bolt that flies at the camera
+// (+ muzzle flash) so "taking fire" reads. (Was off: bare icosahedra read as glitches.)
+const COMBAT_ACTORS_ENABLED = true;
 
 export interface ActorHost {
   add(a: Actor): void;

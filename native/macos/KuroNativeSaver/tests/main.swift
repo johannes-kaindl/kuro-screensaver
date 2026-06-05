@@ -128,13 +128,15 @@ do {
     check(nextPick != prev, "no immediate repeat when alt exists")
 }
 
-// --- CombatDirector: actors gated off (2026-06-05) — no spawn ---------------------
+// --- CombatDirector: actors re-enabled (2026-06-05) — spawns above threat threshold ---
 if let device = MTLCreateSystemDefaultDevice() {
     var n = 0
     let host = ActorHost(device: device, add: { _ in n += 1 }, accentRGB: { SIMD3(0, 1, 0) }, enemyRGB: { SIMD3(1, 0, 0.25) })
     let c = CombatDirector(seed: 5, bus: EventBus(), host: host)
-    c.update(t: 1, threat: 0.9)
-    check(n == 0, "combat actors gated off — no spawn (re-enable to test thresholds)")
+    c.update(t: 1, threat: 0.0)
+    check(n == 0, "combat: no spawn at zero threat")
+    c.update(t: 2, threat: 0.9)
+    check(n >= 1, "combat: antagonist spawns above threat threshold")
 } else {
     print("ok   - (combat test skipped — no Metal device)")
 }
