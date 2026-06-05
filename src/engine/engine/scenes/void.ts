@@ -116,10 +116,11 @@ function buildFlythrough(ctx: SceneCtx, opts: FlythroughOpts): SceneUpdater {
   let lastT = 0;
   // Heading state — the camera truly translates through world-static geometry, so a real
   // course change reads convincingly. camPath = the flown base path (xz); weave rides on top.
-  let heading = 0, headTarget = 0, nextTurnT = 18 + rng() * 22, prevHeading = 0;
+  let heading = 0, headTarget = 0, nextTurnT = 12 + rng() * 10, prevHeading = 0;
   const camPath = new THREE.Vector3(0, 0, 0);
   const fwd = new THREE.Vector3(0, 0, -1), right = new THREE.Vector3(1, 0, 0);
   const tmp = new THREE.Vector3();
+  const LAT_MAX = 64;   // rocks past this lateral offset recycle ahead → forward tube stays dense through a turn
 
   const respawnAhead = (out: THREE.Vector3): boolean => {
     for (let tries = 0; tries < 5; tries++) {
@@ -137,32 +138,36 @@ function buildFlythrough(ctx: SceneCtx, opts: FlythroughOpts): SceneUpdater {
     lastT = t;
     const spd = (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]);
 
-    // Course: frequent, pronounced heading changes so the flight reads as CURVING, not
-    // strafing. (You move sideways by turning the nose, not by sliding the body sideways.)
+    // Course: distinct, banked heading changes so the flight reads as CURVING, not strafing.
+    // You move sideways by turning the nose (+ rolling into it), not by sliding the body.
     if (t > nextTurnT) {
-      headTarget += (rng() < 0.5 ? -1 : 1) * (0.5 + rng() * 0.9);
-      nextTurnT = t + 8 + rng() * 12;
+      headTarget += (rng() < 0.5 ? -1 : 1) * (0.6 + rng() * 0.9);
+      nextTurnT = t + 6 + rng() * 7;
     }
     prevHeading = heading;
-    heading += (headTarget - heading) * (1 - Math.exp(-dts / 2.6));
+    heading += (headTarget - heading) * (1 - Math.exp(-dts / 1.8));   // crisper turn-in
     fwd.set(Math.sin(heading), 0, -Math.cos(heading));
     right.set(Math.cos(heading), 0, Math.sin(heading));
 
     camPath.addScaledVector(fwd, spd * 14 * dts);
 
-    // Lateral weave kept small (it WAS the strafe); the heading is the real lateral motion.
+    // Almost no lateral weave — weave alone read as strafe; the heading IS the lateral motion.
     const f = fly.sample(t, spd * 14);
-    cam.position.set(camPath.x + right.x * f.x * 0.3, f.y, camPath.z + right.z * f.x * 0.3);
+    cam.position.set(camPath.x + right.x * f.x * 0.12, f.y, camPath.z + right.z * f.x * 0.12);
     const turnRate = (heading - prevHeading) / Math.max(1e-4, dts);
-    cam.rotation.set(f.pitch, heading + f.yaw * 0.3, f.roll - turnRate * 2.6);
+    const bank = Math.max(-0.7, Math.min(0.7, -turnRate * 3.0));   // visible roll into the turn (clamped)
+    cam.rotation.set(f.pitch, heading + f.yaw * 0.3, f.roll + bank);
 
-    // Rotation + recycle (heading frame: ahead = (pos - camPath)·fwd).
+    // Rotation + recycle (heading frame: along = (pos-camPath)·fwd, lateral = ·right).
     for (const a of asteroids) {
       a.mesh.rotation.x += a.rx * spd;
       a.mesh.rotation.y += a.ry * spd;
       a.mesh.rotation.z += a.rz * spd;
       tmp.copy(a.mesh.position).sub(camPath);
-      if (tmp.dot(fwd) < -BEHIND && respawnAhead(tmp)) {
+      // Recycle rocks that fell behind OR drifted too far to the side. The lateral test is
+      // what makes turning work: a heading change sweeps old rocks sideways, and recycling
+      // them ahead in the NEW heading keeps the forward tube dense (no fly-out-of-field).
+      if ((tmp.dot(fwd) < -BEHIND || Math.abs(tmp.dot(right)) > LAT_MAX) && respawnAhead(tmp)) {
         a.mesh.position.copy(tmp);
         a.mesh.scale.setScalar(SCALE_MIN + rng() * SCALE_SPAN);
         a.mesh.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);

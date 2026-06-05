@@ -19,7 +19,7 @@ final class VoidScene: Scene {
     private struct Roid { var item: DrawItem; var pos: SIMD3<Float>; var rot: SIMD3<Float>; var scale: Float; var spin: SIMD3<Float>; var baseOpacity: Float }
     private var roids: [Roid] = []
     private var heading: Float = 0, headTarget: Float = 0, prevHeading: Float = 0
-    private var nextTurnT: Double = 20
+    private var nextTurnT: Double = 14
     private var camPath = SIMD3<Float>(0, 0, 0)
     private let speed: DrawItem
     var storm: Float = 0            // reactive-world PANIC storm (set by Renderer)
@@ -28,6 +28,7 @@ final class VoidScene: Scene {
     // field constants (void.ts)
     private let FIELD_W: Float = 44, NOSPAWN: Float = 16, BELT_S: Float = 14
     private let OFFBELT_P: Float = 0.08, FAR: Float = -100, FAR_VAR: Float = 55, BEHIND: Float = 10
+    private let LAT_MAX: Float = 64   // rocks past this lateral offset recycle ahead → tube stays dense through a turn
     private let FADE_START: Float = 100, FADE_RANGE: Float = 24   // distance-based fade-in (no pop)
 
     init(ctx: SceneContext, debris: Bool = false) {
@@ -158,27 +159,31 @@ final class VoidScene: Scene {
         // Course: occasionally pick a new heading; ease toward it (Void truly translates
         // through world-static rocks → a real heading change reads convincingly).
         if t > nextTurnT {
-            headTarget += (rng.nextF() < 0.5 ? -1 : 1) * (0.5 + rng.nextF() * 0.9)
-            nextTurnT = t + 8 + Double(rng.nextF()) * 12
+            headTarget += (rng.nextF() < 0.5 ? -1 : 1) * (0.6 + rng.nextF() * 0.9)
+            nextTurnT = t + 6 + Double(rng.nextF()) * 7
         }
         prevHeading = heading
-        heading += (headTarget - heading) * (1 - exp(-dtf / 2.6))
+        heading += (headTarget - heading) * (1 - exp(-dtf / 1.8))   // crisper turn-in
         let fwd = SIMD3<Float>(sin(heading), 0, -cos(heading))
         let right = SIMD3<Float>(cos(heading), 0, sin(heading))
 
         camPath += fwd * (spdMul * 14 * dtf)
         let f = fly.update(t: t, forwardSpeed: spdMul * 14)
-        // Lateral weave kept small (it WAS the strafe); the heading is the real lateral motion.
-        camera.position = SIMD3(camPath.x + right.x * f.x * 0.3, f.y, camPath.z + right.z * f.x * 0.3)
+        // Almost no lateral weave — weave alone read as strafe; the heading IS the lateral motion.
+        camera.position = SIMD3(camPath.x + right.x * f.x * 0.12, f.y, camPath.z + right.z * f.x * 0.12)
         let turnRate = (heading - prevHeading) / max(1e-4, dtf)
-        camera.rotation = SIMD3(f.pitch, heading + f.yaw * 0.3, f.roll - turnRate * 2.6)
+        let bank = max(-0.7, min(0.7, -turnRate * 3.0))   // visible roll into the turn (clamped)
+        camera.rotation = SIMD3(f.pitch, heading + f.yaw * 0.3, f.roll + bank)
 
         let spinStep = spdMul * dtf * 60   // web spin is per-frame*spd; normalize to 60fps
 
         for i in roids.indices {
             roids[i].rot += roids[i].spin * spinStep
-            let ahead = simd_dot(roids[i].pos - camPath, fwd)   // forward distance along heading
-            if ahead < -BEHIND, let p = respawnAhead(fwd, right) {
+            let ahead = simd_dot(roids[i].pos - camPath, fwd)       // forward distance along heading
+            let lateral = simd_dot(roids[i].pos - camPath, right)   // sideways offset from the path
+            // Recycle rocks behind OR drifted too far to the side; the lateral test keeps the
+            // forward tube dense through a turn (web parity — no fly-out-of-field).
+            if (ahead < -BEHIND || abs(lateral) > LAT_MAX), let p = respawnAhead(fwd, right) {
                 roids[i].pos = p
                 roids[i].scale = 0.9 + rng.nextF() * 3.0
                 roids[i].rot = SIMD3(rng.nextF() * .pi, rng.nextF() * .pi, rng.nextF() * .pi)
