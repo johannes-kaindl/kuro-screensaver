@@ -27,6 +27,7 @@ export const DICT = {
     rift:    '>> RIFT INCURSION ACTIVE // INVERSION VECTOR ARMED',
     tunnel:  '>> TUNNEL LOCK CONFIRMED // INFIL VECTOR PRIMED',
     void:    '>> VOID DRIFT ACTIVE // DEEP SPACE ANCHOR',
+    wreckage: '>> WRECKAGE FIELD // CORP STATION DEBRIS — SALVAGE SWEEP',
     matrix:  '>> MATRIX RAIN ENGAGED // DIGITAL DOWNPOUR',
   } as const,
 
@@ -91,6 +92,7 @@ export const DICT = {
     rift:    ['THE RIFT', 'CHASM', 'INVERSION'],
     tunnel:  ['INFIL', 'TRANSIT', 'BOOST'],
     void:    ['DRIFT', 'BELT', 'SWARM'],
+    wreckage: ['WRECKAGE', 'SALVAGE', 'DEBRIS'],
     matrix:  ['RAIN', 'CASCADE', 'DELUGE'],
   } as const,
 

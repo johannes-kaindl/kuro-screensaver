@@ -15,6 +15,7 @@ import { CityScene }    from './scenes/city';
 import { RiftScene }    from './scenes/rift';
 import { TunnelScene }  from './scenes/tunnel';
 import { VoidScene }    from './scenes/void';
+import { WreckageScene } from './scenes/wreckage';
 import { MatrixScene }  from './scenes/matrix';
 import { MatrixRain }   from '../fx/matrix-rain';
 import { MATRIX_SHADER } from '../fx/matrix-pass';
@@ -31,6 +32,7 @@ const SCENE_REGISTRY = {
   rift:    RiftScene,
   tunnel:  TunnelScene,
   void:    VoidScene,
+  wreckage: WreckageScene,
   matrix:  MatrixScene,
 };
 

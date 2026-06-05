@@ -427,6 +427,7 @@ export const SCENE_FORESHADOW: Record<string, string[]> = {
   rift:    ['// fault line detected — descending', '// the floor opens up ahead'],
   tunnel:  ['// hyperdrive spinning up', '// conduit acquired — punch-through in 3'],
   void:    ['// debris field on the scope', '// CORP station wreckage ahead'],
+  wreckage: ['// CORP station remains ahead — total loss', '// salvage sweep // wreckage field'],
 };
 
 /** Deterministic foreshadow line for a scene (index keeps it varied + reproducible). */
@@ -443,6 +444,7 @@ export const SCENE_ARRIVAL: Record<string, string[]> = {
   rift:    ['// into the rift — walls closing', '// fault corridor, steady'],
   tunnel:  ['// conduit locked — hyperdrive', '// in the pipe'],
   void:    ['// open space — debris field', '// hard vacuum, scanning'],
+  wreckage: ['// in the wreckage — what\'s left of the station', '// drifting through CORP debris'],
 };
 export function arrivalLine(scene: string, index: number): string | null {
   const lines = SCENE_ARRIVAL[scene];

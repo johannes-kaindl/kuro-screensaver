@@ -12,8 +12,8 @@ const PHASE_CANDIDATES: Record<Phase, FlightSceneId[]> = {
   ROUTINE:   ['terrain', 'city'],
   INTRUSION: ['city', 'rift'],
   ALARM:     ['rift', 'tunnel'],
-  PANIC:     ['tunnel', 'void'],
-  SILENCE:   ['void'],
+  PANIC:     ['tunnel', 'void', 'wreckage'],
+  SILENCE:   ['void', 'wreckage'],
 };
 
 export class FilmDirector {
