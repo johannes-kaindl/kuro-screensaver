@@ -1,7 +1,18 @@
 # Flight Curves & Void Wreckage — Design
 
 - **Date:** 2026-06-05
-- **Status:** Approved (design), implementation pending
+- **Status:** Parts 1–4 implemented + verified (web+native): Rift serpentine, Terrain
+  sweeping course, Void true-heading change, Void wreckage-field variant. Branch
+  `feat/flight-curves-wreckage`.
+  - **Part 5 (City true 90° corner) deferred** — it is a city-geometry rework (the city is
+    a single-axis corridor; a believable corner needs a real built cross-street + heading +
+    scroll-axis swap + dust/recycle remap) that needs a dedicated build→look→tune loop with
+    on-device iteration. Not rushed blind at the tail of a long session. Next focused step.
+  - **Deviations:** Rift/Void use a slow phase-drift / eased-heading curve (not a one-shot
+    turn); wreckage uses wireframe box debris (flatShading is a no-op on the unlit
+    MeshBasicMaterial — the wireframe is already hard-faceted), differentiated by erratic
+    tumble + denser fog; web/native debris template sets differ slightly (parity is by
+    concept, not geometry).
 - **Author:** Johannes + Claude (pair)
 - **Scope:** Scene-flight enrichment (the roadmap's "D-next" strand). One cohesive feature,
   built + verified incrementally, merged once. Builds on the FlightDirector/film engine.
