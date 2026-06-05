@@ -23,7 +23,16 @@ final class VoidScene: Scene {
     private var camPath = SIMD3<Float>(0, 0, 0)
     private let speed: DrawItem
     var storm: Float = 0            // reactive-world PANIC storm (set by Renderer)
+    var threatLevel: Float = 0      // reactive threat 0..1 (set by Renderer; mirrors web ctx.threat())
     private let spvCount = 56
+    // Debris-dodge state (Brick D-next).
+    private var hazard: DrawItem!
+    private var hazardPos = SIMD3<Float>(0, 0, 0)
+    private var hazardRot = SIMD3<Float>(0, 0, 0)
+    private var hazardActive = false
+    private var hazardSide: Float = 1, hazardVert: Float = 1
+    private var nextHazardT: Double = 12
+    private var dodgeX: Float = 0, dodgeY: Float = 0
 
     // field constants (void.ts)
     private let FIELD_W: Float = 44, NOSPAWN: Float = 16, BELT_S: Float = 14
@@ -130,8 +139,15 @@ final class VoidScene: Scene {
                          vertexCount: spvCount, primitive: .point, opacity: 1.0,
                          isPoint: true, pointSizeWorld: 0.14)
 
+        // Debris hazard (Brick D-next): an oversized enemy-tinted chunk, hidden until launched.
+        let ht = pickTpl()
+        let hz = DrawItem(positions: ht.pos, indices: ht.idx, count: ht.ic, vertexCount: ht.vc,
+                          primitive: .line, opacity: 0)
+        hz.infectable = true   // takes the enemy tint under threat
+        hazard = hz
+
         rng = r
-        items = roids.map { $0.item } + [stars, speed]
+        items = roids.map { $0.item } + [stars, speed, hz]
     }
 
     private func model(_ a: Roid) -> matrix_float4x4 {
@@ -168,11 +184,40 @@ final class VoidScene: Scene {
         let right = SIMD3<Float>(cos(heading), 0, sin(heading))
 
         camPath += fwd * (spdMul * 14 * dtf)
+
+        // Debris dodge (Brick D-next): under high threat, a big chunk barrels down the tube;
+        // juke the camera aside (eased) so it whips past — a near-miss, not a hit.
+        if !hazardActive && threatLevel > 0.55 && t > nextHazardT {
+            hazardActive = true
+            hazardSide = rng.nextF() < 0.5 ? -1 : 1
+            hazardVert = rng.nextF() < 0.5 ? -1 : 1
+            hazardPos = camPath + fwd * 120
+        }
+        var dodgeTX: Float = 0, dodgeTY: Float = 0
+        if hazardActive {
+            hazardRot += SIMD3(0.03, 0.022, 0) * spdMul
+            let along = simd_dot(hazardPos - camPath, fwd)
+            if along > 0 && along < 60 {
+                let urgency = 1 - along / 60
+                dodgeTX = hazardSide * 7.5 * urgency
+                dodgeTY = hazardVert * 4.5 * urgency
+            }
+            if along < -BEHIND { hazardActive = false; nextHazardT = t + 7 + Double(rng.nextF()) * 9 }
+            hazard.opacity = hazardActive ? 0.92 : 0
+            hazard.model = Mathx.translation(hazardPos) * Mathx.rotationY(hazardRot.y)
+                * Mathx.rotationX(hazardRot.x) * Mathx.scale(5.1)
+        } else {
+            hazard.opacity = 0
+        }
+        dodgeX += (dodgeTX - dodgeX) * (1 - exp(-dtf / 0.32))
+        dodgeY += (dodgeTY - dodgeY) * (1 - exp(-dtf / 0.32))
+
         let f = fly.update(t: t, forwardSpeed: spdMul * 14)
         // Almost no lateral weave — weave alone read as strafe; the heading IS the lateral motion.
-        camera.position = SIMD3(camPath.x + right.x * f.x * 0.12, f.y, camPath.z + right.z * f.x * 0.12)
+        let latOff = f.x * 0.12 + dodgeX
+        camera.position = SIMD3(camPath.x + right.x * latOff, f.y + dodgeY, camPath.z + right.z * latOff)
         let turnRate = (heading - prevHeading) / max(1e-4, dtf)
-        let bank = max(-0.7, min(0.7, -turnRate * 3.0))   // visible roll into the turn (clamped)
+        let bank = max(-0.7, min(0.7, -turnRate * 3.0 - dodgeX * 0.05))   // roll into turn + juke
         camera.rotation = SIMD3(f.pitch, heading + f.yaw * 0.3, f.roll + bank)
 
         let spinStep = spdMul * dtf * 60   // web spin is per-frame*spd; normalize to 60fps

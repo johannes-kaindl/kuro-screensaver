@@ -319,6 +319,7 @@ final class Renderer {
         let st = settings.reactiveWorld ? stormScalar : 0
         (scene as? TerrainScene)?.storm = st
         (scene as? VoidScene)?.storm = st
+        (scene as? VoidScene)?.threatLevel = threat   // Brick D-next: debris-dodge trigger
         scene.update(t: t, dt: dt)
         // Director: advance its clock, then overlay manoeuvres on the pose the scene
         // wrote. The 'kick' manoeuvre reproduces the old hesitation brake exactly

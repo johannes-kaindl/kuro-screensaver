@@ -111,6 +111,13 @@ function buildFlythrough(ctx: SceneCtx, opts: FlythroughOpts): SceneUpdater {
   const speedPts = new THREE.Points(spg, mats.MP(0.14));
   world.add(speedPts);
 
+  // ── Debris hazard (Brick D-next) — an oversized chunk barrels straight down the flight
+  // tube under high threat; the camera jukes aside at the last moment (near-miss dodge). ──
+  const hazardMesh = new THREE.Mesh(pickGeo(), (ctx.enemyMats ?? mats).M({ transparent: true, opacity: 0.92 }));
+  hazardMesh.scale.setScalar(SCALE_MIN + SCALE_SPAN + 1.2);
+  hazardMesh.visible = false;
+  world.add(hazardMesh);
+
   // ── Update ──
   const fly = new CameraFly(Math.floor(rng() * 2e9), 6, 3, 0, 0, ctx.settings.bankStrength);
   let lastT = 0;
@@ -121,6 +128,9 @@ function buildFlythrough(ctx: SceneCtx, opts: FlythroughOpts): SceneUpdater {
   const fwd = new THREE.Vector3(0, 0, -1), right = new THREE.Vector3(1, 0, 0);
   const tmp = new THREE.Vector3();
   const LAT_MAX = 64;   // rocks past this lateral offset recycle ahead → forward tube stays dense through a turn
+  // Debris-dodge state (Brick D-next).
+  let hazardActive = false, hazardSide = 1, hazardVert = 1, nextHazardT = 8 + rng() * 8;
+  let dodgeX = 0, dodgeY = 0;
 
   const respawnAhead = (out: THREE.Vector3): boolean => {
     for (let tries = 0; tries < 5; tries++) {
@@ -151,11 +161,36 @@ function buildFlythrough(ctx: SceneCtx, opts: FlythroughOpts): SceneUpdater {
 
     camPath.addScaledVector(fwd, spd * 14 * dts);
 
+    // Debris dodge: under high threat, launch a big chunk straight down the tube; as it
+    // bears down, juke the camera aside (eased) so it whips past — a near-miss, not a hit.
+    const threatNow = ctx.threat?.() ?? 0;
+    if (!hazardActive && threatNow > 0.55 && t > nextHazardT) {
+      hazardActive = true;
+      hazardSide = rng() < 0.5 ? -1 : 1;
+      hazardVert = rng() < 0.5 ? -1 : 1;
+      hazardMesh.position.set(camPath.x + fwd.x * 120, 0, camPath.z + fwd.z * 120);   // far ahead, dead on the path
+      hazardMesh.visible = true;
+    }
+    let dodgeTX = 0, dodgeTY = 0;
+    if (hazardActive) {
+      hazardMesh.rotation.x += 0.03 * spd; hazardMesh.rotation.y += 0.022 * spd;
+      const along = tmp.copy(hazardMesh.position).sub(camPath).dot(fwd);
+      if (along > 0 && along < 60) {                 // in range, still ahead → break aside
+        const urgency = 1 - along / 60;
+        dodgeTX = hazardSide * 7.5 * urgency;
+        dodgeTY = hazardVert * 4.5 * urgency;
+      }
+      if (along < -BEHIND) { hazardActive = false; hazardMesh.visible = false; nextHazardT = t + 7 + rng() * 9; }
+    }
+    dodgeX += (dodgeTX - dodgeX) * (1 - Math.exp(-dts / 0.32));
+    dodgeY += (dodgeTY - dodgeY) * (1 - Math.exp(-dts / 0.32));
+
     // Almost no lateral weave — weave alone read as strafe; the heading IS the lateral motion.
     const f = fly.sample(t, spd * 14);
-    cam.position.set(camPath.x + right.x * f.x * 0.12, f.y, camPath.z + right.z * f.x * 0.12);
+    const latOff = f.x * 0.12 + dodgeX;
+    cam.position.set(camPath.x + right.x * latOff, f.y + dodgeY, camPath.z + right.z * latOff);
     const turnRate = (heading - prevHeading) / Math.max(1e-4, dts);
-    const bank = Math.max(-0.7, Math.min(0.7, -turnRate * 3.0));   // visible roll into the turn (clamped)
+    const bank = Math.max(-0.7, Math.min(0.7, -turnRate * 3.0 - dodgeX * 0.05));   // roll into turn + juke
     cam.rotation.set(f.pitch, heading + f.yaw * 0.3, f.roll + bank);
 
     // Rotation + recycle (heading frame: along = (pos-camPath)·fwd, lateral = ·right).
