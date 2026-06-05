@@ -123,7 +123,12 @@ function buildFlythrough(ctx: SceneCtx, opts: FlythroughOpts): SceneUpdater {
   let lastT = 0;
   // Heading state — the camera truly translates through world-static geometry, so a real
   // course change reads convincingly. camPath = the flown base path (xz); weave rides on top.
-  let heading = 0, headTarget = 0, nextTurnT = 12 + rng() * 10, prevHeading = 0;
+  let heading = 0, nextTurnT = 12 + rng() * 10;
+  // Roll-LED coordinated turn: the camera banks FIRST, the heading follows the bank (you
+  // turn because you're banked), and it rolls out as the turn completes. The lead-in roll
+  // is the cue that says "going into a curve" before the field swings — without it a
+  // heading change in the structureless field just reads as a swivel + strafe.
+  let turnDir = 0, turnRemaining = 0, bankSmooth = 0;
   const camPath = new THREE.Vector3(0, 0, 0);
   const fwd = new THREE.Vector3(0, 0, -1), right = new THREE.Vector3(1, 0, 0);
   const tmp = new THREE.Vector3();
@@ -148,14 +153,19 @@ function buildFlythrough(ctx: SceneCtx, opts: FlythroughOpts): SceneUpdater {
     lastT = t;
     const spd = (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]);
 
-    // Course: distinct, banked heading changes so the flight reads as CURVING, not strafing.
-    // You move sideways by turning the nose (+ rolling into it), not by sliding the body.
+    // Roll-led coordinated turn (see decl). On a trigger, commit to a turn direction +
+    // amount; the bank eases in first, the heading rate tracks the bank, and the turn
+    // "uses up" its remaining angle so the bank rolls back out at the end.
     if (t > nextTurnT) {
-      headTarget += (rng() < 0.5 ? -1 : 1) * (0.6 + rng() * 0.9);
-      nextTurnT = t + 6 + rng() * 7;
+      turnDir = rng() < 0.5 ? -1 : 1;
+      turnRemaining = 0.8 + rng() * 0.9;
+      nextTurnT = t + 7 + rng() * 8;
     }
-    prevHeading = heading;
-    heading += (headTarget - heading) * (1 - Math.exp(-dts / 1.8));   // crisper turn-in
+    const bankTarget = turnRemaining > 0.03 ? turnDir * 0.6 : 0;
+    bankSmooth += (bankTarget - bankSmooth) * (1 - Math.exp(-dts / 0.5));
+    const turnStep = bankSmooth * 0.75 * dts;        // heading rate ∝ current bank (wider arc)
+    heading += turnStep;
+    turnRemaining = Math.max(0, turnRemaining - Math.abs(turnStep));
     fwd.set(Math.sin(heading), 0, -Math.cos(heading));
     right.set(Math.cos(heading), 0, Math.sin(heading));
 
@@ -185,13 +195,12 @@ function buildFlythrough(ctx: SceneCtx, opts: FlythroughOpts): SceneUpdater {
     dodgeX += (dodgeTX - dodgeX) * (1 - Math.exp(-dts / 0.32));
     dodgeY += (dodgeTY - dodgeY) * (1 - Math.exp(-dts / 0.32));
 
-    // Almost no lateral weave — weave alone read as strafe; the heading IS the lateral motion.
     const f = fly.sample(t, spd * 14);
-    const latOff = f.x * 0.12 + dodgeX;
+    // Suppress the lateral weave mid-turn — the weave alone reads as strafe; let the bank own it.
+    const weaveScale = 0.12 * (1 - Math.min(1, Math.abs(bankSmooth) / 0.6) * 0.85);
+    const latOff = f.x * weaveScale + dodgeX;
     cam.position.set(camPath.x + right.x * latOff, f.y + dodgeY, camPath.z + right.z * latOff);
-    const turnRate = (heading - prevHeading) / Math.max(1e-4, dts);
-    const bank = Math.max(-0.7, Math.min(0.7, -turnRate * 3.0 - dodgeX * 0.05));   // roll into turn + juke
-    cam.rotation.set(f.pitch, heading + f.yaw * 0.3, f.roll + bank);
+    cam.rotation.set(f.pitch, heading + f.yaw * 0.3, f.roll - bankSmooth - dodgeX * 0.05);
 
     // Rotation + recycle (heading frame: along = (pos-camPath)·fwd, lateral = ·right).
     for (const a of asteroids) {

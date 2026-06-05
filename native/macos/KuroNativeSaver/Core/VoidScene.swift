@@ -18,7 +18,10 @@ final class VoidScene: Scene {
 
     private struct Roid { var item: DrawItem; var pos: SIMD3<Float>; var rot: SIMD3<Float>; var scale: Float; var spin: SIMD3<Float>; var baseOpacity: Float }
     private var roids: [Roid] = []
-    private var heading: Float = 0, headTarget: Float = 0, prevHeading: Float = 0
+    private var heading: Float = 0
+    // Roll-LED coordinated turn (see void.ts): bank first, heading follows the bank, roll out
+    // as the turn completes — the lead-in roll is what reads as "curve" not "swivel + strafe".
+    private var turnDir: Float = 0, turnRemaining: Float = 0, bankSmooth: Float = 0
     private var nextTurnT: Double = 14
     private var camPath = SIMD3<Float>(0, 0, 0)
     private let speed: DrawItem
@@ -175,11 +178,15 @@ final class VoidScene: Scene {
         // Course: occasionally pick a new heading; ease toward it (Void truly translates
         // through world-static rocks → a real heading change reads convincingly).
         if t > nextTurnT {
-            headTarget += (rng.nextF() < 0.5 ? -1 : 1) * (0.6 + rng.nextF() * 0.9)
-            nextTurnT = t + 6 + Double(rng.nextF()) * 7
+            turnDir = rng.nextF() < 0.5 ? -1 : 1
+            turnRemaining = 0.8 + rng.nextF() * 0.9
+            nextTurnT = t + 7 + Double(rng.nextF()) * 8
         }
-        prevHeading = heading
-        heading += (headTarget - heading) * (1 - exp(-dtf / 1.8))   // crisper turn-in
+        let bankTarget: Float = turnRemaining > 0.03 ? turnDir * 0.6 : 0
+        bankSmooth += (bankTarget - bankSmooth) * (1 - exp(-dtf / 0.5))
+        let turnStep = bankSmooth * 0.75 * dtf        // heading rate ∝ current bank (wider arc)
+        heading += turnStep
+        turnRemaining = max(0, turnRemaining - abs(turnStep))
         let fwd = SIMD3<Float>(sin(heading), 0, -cos(heading))
         let right = SIMD3<Float>(cos(heading), 0, sin(heading))
 
@@ -213,12 +220,11 @@ final class VoidScene: Scene {
         dodgeY += (dodgeTY - dodgeY) * (1 - exp(-dtf / 0.32))
 
         let f = fly.update(t: t, forwardSpeed: spdMul * 14)
-        // Almost no lateral weave — weave alone read as strafe; the heading IS the lateral motion.
-        let latOff = f.x * 0.12 + dodgeX
+        // Suppress the lateral weave mid-turn — the weave alone reads as strafe; let the bank own it.
+        let weaveScale = 0.12 * (1 - min(1, abs(bankSmooth) / 0.6) * 0.85)
+        let latOff = f.x * weaveScale + dodgeX
         camera.position = SIMD3(camPath.x + right.x * latOff, f.y + dodgeY, camPath.z + right.z * latOff)
-        let turnRate = (heading - prevHeading) / max(1e-4, dtf)
-        let bank = max(-0.7, min(0.7, -turnRate * 3.0 - dodgeX * 0.05))   // roll into turn + juke
-        camera.rotation = SIMD3(f.pitch, heading + f.yaw * 0.3, f.roll + bank)
+        camera.rotation = SIMD3(f.pitch, heading + f.yaw * 0.3, f.roll - bankSmooth - dodgeX * 0.05)
 
         let spinStep = spdMul * dtf * 60   // web spin is per-frame*spd; normalize to 60fps
 
