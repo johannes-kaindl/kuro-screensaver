@@ -88,10 +88,15 @@ final class RiftScene: Scene {
         cAz += spd; cBz += spd
         if cAz > 148 { cAz -= 560 }
         if cBz > 148 { cBz -= 560 }
-        cAneg.model = Mathx.translation(SIMD3(-RiftScene.WALL_X, 8, cAz))
-        cApos.model = Mathx.translation(SIMD3(RiftScene.WALL_X, 8, cAz))
-        cBneg.model = Mathx.translation(SIMD3(-RiftScene.WALL_X, 8, cBz))
-        cBpos.model = Mathx.translation(SIMD3(RiftScene.WALL_X, 8, cBz))
+        // Gentle evolving serpentine (seam-safe: curve shares the chunk period; slow drift).
+        let curveAmp: Float = 5, phase = tf * 0.18
+        let kBase = 2 * Float.pi / RiftScene.CHUNK_LEN
+        func curveX(_ z: Float) -> Float { curveAmp * sin(z * kBase + phase) }
+        let slope = curveAmp * kBase * cos(phase)
+        cAneg.model = Mathx.translation(SIMD3(-RiftScene.WALL_X + curveX(cAz), 8, cAz))
+        cApos.model = Mathx.translation(SIMD3(RiftScene.WALL_X + curveX(cAz), 8, cAz))
+        cBneg.model = Mathx.translation(SIMD3(-RiftScene.WALL_X + curveX(cBz), 8, cBz))
+        cBpos.model = Mathx.translation(SIMD3(RiftScene.WALL_X + curveX(cBz), 8, cBz))
 
         // barrel roll
         if !rollActive && t > nextRollT { rollActive = true; rollStartT = t }
@@ -106,7 +111,7 @@ final class RiftScene: Scene {
             }
         }
 
-        camera.position = SIMD3(sin(tf * 0.08) * 2.4, 8 + sin(tf * 0.27) * 0.5, 0)
-        camera.rotation = SIMD3(-0.06, cos(tf * 0.08) * 0.03, sin(tf * 0.08) * 0.04 + currentRoll)
+        camera.position = SIMD3(curveX(0) + sin(tf * 0.08) * 2.4, 8 + sin(tf * 0.27) * 0.5, 0)
+        camera.rotation = SIMD3(-0.06, cos(tf * 0.08) * 0.03 - slope * 1.2, sin(tf * 0.08) * 0.04 + currentRoll - slope * 2.2)
     }
 }

@@ -109,11 +109,19 @@ export const RiftScene: SceneModule = {
       if (cA.position.z > CHUNK_LEN / 2 + 8) cA.position.z -= CHUNK_LEN * 2;
       if (cB.position.z > CHUNK_LEN / 2 + 8) cB.position.z -= CHUNK_LEN * 2;
 
-      // Gentle lateral + vertical drift
-      cam.position.x = Math.sin(t * 0.08) * 2.4;
+      // Gentle evolving serpentine: offset the wall groups by a curve that shares the
+      // chunk period (so recycled chunks stay seam-free) with a slow phase drift so the
+      // bend changes over the flight. Camera rides the bend + yaws/banks into it.
+      const CURVE_AMP = 5, curvePhase = t * 0.18;
+      const curveX = (z: number) => CURVE_AMP * Math.sin(z * K_BASE + curvePhase);
+      cA.position.x = curveX(cA.position.z);
+      cB.position.x = curveX(cB.position.z);
+      const slope = CURVE_AMP * K_BASE * Math.cos(curvePhase);   // corridor slope at the camera
+
+      cam.position.x = curveX(0) + Math.sin(t * 0.08) * 2.4;     // ride the bend (clearance ±13)
       cam.position.y = 8 + Math.sin(t * 0.27) * 0.5;
       cam.rotation.x = -0.06;
-      cam.rotation.y = Math.cos(t * 0.08) * 0.03;
+      cam.rotation.y = Math.cos(t * 0.08) * 0.03 - slope * 1.2;
 
       // Barrel-roll trigger / progress
       if (!rollActive && t > nextRollT) {
@@ -134,7 +142,7 @@ export const RiftScene: SceneModule = {
       }
 
       // Z = base subtle sway + barrel-roll contribution
-      cam.rotation.z = Math.sin(t * 0.08) * 0.04 + currentRoll;
+      cam.rotation.z = Math.sin(t * 0.08) * 0.04 + currentRoll - slope * 2.2;
     };
   },
 };
