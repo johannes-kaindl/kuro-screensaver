@@ -9,6 +9,7 @@ import { mkRng } from '../rng';
 
 const CL = 320;  // chunk length
 const SW = 22;   // corridor half-width
+const JUNCTION = 54;  // open zone at each chunk end → the seam between two chunks reads as an intersection
 
 interface BlinkRef {
   mesh: THREE.Mesh; phase: number; speed: number; hi: number; lo: number;
@@ -42,6 +43,7 @@ function buildChunk(grp: THREE.Group, mats: SceneCtx['mats'], seed: number, blin
   const nb = Math.floor(CL / BS);
   for (let b = 0; b < nb; b++) {
     const bz = -half + b * BS + BS / 2;
+    if (Math.abs(bz) > half - JUNCTION) continue;   // leave the ends open → seams become junctions
     for (const side of [-1, 1]) {
       const nB = 1 + (rng() > 0.45 ? 1 : 0);
       for (let i = 0; i < nB; i++) {
@@ -132,6 +134,25 @@ function buildChunk(grp: THREE.Group, mats: SceneCtx['mats'], seed: number, blin
       grp.add(tank);
     }
   }
+
+  // Junction corner blocks — towers in the four quadrants of each open end, framing the
+  // crossing. Both the main street (free along z at |x|<SW) and the cross street (free
+  // along x at |z-end|<SW) stay open, so a turn over the junction reveals city, not a void.
+  for (const endZ of [-half + JUNCTION * 0.5, half - JUNCTION * 0.5]) {
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      const w = 12 + rng() * 16, h = 22 + rng() * 54, d = 12 + rng() * 16;
+      const bx = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mats.M({ transparent: true, opacity: 0.5 + rng() * 0.3 }));
+      bx.position.set(sx * (SW + 5 + w / 2), h / 2, endZ + sz * (SW + 5 + d / 2));
+      grp.add(bx);
+      // a few lit windows on the corner blocks too
+      if (rng() < 0.6) {
+        const wm = ((enemyMats && rng() < 0.25) ? enemyMats : mats).MSolid(0.9);
+        const wx = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.56, 0.09), wm);
+        wx.position.set(bx.position.x, 3 + rng() * (h - 6), bx.position.z + (rng() > 0.5 ? d / 2 + 0.05 : -d / 2 - 0.05));
+        grp.add(wx);
+      }
+    }
+  }
 }
 
 export const CityScene: SceneModule = {
@@ -188,27 +209,89 @@ export const CityScene: SceneModule = {
     cam.rotation.set(-0.08, 0, 0);
     const fly = new CameraFly(Math.floor(ctx.rng() * 2e9), 8, 1.6, ALT_VALUES[settings.cityAltitude], -0.08, ctx.settings.bankStrength);
 
-    let blinkTick = 0;
+    let blinkTick = 0, lastT = 0;
+    // Heading-frame flight: the city is world-static; the camera flies through it along a
+    // heading. At a junction (the open zone where two chunks meet) the heading swings 90° —
+    // a real corner. Corridor chunks recycle as a chain ahead in the current heading.
+    let heading = 0, nextTurnT = 16 + ctx.rng() * 8;
+    let turning = false, turnFrom = 0, turnTo = 0, turnT0 = 0;
+    const camPath = new THREE.Vector3(0, 0, 0);
+    const fwd = new THREE.Vector3(0, 0, -1), right = new THREE.Vector3(1, 0, 0);
+    const tmp = new THREE.Vector3();
+    const turnRng = mkRng((baseSeed ^ 0x717271) >>> 0);
+    const TURN_DUR = 1.6;
+    const segs = [cA, cB];
+    cA.position.set(0, 0, -CL / 2);
+    cB.position.set(0, 0, -CL / 2 - CL);
+    const dp = dustG.attributes.position as THREE.BufferAttribute;
 
     return (t: number, _dt: number) => {
+      const dts = lastT === 0 ? 0.016 : Math.min(0.1, t - lastT);
+      lastT = t;
       const altTarget = ALT_VALUES[ctx.settings.cityAltitude];
-      const spd = (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]) * 0.24;
-      cA.position.z += spd; cB.position.z += spd;
-      // Stream dust past the camera (same rate as the city scroll) — no constant-distance hang.
-      const dp = dustG.attributes.position as THREE.BufferAttribute;
+      const spd = (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]) * 0.24 * 60;   // units/sec
+
+      // Are we in an open junction zone (near a chunk seam)? Turns only start there, so the
+      // 90° swing plays out over the open intersection, never into a building wall.
+      let inJunction = false;
+      for (const s of segs) {
+        const sy = s.rotation.y;
+        const la = (camPath.x - s.position.x) * Math.sin(sy) - (camPath.z - s.position.z) * Math.cos(sy);
+        if (Math.abs(la) < CL / 2 && Math.abs(la) > CL / 2 - JUNCTION) { inJunction = true; break; }
+      }
+      // Corner choreography: at an open junction, swing the heading 90°.
+      const prevHeading = heading;
+      if (!turning && t > nextTurnT && inJunction) {
+        turning = true; turnFrom = heading;
+        turnTo = heading + (turnRng() < 0.5 ? -1 : 1) * Math.PI / 2;
+        turnT0 = t;
+        // Re-aim the far (fogged-out) chunk into the NEW direction so we emerge into corridor.
+        const nfx = Math.sin(turnTo), nfz = -Math.cos(turnTo);
+        let front = segs[0], fd = -1e9;
+        for (const s of segs) { const d = tmp.copy(s.position).sub(camPath).dot(fwd); if (d > fd) { fd = d; front = s; } }
+        front.position.set(camPath.x + nfx * (CL / 2 + 30), 0, camPath.z + nfz * (CL / 2 + 30));
+        front.rotation.y = turnTo;
+      }
+      if (turning) {
+        const p = Math.min(1, (t - turnT0) / TURN_DUR);
+        const e = 0.5 - 0.5 * Math.cos(p * Math.PI);      // cosine ease in/out
+        heading = turnFrom + (turnTo - turnFrom) * e;
+        if (p >= 1) { turning = false; heading = turnTo; nextTurnT = t + 6 + turnRng() * 6; }
+      }
+      fwd.set(Math.sin(heading), 0, -Math.cos(heading));
+      right.set(Math.cos(heading), 0, Math.sin(heading));
+      const turnRate = (heading - prevHeading) / Math.max(1e-4, dts);
+
+      camPath.addScaledVector(fwd, spd * dts);
+
+      // Recycle corridor chunks as a chain: a chunk that falls behind re-appends one CL ahead
+      // of the other, rotated to the current heading (so the corridor follows the corner).
+      for (let i = 0; i < segs.length; i++) {
+        const seg = segs[i];
+        if (tmp.copy(seg.position).sub(camPath).dot(fwd) < -CL / 2 - 24) {
+          const other = segs[(i + 1) % segs.length];
+          seg.position.copy(other.position).addScaledVector(fwd, CL);
+          seg.rotation.y = heading;
+        }
+      }
+
+      // Dust streams along the heading (recycle when it falls behind the camera).
       for (let i = 0; i < dp.count; i++) {
-        let dz = dp.getZ(i) + spd;
-        if (dz > 10) dz -= 720;
-        dp.setZ(i, dz);
+        const ahead = (dp.getX(i) - camPath.x) * fwd.x + (dp.getZ(i) - camPath.z) * fwd.z;
+        if (ahead < -6) {
+          const d = 30 + Math.random() * 670, lat = (Math.random() - 0.5) * 80;
+          dp.setX(i, camPath.x + fwd.x * d + right.x * lat);
+          dp.setZ(i, camPath.z + fwd.z * d + right.z * lat);
+          dp.setY(i, Math.random() * 55);
+        }
       }
       dp.needsUpdate = true;
-      if (cA.position.z > CL / 2 + 8) cA.position.z -= CL * 2;
-      if (cB.position.z > CL / 2 + 8) cB.position.z -= CL * 2;
 
       fly.vertBase = altTarget;
-      const f = fly.sample(t, spd * 60);
-      cam.position.x = f.x; cam.position.y = Math.max(1.8, f.y);   // clamp above the street
-      cam.rotation.set(f.pitch, f.yaw, f.roll);
+      const f = fly.sample(t, spd);
+      cam.position.set(camPath.x + right.x * f.x, Math.max(1.8, f.y), camPath.z + right.z * f.x);
+      const bank = Math.max(-0.5, Math.min(0.5, -turnRate * 0.4));   // bank into the corner (clamped)
+      cam.rotation.set(f.pitch, heading + f.yaw, f.roll + bank);
 
       blinkTick++;
       if (blinkTick % 2 === 0) {
