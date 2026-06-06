@@ -71,30 +71,30 @@ export const CityScene: SceneModule = {
     const blinks: BlinkRef[] = [];
     const baseSeed = (ctx.rng() * 0xffffffff) | 0;
 
-    // ── Block grid: COLS fixed in x, ROWS scrolling in z. Block centres sit at (k+0.5)·P,
-    // so x=0 / z=k·P are streets (the lane the camera flies + the cross-streets). ──
-    interface Blk { grp: THREE.Group; }
+    // ── Block grid: a pool of COLS×ROWS blocks tiled toroidally around the camera on the
+    // fixed lattice each frame. Block centres sit at (i+0.5)·P, so x=k·P / z=k·P are streets. ──
+    interface Blk { grp: THREE.Group; a: number; b: number; }
     const blocks: Blk[] = [];
-    for (let c = 0; c < COLS; c++) {
-      for (let r = 0; r < ROWS; r++) {
+    for (let a = 0; a < COLS; a++) {
+      for (let b = 0; b < ROWS; b++) {
         const grp = new THREE.Group();
-        buildBlock(grp, mats, baseSeed + c * 101 + r * 7919 + 17, blinks, ctx.enemyMats);
-        grp.position.x = (c - (COLS - 1) / 2) * P + P / 2;        // …,-1.5P,-0.5P,0.5P,1.5P,… (x=0 is a street)
-        grp.position.z = (r - (ROWS - 1)) * P + P / 2;            // rows ahead of the camera, scrolling +z
+        buildBlock(grp, mats, baseSeed + a * 101 + b * 7919 + 17, blinks, ctx.enemyMats);
         world.add(grp);
-        blocks.push({ grp });
+        blocks.push({ grp, a, b });
       }
     }
+    const cxi = Math.floor(COLS / 2), czi = Math.floor(ROWS / 2);
 
-    // ── Ground street grid (P-periodic, scrolls with the blocks, wraps seamlessly at P) ──
+    // ── Ground street grid (centred on the camera each frame, snapped to the lattice) ──
     const groundGrid = new THREE.Group();
     {
       const lp: number[] = [];
-      const xspan = (COLS / 2 + 1) * P, zlo = -(ROWS + 1) * P, zhi = 2 * P;
-      for (let k = -Math.ceil(COLS / 2) - 1; k <= Math.ceil(COLS / 2) + 1; k++)        // streets along z
-        lp.push(k * P, 0.05, zlo, k * P, 0.05, zhi);
-      for (let k = Math.floor(zlo / P) - 1; k <= Math.ceil(zhi / P) + 1; k++)          // cross-streets along x
-        lp.push(-xspan, 0.05, k * P, xspan, 0.05, k * P);
+      const kmax = Math.ceil(Math.max(COLS, ROWS) / 2) + 2;
+      const span = kmax * P;
+      for (let k = -kmax; k <= kmax; k++) {
+        lp.push(k * P, 0.05, -span, k * P, 0.05, span);   // streets along z
+        lp.push(-span, 0.05, k * P, span, 0.05, k * P);   // cross-streets along x
+      }
       const lg = new THREE.BufferGeometry();
       lg.setAttribute('position', new THREE.Float32BufferAttribute(lp, 3));
       groundGrid.add(new THREE.LineSegments(lg, mats.ML(0.22)));
@@ -105,7 +105,7 @@ export const CityScene: SceneModule = {
     {
       const sv: number[] = [];
       const r = ctx.rng;
-      for (let i = 0; i < 1100; i++) sv.push((r() - 0.5) * 800, 60 + r() * 200, (r() - 0.5) * 800);
+      for (let i = 0; i < 1100; i++) sv.push((r() - 0.5) * 900, 70 + r() * 220, (r() - 0.5) * 900);
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(sv, 3));
       world.add(new THREE.Points(g, mats.MP(0.14)));
@@ -115,24 +115,63 @@ export const CityScene: SceneModule = {
     cam.rotation.set(-0.05, 0, 0);
     const fly = new CameraFly(Math.floor(ctx.rng() * 2e9), 6, 1.4, ALT_VALUES[settings.cityAltitude], -0.05, ctx.settings.bankStrength);
 
-    let blinkTick = 0, scrollZ = 0;
+    // Heading-frame flight on the street lanes: camPath rides a lane; at an intersection the
+    // heading swings 90° onto the cross-street. Blocks tile toroidally on the fixed lattice,
+    // so the lanes (k·P) are always clear — the camera never enters a building.
+    let heading = 0, nextTurnT = 12 + ctx.rng() * 8, lastT = 0;
+    let turning = false, turnFrom = 0, turnTo = 0, turnT0 = 0;
+    const camPath = new THREE.Vector3(0, 0, 0);
+    const fwd = new THREE.Vector3(0, 0, -1), right = new THREE.Vector3(1, 0, 0);
+    const turnRng = mkRng((baseSeed ^ 0x717271) >>> 0);
+    const TURN_DUR = 1.3;
+    let blinkTick = 0;
 
     return (t: number, _dt: number) => {
+      const dts = lastT === 0 ? 0.016 : Math.min(0.1, t - lastT);
+      lastT = t;
       const altTarget = ALT_VALUES[ctx.settings.cityAltitude];
-      const spd = (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]) * 0.24;
+      const spd = (ctx.speed?.() ?? SPEED_VALUES[ctx.settings.speed]) * 0.24 * 60;   // units/sec
 
-      // Scroll the blocks toward the camera; wrap each one period behind the back row.
-      scrollZ += spd;
-      for (const b of blocks) {
-        b.grp.position.z += spd;
-        if (b.grp.position.z > P) b.grp.position.z -= ROWS * P;
+      // Turn at an intersection: when the along-lane coordinate is near a lattice crossing
+      // (k·P), swing the heading 90° onto the cross street.
+      const prevHeading = heading;
+      const alongZ = Math.abs(Math.cos(heading)) > 0.5;            // flying along z (vs x)?
+      const along = alongZ ? camPath.z : camPath.x;
+      const atCrossing = Math.abs(along - Math.round(along / P) * P) < 14;
+      if (!turning && t > nextTurnT && atCrossing) {
+        turning = true; turnFrom = heading;
+        turnTo = heading + (turnRng() < 0.5 ? -1 : 1) * Math.PI / 2;
+        turnT0 = t;
       }
-      groundGrid.position.z = scrollZ % P;                  // P-periodic → seamless
+      if (turning) {
+        const p = Math.min(1, (t - turnT0) / TURN_DUR);
+        const e = 0.5 - 0.5 * Math.cos(p * Math.PI);
+        heading = turnFrom + (turnTo - turnFrom) * e;
+        if (p >= 1) {
+          turning = false; heading = turnTo; nextTurnT = t + 10 + turnRng() * 8;
+          // snap the now-fixed axis exactly onto its lane (kills any cornering drift)
+          if (Math.abs(Math.cos(heading)) > 0.5) camPath.x = Math.round(camPath.x / P) * P;
+          else camPath.z = Math.round(camPath.z / P) * P;
+        }
+      }
+      fwd.set(Math.sin(heading), 0, -Math.cos(heading));
+      right.set(Math.cos(heading), 0, Math.sin(heading));
+      const turnRate = (heading - prevHeading) / Math.max(1e-4, dts);
+
+      camPath.addScaledVector(fwd, spd * dts);
+
+      // Tile the block pool toroidally on the lattice around the camera.
+      const baseI = Math.round(camPath.x / P - 0.5), baseJ = Math.round(camPath.z / P - 0.5);
+      for (const blk of blocks) {
+        blk.grp.position.set((baseI + blk.a - cxi + 0.5) * P, 0, (baseJ + blk.b - czi + 0.5) * P);
+      }
+      groundGrid.position.set(Math.round(camPath.x / P) * P, 0, Math.round(camPath.z / P) * P);
 
       fly.vertBase = altTarget;
-      const f = fly.sample(t, spd * 60);
-      cam.position.set(f.x * 0.22, Math.max(2, f.y), 0);    // hold the x=0 lane (small weave only)
-      cam.rotation.set(f.pitch, f.yaw * 0.3, f.roll);
+      const f = fly.sample(t, spd);
+      const bank = Math.max(-0.45, Math.min(0.45, -turnRate * 0.4));
+      cam.position.set(camPath.x + right.x * f.x * 0.22, Math.max(2, f.y), camPath.z + right.z * f.x * 0.22);
+      cam.rotation.set(f.pitch, heading + f.yaw * 0.3, f.roll + bank);
 
       blinkTick++;
       if (blinkTick % 2 === 0) {
