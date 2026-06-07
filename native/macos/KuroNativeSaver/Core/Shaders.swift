@@ -210,8 +210,11 @@ enum Shaders {
             col *= mix(float3(1.0), m, maskStr);
         }
         // constant analog grain + gentle brightness shimmer
+        // 24 Hz filmic cadence (was 60): at 60 the field was reseeded every frame and
+        // "boiled" at the display refresh rate (visible strobe on 60/120 Hz). A film-rate
+        // step holds each field ~2-3 frames so it reads as organic grain, not buzz.
         float grain = u.p5.z;
-        if (grain > 0.0) { col += (hash21(in.pos.xy + floor(u.p1.w * 60.0)) - 0.5) * grain; }
+        if (grain > 0.0) { col += (hash21(in.pos.xy + floor(u.p1.w * 24.0)) - 0.5) * grain; }
         float flick = u.p5.w;
         if (flick > 0.0) { col *= 1.0 - flick * (0.5 + 0.5 * sin(u.p1.w * 38.0)); }
 
