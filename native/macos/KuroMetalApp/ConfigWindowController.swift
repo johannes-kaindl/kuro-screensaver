@@ -5,7 +5,7 @@ import AppKit
 
 final class ConfigWindowController: NSWindowController {
     private var lookPopup, scenePopup, presetPopup, speedPopup, altPopup, fogPopup, weatherPopup, cyclePopup, idlePopup, terminalPopup: NSPopUpButton!
-    private var hudCheck, dayNightCheck, soundCheck, cycleCheck, autostartCheck, flatHudCheck, reactiveWorldCheck: NSButton!
+    private var hudCheck, radarCheck, dayNightCheck, soundCheck, cycleCheck, autostartCheck, flatHudCheck, reactiveWorldCheck: NSButton!
     private var intensitySlider, curvSlider, maskSlider, bloomSlider, trailsSlider, ntscSlider, halSlider, termSlider, bandSlider, bankSlider: NSSlider!
     private var previewContainer: NSView!
     private var previewView: MetalHostView?
@@ -130,6 +130,7 @@ final class ConfigWindowController: NSWindowController {
 
         // Checkboxes.
         hudCheck = mkCheck("HUD (Instrumente)", AppSettings.showHud)
+        radarCheck = mkCheck("Radar", AppSettings.showRadar)
         dayNightCheck = mkCheck("Tag/Nacht-Zyklus", AppSettings.dayNight)
         soundCheck = mkCheck("Ton (Atmosphäre)", AppSettings.sound)
         cycleCheck = mkCheck("Szenen automatisch wechseln", AppSettings.autoCycle)
@@ -155,7 +156,7 @@ final class ConfigWindowController: NSWindowController {
         ])
         let secTerminal = section("Terminal", [termGrid])
         let secBehavior = section("Anzeige & Automatik", [
-            hudCheck, dayNightCheck, soundCheck, cycleCheck,
+            hudCheck, radarCheck, dayNightCheck, soundCheck, cycleCheck,
             grid([[lab("Wechsel:"), cyclePopup], [lab("Auto-Start:"), idlePopup]]), autostartCheck,
         ])
 
@@ -251,6 +252,7 @@ final class ConfigWindowController: NSWindowController {
         AppSettings.halation = Float(halSlider.doubleValue)
         AppSettings.terminalScale = Float(termSlider.doubleValue)
         AppSettings.showHud = hudCheck.state == .on
+        AppSettings.showRadar = radarCheck.state == .on
         AppSettings.flatHud = flatHudCheck.state == .on
         AppSettings.reactiveWorld = reactiveWorldCheck.state == .on
         AppSettings.terminalLayout = termLayouts[max(0, terminalPopup.indexOfSelectedItem)].1

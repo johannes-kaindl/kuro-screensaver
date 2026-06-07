@@ -27,6 +27,7 @@ struct Settings {
     var speed: Speed = .norm
     var cityAltitude: Altitude = .low
     var showHud = true              // HUD panels (flight data, crosshair, scene label)
+    var showRadar = true            // tactical radar (bottom-right); gated also by showHud
     var flatHud = false             // draw HUD + terminal flat AFTER the CRT composite (crisp, uncurved) vs in-monitor
     var reducedMotion = false       // a11y: route scene transitions through the CALM profile (set by the app host from NSWorkspace)
     enum TerminalLayout: String, CaseIterable { case off, strip, stripDark = "stripdark", window }

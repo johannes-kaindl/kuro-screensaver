@@ -36,7 +36,7 @@ final class Hud {
     func renderOverlay(_ tr: TextRenderer, width: Int, height: Int, accent: SIMD3<Float>,
                        t: Double, scene: String, terminalScale: Float = 1,
                        terminalLayout: Settings.TerminalLayout = .strip, terminalBand: Float = 0.24,
-                       showPanels: Bool = true) {
+                       showPanels: Bool = true, showRadar: Bool = true) {
         let dim = accent * 0.72
         let s = Float(height) / 64                         // base cell height (px)
         let pad = s * 1.5
@@ -86,6 +86,63 @@ final class Hud {
         let lw = tr.width(label, pxHeight: s * 2)
         tr.add(label, xPx: (W - lw) / 2, yPx: pad, pxHeight: s * 2, color: accent, opacity: 0.55)
 
+        // --- radar (bottom-right) ---
+        if showRadar {
+            let reserve: Float = terminalLayout == .stripDark ? max(s * 3, H * terminalBand) : 0
+            renderRadar(tr, W: W, H: H, s: s, accent: accent, t: t, bottomReserve: reserve)
+        }
+    }
+
+    /// Tactical radar — concentric rings, crosshair, a rotating sweep with fading
+    /// afterglow, drifting blips, and a centre dot. Bottom-right. Web mirror
+    /// (hud/index.ts drawRadar), deterministic from t (no per-frame RNG state).
+    private func renderRadar(_ tr: TextRenderer, W: Float, H: Float, s: Float,
+                             accent: SIMD3<Float>, t: Double, bottomReserve: Float) {
+        let R = H * 0.05                                   // outer radius (proportional)
+        let pad = s * 1.5
+        let cx = W - R - pad
+        let cy = H - R - pad - bottomReserve
+        let lw = max(1, R * 0.03)
+        func h(_ x: Float) -> Float { let v = sin(x * 12.9898) * 43758.5453; return v - floor(v) }
+
+        // rings (polygon approximation)
+        let segs = 40
+        for rr in [R * 0.33, R * 0.57, R * 0.86] {
+            var px = cx + rr, py = cy
+            for k in 1...segs {
+                let a = Float(k) / Float(segs) * 6.2831853
+                let nx = cx + cos(a) * rr, ny = cy + sin(a) * rr
+                tr.line(px, py, nx, ny, width: lw, color: accent, opacity: 0.14)
+                px = nx; py = ny
+            }
+        }
+        // crosshair
+        tr.line(cx, cy - R, cx, cy + R, width: lw, color: accent, opacity: 0.10)
+        tr.line(cx - R, cy, cx + R, cy, width: lw, color: accent, opacity: 0.10)
+
+        // rotating sweep + fading afterglow
+        let rA = Float(t.truncatingRemainder(dividingBy: 1000)) * 2.5
+        for i in 0..<16 {
+            let a = rA - Float(i) * 0.07
+            tr.line(cx, cy, cx + cos(a) * R, cy + sin(a) * R,
+                    width: lw * 1.5, color: accent, opacity: (1 - Float(i) / 16) * 0.34)
+        }
+        tr.line(cx, cy, cx + cos(rA) * R, cy + sin(rA) * R, width: lw * 1.6, color: accent, opacity: 0.85)
+
+        // blips (deterministic fade/respawn)
+        for i in 0..<12 {
+            let cyc = Float(t) * 0.5 + Float(i) * 0.131
+            let k = floor(cyc)
+            let life = 1 - (cyc - k)
+            let ang = h(Float(i) * 7.13 + k * 1.7) * 6.2831853
+            let rr = (0.22 + h(Float(i) * 13.1 + k * 2.3) * 0.74) * R
+            let bs = max(2, R * 0.06)
+            tr.fillRect(xPx: cx + cos(ang) * rr - bs / 2, yPx: cy + sin(ang) * rr - bs / 2,
+                        wPx: bs, hPx: bs, color: accent, opacity: life * 0.85)
+        }
+        // centre dot
+        let ds = max(3, R * 0.09)
+        tr.fillRect(xPx: cx - ds / 2, yPx: cy - ds / 2, wPx: ds, hPx: ds, color: accent, opacity: 0.95)
     }
 
     // --- terminal: bottom-left strip, fading upward (the compact overlay) ---

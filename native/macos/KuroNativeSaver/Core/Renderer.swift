@@ -485,7 +485,7 @@ final class Renderer {
                                   t: t, scene: SceneRegistry.ids[sceneIndex],
                                   terminalScale: settings.terminalScale,
                                   terminalLayout: settings.terminalLayout, terminalBand: settings.terminalBandHeight,
-                                  showPanels: settings.showHud)
+                                  showPanels: settings.showHud, showRadar: settings.showRadar)
             }
             text.flush(tenc)
         }
@@ -535,7 +535,7 @@ final class Renderer {
                               t: t, scene: SceneRegistry.ids[sceneIndex],
                               terminalScale: settings.terminalScale,
                               terminalLayout: settings.terminalLayout, terminalBand: settings.terminalBandHeight,
-                              showPanels: settings.showHud)
+                              showPanels: settings.showHud, showRadar: settings.showRadar)
             textFlat.flush(fenc)
             fenc.endEncoding()
         }

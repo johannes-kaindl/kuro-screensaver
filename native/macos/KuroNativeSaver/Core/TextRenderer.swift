@@ -73,6 +73,23 @@ final class TextRenderer {
         v(x0, yb); v(x1, yt); v(x1, yb)
     }
 
+    /// Draw a thickness-wide line between two screen-pixel points (a rotated quad,
+    /// solid fill). Used for non-axis-aligned HUD geometry like the radar sweep/rings.
+    func line(_ ax: Float, _ ay: Float, _ bx: Float, _ by: Float, width: Float, color: SIMD3<Float>, opacity: Float) {
+        guard opacity > 0.002 else { return }
+        let dx = bx - ax, dy = by - ay
+        let len = max(0.0001, (dx * dx + dy * dy).squareRoot())
+        let hw = width * 0.5
+        let nx = -dy / len * hw, ny = dx / len * hw      // perpendicular half-width offset
+        let u = atlas.solidU, vv = atlas.solidV
+        let r3 = color.x, g3 = color.y, b3 = color.z, a = opacity
+        func v(_ px: Float, _ py: Float) {
+            verts.append(contentsOf: [px / vpW * 2 - 1, 1 - py / vpH * 2, u, vv, r3, g3, b3, a])
+        }
+        v(ax + nx, ay + ny); v(bx + nx, by + ny); v(ax - nx, ay - ny)
+        v(ax - nx, ay - ny); v(bx + nx, by + ny); v(bx - nx, by - ny)
+    }
+
     /// Measured pixel width of a string at a given cell height.
     func width(_ text: String, pxHeight: Float) -> Float { Float(text.count) * pxHeight * atlas.cellAspect }
 
