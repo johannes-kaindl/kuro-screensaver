@@ -100,11 +100,10 @@ final class Hud {
         let maxLines = max(2, min(10, Int((promptY - H * 0.06) / lh)))
         let lines = terminal.visibleLines(max: maxLines)
         for (i, ln) in lines.reversed().enumerated() {
-            let op = max(0.05, pow(0.72, Float(i)))
-            let col = ln.category == .quotes ? accent : dim
-            tr.add(ln.text, xPx: leftPad, yPx: promptY - Float(i + 1) * lh, pxHeight: cell, color: col, opacity: op)
+            let op = max(0.05, pow(0.72, Float(i)))   // upward fade by age (the strip's deliberate gradient)
+            tr.add(ln.text, xPx: leftPad, yPx: promptY - Float(i + 1) * lh, pxHeight: cell, color: dim, opacity: op)
         }
-        tr.add(terminal.promptLine(t: t), xPx: leftPad, yPx: promptY, pxHeight: cell, color: accent, opacity: 0.95)
+        tr.add(terminal.promptLine(t: t), xPx: leftPad, yPx: promptY, pxHeight: cell, color: dim, opacity: 0.9)
     }
 
     // --- terminal: a full-width darkened band at the bottom, height = bandFraction·H ---
@@ -128,7 +127,7 @@ final class Hud {
             let (col, op) = colorFor(ln.category, accent: accent, dim: dim)
             for r in wrap(ln.text, maxChars) { rows.append((r, col, op)) }
         }
-        for r in wrap(terminal.promptLine(t: t), maxChars) { rows.append((r, accent, 0.95)) }
+        for r in wrap(terminal.promptLine(t: t), maxChars) { rows.append((r, dim, 0.66)) }   // prompt matches the log (uniform glow)
         let shown = Array(rows.suffix(maxRows + 1))            // +1 for the prompt row
         let n = shown.count
         for (i, row) in shown.enumerated() {
@@ -204,7 +203,7 @@ final class Hud {
             let (col, op) = colorFor(ln.category, accent: accent, dim: dim)
             for r in wrap(ln.text, maxChars) { rows.append((r, col, op)) }
         }
-        for r in wrap(terminal.promptLine(t: t), maxChars) { rows.append((r, accent, 0.95)) }
+        for r in wrap(terminal.promptLine(t: t), maxChars) { rows.append((r, dim, 0.66)) }   // prompt matches the log (uniform glow)
         let shown = rows.suffix(maxRows)
         let startI = maxRows - shown.count                      // bottom-align under the prompt
         for (i, row) in shown.enumerated() {
@@ -231,15 +230,11 @@ final class Hud {
     }
 
     private func colorFor(_ c: Terminal.Cat, accent: SIMD3<Float>, dim: SIMD3<Float>) -> (SIMD3<Float>, Float) {
-        // Kept dim — the window is drawn into the HDR scene, so bright text blooms
-        // into haze. Low deposited luma keeps it crisp + readable.
-        switch c {
-        case .cmd, .deny, .warning: return (accent, 0.72)
-        case .quotes: return (accent, 0.70)
-        case .instr: return (accent, 0.66)
-        case .ghost: return (dim * 0.85, 0.55)
-        default: return (dim, 0.6)
-        }
+        // Uniform glow across all categories. Bright per-category colors (accent vs dim)
+        // bloomed unevenly into the HDR haze — some lines glowed much harder than others,
+        // which read as accidental. One deposited luma keeps the whole log calm, crisp and
+        // consistent; the live prompt's cursor is the only moving accent.
+        (dim, 0.66)
     }
 
     private func clock() -> String {
