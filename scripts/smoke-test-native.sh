@@ -21,8 +21,8 @@ log="$(mktemp)"
 trap 'rm -f "$log"' EXIT
 
 # build-native-harness.sh compiles Core/* + harness then forwards args to the harness.
-# A single deterministic frame (terrain @ t=1) is enough to prove the engine runs.
-if ! bash "$ROOT/scripts/build-native-harness.sh" --out "$OUT" --scene terrain --at 1 >"$log" 2>&1; then
+# A single deterministic frame (terrain @ t=8 — past the boot overlay) proves the engine runs.
+if ! bash "$ROOT/scripts/build-native-harness.sh" --out "$OUT" --scene terrain --at 8 >"$log" 2>&1; then
   if grep -q "no Metal device" "$log"; then
     echo "⚠ smoke: no Metal GPU on this host — skipping render assertion (compile was OK)"
     exit 0
@@ -32,7 +32,8 @@ if ! bash "$ROOT/scripts/build-native-harness.sh" --out "$OUT" --scene terrain -
   exit 1
 fi
 
-png="$(ls -S "$OUT"/*.png 2>/dev/null | head -1 || true)"
+shopt -s nullglob; pngs=("$OUT"/*.png); shopt -u nullglob
+png="${pngs[0]:-}"
 if [ -z "$png" ]; then
   echo "✗ smoke: harness ran but produced no PNG" >&2
   cat "$log" >&2

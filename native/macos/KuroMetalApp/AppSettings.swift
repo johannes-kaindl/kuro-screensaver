@@ -22,6 +22,8 @@ enum AppSettings {
     static var intensity: Float { get { store.object(forKey: "Intensity") != nil ? store.float(forKey: "Intensity") : 0.35 } set { store.set(newValue, forKey: "Intensity") } }
     static var showHud: Bool { get { bool("ShowHud", true) } set { store.set(newValue, forKey: "ShowHud") } }
     static var showRadar: Bool { get { bool("ShowRadar", true) } set { store.set(newValue, forKey: "ShowRadar") } }
+    static var bootEnabled: Bool { get { bool("BootEnabled", true) } set { store.set(newValue, forKey: "BootEnabled") } }
+    static var bootSpeed: String { get { str("BootSpeed", "normal") } set { setStr("BootSpeed", newValue) } }
     static var flatHud: Bool { get { bool("FlatHud", false) } set { store.set(newValue, forKey: "FlatHud") } }
     static var terminalLayout: String { get { str("TerminalLayout", "strip") } set { setStr("TerminalLayout", newValue) } }
     static var terminalBandHeight: Float { get { store.object(forKey: "TermBand") != nil ? store.float(forKey: "TermBand") : 0.24 } set { store.set(newValue, forKey: "TermBand") } }
@@ -57,6 +59,8 @@ enum AppSettings {
         s.crtIntensity = min(1, max(0, intensity))
         s.showHud = showHud
         s.showRadar = showRadar
+        s.bootEnabled = bootEnabled
+        s.bootSpeed = Settings.BootSpeed(rawValue: bootSpeed) ?? .normal
         s.flatHud = flatHud
         s.terminalLayout = Settings.TerminalLayout(rawValue: terminalLayout) ?? .strip
         s.terminalBandHeight = terminalBandHeight

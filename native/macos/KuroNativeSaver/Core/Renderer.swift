@@ -35,6 +35,7 @@ final class Renderer {
     private var sceneIndex = 0
     private var sceneAge: Double = 0
     private var crash = CrashFx()
+    private var boot: BootSequence?     // BIOS boot overlay; nil once finished (then powerOn fires)
     var autoCycleSec: Double = 0   // 0 = off (host enables; harness leaves off)
 
     private let scenePipe: MTLRenderPipelineState
@@ -121,7 +122,13 @@ final class Renderer {
                 return s.enemyAccent(s.preset.accentRGB)
             }))
         chatter = ChatterDirector(seed: settings.seed ?? freshSeed())   // Brick E radio chatter
-        crash.powerOn()   // diegetic CRT power-on (image expands out of a line + flickers)
+        // Startup: BIOS boot overlay first (then it fires powerOn on finish), else
+        // power on straight away.
+        if settings.bootEnabled {
+            boot = BootSequence(scene: SceneRegistry.ids[sceneIndex], speed: settings.bootSpeed)
+        } else {
+            crash.powerOn()   // diegetic CRT power-on (image expands out of a line + flickers)
+        }
     }
 
     /// Debug: render a black scene (skip geometry) to verify text/overlays alone.
@@ -386,6 +393,9 @@ final class Renderer {
             ? min(1, settings.crtIntensity + threat * 0.7) : settings.crtIntensity
         scanDriftY = (scanDriftY + 36 * Float(dt)).truncatingRemainder(dividingBy: 4)
 
+        // Boot overlay: when it finishes, fire the CRT power-on so the scene expands in.
+        if boot != nil, boot!.advance(dt) { crash.powerOn(); boot = nil }
+
         // Scene changes are phase-driven (Brick C: onFilmPhase warps at each phase
         // boundary in film mode). crash.update stays for the boot power-on only.
         _ = crash.update(dt: dt)
@@ -538,6 +548,19 @@ final class Renderer {
                               showPanels: settings.showHud, showRadar: settings.showRadar)
             textFlat.flush(fenc)
             fenc.endEncoding()
+        }
+
+        // --- boot overlay: opaque BIOS sequence on top of everything, until it ends ---
+        if let boot {
+            let bp = MTLRenderPassDescriptor()
+            bp.colorAttachments[0].texture = target
+            bp.colorAttachments[0].loadAction = .load
+            bp.colorAttachments[0].storeAction = .store
+            let benc = cb.makeRenderCommandEncoder(descriptor: bp)!
+            textFlat.begin(width: width, height: height)
+            boot.render(textFlat, W: Float(width), H: Float(height), accent: preset.accentRGB)
+            textFlat.flush(benc)
+            benc.endEncoding()
         }
 
         cb.commit()
