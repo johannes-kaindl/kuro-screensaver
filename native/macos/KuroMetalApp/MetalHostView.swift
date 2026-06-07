@@ -26,6 +26,13 @@ final class MetalHostView: NSView {
     private let sizeLock = NSLock()
     private var pendingDrawableSize: CGSize?
 
+    // Render-lifecycle barrier: the CVDisplayLink callback runs on the display
+    // thread and dereferences `self` via an unretained pointer. runLock + isRunning
+    // let stop() block until an in-flight callback returns, so the renderer/layer
+    // (and self) can be torn down without a use-after-free on the display thread.
+    private let runLock = NSLock()
+    private var isRunning = false
+
     init(frame: NSRect, settings: Settings, autoCycleSec: Double) {
         self.settings = settings
         self.autoCycleSec = autoCycleSec
@@ -51,9 +58,16 @@ final class MetalHostView: NSView {
         let ctx = SceneContext(device: device, rng: LCG(seed: settings.seed ?? freshSeed()),
                                settings: settings, accent: settings.preset.accentRGB)
         let scene = SceneRegistry.make(settings.scene, ctx: ctx)
-        let r = Renderer(device: device, settings: settings, scene: scene, targetFormat: .bgra8Unorm)
-        r.autoCycleSec = autoCycleSec
-        renderer = r
+        do {
+            let r = try Renderer(device: device, settings: settings, scene: scene, targetFormat: .bgra8Unorm)
+            r.autoCycleSec = autoCycleSec
+            renderer = r
+        } catch {
+            // Don't hard-crash: leave renderer nil so start()/renderFrame() no-op
+            // (black layer) and the app stays alive with a logged reason.
+            NSLog("[Kuro] Renderer init failed — rendering disabled: \(error)")
+            renderer = nil
+        }
         updateDrawableSize()
     }
 
@@ -76,16 +90,31 @@ final class MetalHostView: NSView {
         CVDisplayLinkCreateWithActiveCGDisplays(&dl)
         guard let dl else { return }
         let cb: CVDisplayLinkOutputCallback = { (_, _, _, _, _, ctx) -> CVReturn in
-            Unmanaged<MetalHostView>.fromOpaque(ctx!).takeUnretainedValue().renderFrame()
+            let view = Unmanaged<MetalHostView>.fromOpaque(ctx!).takeUnretainedValue()
+            // Hold runLock across the whole frame so stop() can wait it out; isRunning
+            // gates a stray callback that fires after CVDisplayLinkStop.
+            view.runLock.lock()
+            if view.isRunning { view.renderFrame() }
+            view.runLock.unlock()
             return kCVReturnSuccess
         }
         CVDisplayLinkSetOutputCallback(dl, cb, Unmanaged.passUnretained(self).toOpaque())
+        runLock.lock(); isRunning = true; runLock.unlock()   // publish before the link can fire
         CVDisplayLinkStart(dl)
         displayLink = dl
     }
 
     func stop() {
-        if let dl = displayLink { CVDisplayLinkStop(dl) }
+        guard let dl = displayLink else { return }
+        // Order matters: stop the link FIRST, then take runLock — never the reverse.
+        // CVDisplayLinkStop can block until the current callback returns, so locking
+        // before it would deadlock against a callback already waiting on runLock.
+        // Taking the lock here waits out any in-flight frame (which renders harmlessly
+        // against still-live objects); isRunning=false then makes any straggler that
+        // acquires the lock afterwards a no-op. Once stop() returns, no callback runs
+        // again, so the renderer/layer (and self) are safe to free.
+        CVDisplayLinkStop(dl)
+        runLock.lock(); isRunning = false; runLock.unlock()
         displayLink = nil
     }
 

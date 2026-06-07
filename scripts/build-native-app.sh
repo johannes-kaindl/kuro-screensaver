@@ -18,25 +18,26 @@ SIGN_ID="${KURO_SIGN_ID:-Developer ID Application: Johannes Kaindl (U9X7M39R56)}
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS"
 
 echo "compiling app…"
-# shellcheck disable=SC2046
+core_src=("$SRC"/Core/*.swift)
+app_src=("$APPSRC"/*.swift)
 swiftc -O \
-  $(ls "$SRC"/Core/*.swift) $(ls "$APPSRC"/*.swift) \
+  "${core_src[@]}" "${app_src[@]}" \
   -o "$APP/Contents/MacOS/KuroMetalApp" \
   -framework Metal -framework MetalPerformanceShaders -framework AVFoundation -framework QuartzCore \
   -framework AppKit -framework CoreText -framework Foundation
 
 cp "$APPSRC/Info.plist" "$APP/Contents/Info.plist"
 
-# App icon: generate AppIcon.icns from the committed 1024² source.
+# App icon: generate AppIcon.icns from the committed 1024² source. Mandatory for a
+# labelled, distributable app — fail loudly rather than silently shipping iconless.
 ICON_SRC="$APPSRC/icon-1024.png"
-if [ -f "$ICON_SRC" ]; then
-  ISET="$BUILD/AppIcon.iconset"; rm -rf "$ISET"; mkdir -p "$ISET" "$APP/Contents/Resources"
-  for sz in 16 32 128 256 512; do
-    sips -z "$sz" "$sz" "$ICON_SRC" --out "$ISET/icon_${sz}x${sz}.png" >/dev/null 2>&1
-    sips -z "$((sz*2))" "$((sz*2))" "$ICON_SRC" --out "$ISET/icon_${sz}x${sz}@2x.png" >/dev/null 2>&1
-  done
-  iconutil -c icns "$ISET" -o "$APP/Contents/Resources/AppIcon.icns" && echo "icon generated"
-fi
+[ -f "$ICON_SRC" ] || { echo "✗ missing app icon: $ICON_SRC (required for a labelled, distributable app)" >&2; exit 1; }
+ISET="$BUILD/AppIcon.iconset"; rm -rf "$ISET"; mkdir -p "$ISET" "$APP/Contents/Resources"
+for sz in 16 32 128 256 512; do
+  sips -z "$sz" "$sz" "$ICON_SRC" --out "$ISET/icon_${sz}x${sz}.png" >/dev/null 2>&1
+  sips -z "$((sz*2))" "$((sz*2))" "$ICON_SRC" --out "$ISET/icon_${sz}x${sz}@2x.png" >/dev/null 2>&1
+done
+iconutil -c icns "$ISET" -o "$APP/Contents/Resources/AppIcon.icns" && echo "icon generated"
 
 echo "signing…"
 if security find-identity -v -p codesigning 2>/dev/null | grep -q "$SIGN_ID"; then

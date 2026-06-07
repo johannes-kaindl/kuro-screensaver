@@ -11,9 +11,9 @@ SRC="$ROOT/native/macos/KuroNativeSaver"
 OUT="/tmp/kuro-native"
 mkdir -p "$OUT"
 
-# shellcheck disable=SC2046
+core_src=("$SRC"/Core/*.swift)
 swiftc -O \
-  $(ls "$SRC"/Core/*.swift) \
+  "${core_src[@]}" \
   "$SRC/harness/main.swift" \
   -o "$OUT/harness" \
   -framework Metal -framework MetalPerformanceShaders -framework AVFoundation -framework Foundation \

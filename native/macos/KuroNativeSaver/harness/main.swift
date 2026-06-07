@@ -175,8 +175,11 @@ if args.flatHud { settings.flatHud = true }
 let ctx = SceneContext(device: device, rng: LCG(seed: args.seed),
                        settings: settings, accent: settings.preset.accentRGB)
 let scene: Scene = SceneRegistry.make(args.scene, ctx: ctx)
-let renderer = Renderer(device: device, settings: settings, scene: scene,
-                        targetFormat: target.pixelFormat)
+let renderer: Renderer
+do {
+    renderer = try Renderer(device: device, settings: settings, scene: scene,
+                            targetFormat: target.pixelFormat)
+} catch { die("renderer init failed: \(error)") }
 if let th = args.threat { renderer.forcedThreat = th }
 if let g = args.forceGlitch { renderer.debugForceGlitch(g) }
 if args.crash >= 0 { renderer.debugForceCrash(args.crash) }

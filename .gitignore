@@ -25,3 +25,6 @@ dist-native
 
 # Phase-0 render proof artifacts
 render-out/
+
+# bump-version.sh staging temp files (trap-cleaned; ignored as defense-in-depth)
+.bump.*

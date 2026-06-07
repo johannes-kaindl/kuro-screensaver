@@ -44,6 +44,12 @@ jobs:
           bash scripts/build-native-app.sh
           mkdir -p dist-native
           ditto -c -k --keepParent native/macos/build/KuroMetalApp.app dist-native/KuroMetalApp-ci-unsigned.zip
+      - name: Headless render smoke test
+        # Renders one frame through the real engine (runtime shader compile + draw)
+        # and asserts a valid PNG — catches runtime shader/pipeline regressions the
+        # logic tests can't see. GPU-aware: the script self-skips (exit 0) if the
+        # runner has no Metal device, so this is safe to run blocking.
+        run: bash scripts/smoke-test-native.sh
       - uses: actions/upload-artifact@v4
         with:
           name: dist-macos-ci

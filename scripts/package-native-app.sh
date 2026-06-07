@@ -41,11 +41,29 @@ if ! xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>
   exit 1
 fi
 
+# Re-verify the signature right before submitting — a broken/missing signature is a
+# guaranteed Apple rejection, so fail fast locally instead of round-tripping to Apple.
+echo "── re-verifying signature before notarize ──"
+codesign --verify --strict "$APP" || { echo "✗ codesign verify failed — not submitting" >&2; exit 1; }
+
 echo "── notarizing (profile $NOTARY_PROFILE; this takes a few minutes) ──"
 NZIP="$BUILD/KuroMetalApp-notarize.zip"
 ditto -c -k --keepParent "$APP" "$NZIP"
-xcrun notarytool submit "$NZIP" --keychain-profile "$NOTARY_PROFILE" --wait
+
+# Retry transient notary failures (network / Apple 5xx) with backoff — mirrors the
+# Codeberg-upload retry in release.yml. The signed app stays on disk, so a failed run
+# is resumable by simply re-running the script.
+notarized=0
+for attempt in 1 2 3 4; do
+  if xcrun notarytool submit "$NZIP" --keychain-profile "$NOTARY_PROFILE" --wait; then
+    notarized=1; break
+  fi
+  echo "⚠ notarization attempt $attempt failed" >&2
+  if [ "$attempt" = 4 ]; then break; fi
+  sleep $((attempt * 10))
+done
 rm -f "$NZIP"
+[ "$notarized" = 1 ] || { echo "✗ notarization failed after 4 attempts — re-run to resume (app is signed on disk)" >&2; exit 1; }
 
 # 3. Staple the ticket onto the .app so it validates offline.
 echo "── stapling ──"

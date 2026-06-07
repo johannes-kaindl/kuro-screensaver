@@ -6,6 +6,26 @@ import Metal
 import simd
 import Foundation
 
+/// Init-time failures of the GPU resource setup. Surfaced (not `fatalError`'d) so
+/// the host can degrade gracefully instead of hard-crashing to the console — for a
+/// screensaver, a logged blank frame beats a process abort. In practice these only
+/// trip on a broken GPU/driver (the shaders are static source strings).
+enum RendererError: Error, CustomStringConvertible {
+    case commandQueue
+    case shaderCompile(Error)
+    case pipeline(String, Error)
+    case depthState
+
+    var description: String {
+        switch self {
+        case .commandQueue:            return "failed to create Metal command queue"
+        case .shaderCompile(let e):    return "shader compile failed: \(e)"
+        case .pipeline(let n, let e):  return "pipeline '\(n)' creation failed: \(e)"
+        case .depthState:              return "failed to create depth-stencil state"
+        }
+    }
+}
+
 final class Renderer {
     let device: MTLDevice
     let queue: MTLCommandQueue
@@ -46,13 +66,14 @@ final class Renderer {
     static let hdrFormat: MTLPixelFormat = .rgba16Float
 
     init(device: MTLDevice, settings: Settings, scene: Scene,
-         targetFormat: MTLPixelFormat) {
+         targetFormat: MTLPixelFormat) throws {
         self.device = device
         self.settings = settings
         self.preset = settings.preset
         self.scene = scene
         self.sceneIndex = SceneRegistry.ids.firstIndex(of: settings.scene) ?? 0
-        self.queue = device.makeCommandQueue()!
+        guard let queue = device.makeCommandQueue() else { throw RendererError.commandQueue }
+        self.queue = queue
         let bus = EventBus()
         self.bus = bus
         self.director = FlightDirector(seed: settings.seed ?? freshSeed(), bus: bus)
@@ -60,25 +81,28 @@ final class Renderer {
 
         let lib: MTLLibrary
         do { lib = try device.makeLibrary(source: Shaders.source, options: nil) }
-        catch { fatalError("shader compile failed: \(error)") }
+        catch { throw RendererError.shaderCompile(error) }
 
         let sp = MTLRenderPipelineDescriptor()
         sp.vertexFunction = lib.makeFunction(name: "scene_v")
         sp.fragmentFunction = lib.makeFunction(name: "scene_f")
         sp.colorAttachments[0].pixelFormat = Renderer.hdrFormat
         sp.depthAttachmentPixelFormat = .depth32Float
-        scenePipe = try! device.makeRenderPipelineState(descriptor: sp)
+        do { scenePipe = try device.makeRenderPipelineState(descriptor: sp) }
+        catch { throw RendererError.pipeline("scene", error) }
 
         let cp = MTLRenderPipelineDescriptor()
         cp.vertexFunction = lib.makeFunction(name: "fsq_v")
         cp.fragmentFunction = lib.makeFunction(name: "composite_f")
         cp.colorAttachments[0].pixelFormat = targetFormat
-        compositePipe = try! device.makeRenderPipelineState(descriptor: cp)
+        do { compositePipe = try device.makeRenderPipelineState(descriptor: cp) }
+        catch { throw RendererError.pipeline("composite", error) }
 
         let ds = MTLDepthStencilDescriptor()
         ds.depthCompareFunction = .less
         ds.isDepthWriteEnabled = true
-        depthState = device.makeDepthStencilState(descriptor: ds)!
+        guard let depthState = device.makeDepthStencilState(descriptor: ds) else { throw RendererError.depthState }
+        self.depthState = depthState
 
         bloom = BloomChain(device: device, library: lib, sigma: 3)   // quarter-res → sigma 3 ≈ half-res 6
         trails = TrailsChain(device: device, library: lib)
