@@ -143,4 +143,4 @@ moved out to its own top-level dir (2026-06-01):
   `__BODY_CLASS__`). The `sync-to-plugin.sh` DST already points at this
   absolute path.
 - `kuro-gamification` (symlink → `/Users/Shared/20_Claude/.../40_src/`) —
-  separate Obsidian plugin, deployed in vault X1_v6t2b9.
+  separate Obsidian plugin, deployed in vault 10_Pallas.
