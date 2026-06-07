@@ -20,6 +20,8 @@ final class MetalHostView: NSView {
     func setFrameCap(_ fps: Double) { minFrameInterval = 1.0 / max(1, fps) }
     /// Wallpaper power policy: freeze rendering (CVDisplayLink keeps running, frames skipped).
     func setPaused(_ p: Bool) { paused = p }
+    /// Manual scene-switch hotkey (deliberate fullscreen only): +1 next, -1 previous.
+    func cycleScene(by delta: Int) { renderer?.cycleScene(by: delta) }
     private let settings: Settings
     private let autoCycleSec: Double
 

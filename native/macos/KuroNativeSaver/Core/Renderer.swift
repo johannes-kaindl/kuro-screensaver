@@ -139,6 +139,26 @@ final class Renderer {
         scene = SceneRegistry.make(SceneRegistry.ids[sceneIndex], ctx: ctx)
     }
 
+    /// Manually switch scene with the same warp/crash transition the film director
+    /// uses. delta>0 = next, <0 = previous. No-op while a transition is already
+    /// running. Driven by the app's fullscreen scene-switch hotkey (←/→).
+    func cycleScene(by delta: Int) {
+        // Only when the film director isn't driving scenes — a manual swap would fight
+        // onFilmPhase and desync phaseCounter/script arrivals. (The app also gates the
+        // hotkey to autoCycle-off, so this is belt-and-suspenders.)
+        guard !filmMode, delta != 0, !director.inTransition else { return }
+        let n = SceneRegistry.ids.count
+        guard n > 1 else { return }
+        let from = SceneRegistry.ids[sceneIndex]
+        let to = SceneRegistry.ids[((sceneIndex + delta) % n + n) % n]
+        guard to != from else { return }
+        beginTransition(TransitionProfiles.profileFor(from: from, to: to)) { [weak self] in
+            guard let s = self else { return }
+            s.pulse(.warp); s.swapSceneTo(to)
+            if let line = Script.arrivalLine(to, s.phaseCounter) { s.hud.terminal.pushLine(line, .hq) }
+        }
+    }
+
     /// native film-mode gate (no autoCycle.on setting; autoCycleSec>0 means "film on").
     private var filmMode: Bool { autoCycleSec > 0 }
 
@@ -462,7 +482,7 @@ final class Renderer {
             if wantMatrix { hud.renderMatrix(text, width: width, height: height, accent: preset.accentRGB, t: t, opacity: 0.7) }
             if overlayInMonitor {
                 hud.renderOverlay(text, width: width, height: height, accent: preset.accentRGB,
-                                  kanji: preset.kanji, t: t, scene: SceneRegistry.ids[sceneIndex],
+                                  t: t, scene: SceneRegistry.ids[sceneIndex],
                                   terminalScale: settings.terminalScale,
                                   terminalLayout: settings.terminalLayout, terminalBand: settings.terminalBandHeight,
                                   showPanels: settings.showHud)
@@ -512,7 +532,7 @@ final class Renderer {
             let fenc = cb.makeRenderCommandEncoder(descriptor: flatPass)!
             textFlat.begin(width: width, height: height)
             hud.renderOverlay(textFlat, width: width, height: height, accent: preset.accentRGB,
-                              kanji: preset.kanji, t: t, scene: SceneRegistry.ids[sceneIndex],
+                              t: t, scene: SceneRegistry.ids[sceneIndex],
                               terminalScale: settings.terminalScale,
                               terminalLayout: settings.terminalLayout, terminalBand: settings.terminalBandHeight,
                               showPanels: settings.showHud)

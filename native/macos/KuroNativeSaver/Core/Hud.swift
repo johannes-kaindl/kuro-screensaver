@@ -1,6 +1,6 @@
-// Hud — the tactical overlay (info panels, crosshair, scene-label slab, vault
-// kanji) + the terminal scrollback, drawn via the TextRenderer into the HDR
-// scene so the CRT post treats it. Faithful to the web hud/index.ts layout.
+// Hud — the tactical overlay (info panels, crosshair, scene-label slab) + the
+// terminal scrollback, drawn via the TextRenderer into the HDR scene so the CRT
+// post treats it. Faithful to the web hud/index.ts layout.
 
 import simd
 import Foundation
@@ -34,7 +34,7 @@ final class Hud {
     /// HUD panels + narrative terminal. Drawn either into the HDR scene (in-monitor,
     /// curved) or flat onto the final composite (flatHud), depending on the renderer.
     func renderOverlay(_ tr: TextRenderer, width: Int, height: Int, accent: SIMD3<Float>,
-                       kanji: String, t: Double, scene: String, terminalScale: Float = 1,
+                       t: Double, scene: String, terminalScale: Float = 1,
                        terminalLayout: Settings.TerminalLayout = .strip, terminalBand: Float = 0.24,
                        showPanels: Bool = true) {
         let dim = accent * 0.72

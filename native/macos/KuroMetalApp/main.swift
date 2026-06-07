@@ -31,6 +31,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var screenRebuildItem: DispatchWorkItem?
     private var startTime = CACurrentMediaTime()
     private var active = false
+    private var sceneHotkeyEnabled = false       // ←/→ scene switch: deliberate fullscreen only
+    private var quitOnLastWindowClosed = false   // config mode: closing the window quits the app
     private var synth: Synth?
 
     init(mode: Mode, override: (Settings, Bool)?) {
@@ -44,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .oneShot:
             startScreensaver()
         case .config:
+            quitOnLastWindowClosed = true   // settings UI: closing the window quits (macOS standard)
             let c = ConfigWindowController(); config = c
             c.showWindow(nil); NSApp.activate(ignoringOtherApps: true)
         case .agent:
@@ -231,6 +234,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    /// Config mode is a settings UI: closing its window quits the app (like System
+    /// Settings). Agent/wallpaper run window-less in the menu bar, so the flag stays
+    /// false there and a temporarily-opened config window closing won't quit them.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        quitOnLastWindowClosed
+    }
+
     // MARK: - fullscreen show / dismiss
 
     func startScreensaver(returnToConfig: Bool = false) {
@@ -263,6 +273,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if returnToConfig { dismissTarget = .config }
         else if mode == .oneShot { dismissTarget = .terminate }
         else { dismissTarget = .resume }
+        // Scene-switch hotkey only in deliberately-viewed fullscreen (config preview or
+        // --screensaver) AND only when the scene is otherwise static (autoCycle off). On
+        // agent/idle activation, or while film mode is auto-advancing, any input dismisses.
+        sceneHotkeyEnabled = (returnToConfig || mode == .oneShot) && cycleSec == 0
     }
 
     private enum DismissTarget { case config, resume, terminate }
@@ -292,10 +306,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self, CACurrentMediaTime() - self.startTime > 1.2 else { return }
             self.dismissScreensaver()
         }
-        monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel]) { e in down(e); return nil } as Any)
+        // ←/→ cycle scenes instead of dismissing — only when enabled (deliberate fullscreen).
+        // Returns true if the key was a scene-switch hotkey (event consumed, saver stays up).
+        let sceneKey: (NSEvent) -> Bool = { [weak self] e in
+            guard let self, self.sceneHotkeyEnabled, e.type == .keyDown, !e.isARepeat else { return false }
+            switch e.keyCode {
+            case 124: self.saverViews.forEach { $0.cycleScene(by: 1) }; return true   // → next
+            case 123: self.saverViews.forEach { $0.cycleScene(by: -1) }; return true  // ← previous
+            default:  return false
+            }
+        }
+        monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown, .otherMouseDown, .scrollWheel]) { e in
+            if sceneKey(e) { return nil }   // consumed: switched scene, don't dismiss
+            down(e); return nil
+        } as Any)
         monitors.append(NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { e in moved(e); return e } as Any)
         monitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.keyDown, .leftMouseDown, .rightMouseDown, .mouseMoved]) { e in
-            if e.type == .mouseMoved { moved(e) } else { down(e) }
+            if e.type == .mouseMoved { moved(e) } else { down(e) }   // scene-switch is local-monitor only
         } as Any)
     }
 }

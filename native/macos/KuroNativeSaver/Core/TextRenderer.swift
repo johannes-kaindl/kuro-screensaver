@@ -73,19 +73,6 @@ final class TextRenderer {
         v(x0, yb); v(x1, yt); v(x1, yb)
     }
 
-    /// Draw a full-width vault kanji as a square quad (CJK glyphs are full-width,
-    /// baked in their own square cells so they aren't clipped like inline text).
-    func drawKanji(_ c: Character, xPx: Float, yPx: Float, pxHeight: Float, color: SIMD3<Float>, opacity: Float) {
-        guard opacity > 0.002, let r = atlas.kanjiUV(c) else { return }
-        let x0 = xPx / vpW * 2 - 1, x1 = (xPx + pxHeight) / vpW * 2 - 1   // square (w == h)
-        let yt = 1 - yPx / vpH * 2
-        let yb = 1 - (yPx + pxHeight) / vpH * 2
-        let r3 = color.x, g3 = color.y, b3 = color.z, a = opacity
-        func v(_ x: Float, _ y: Float, _ u: Float, _ vv: Float) { verts.append(contentsOf: [x, y, u, vv, r3, g3, b3, a]) }
-        v(x0, yt, r.uLo, r.vTop); v(x1, yt, r.uHi, r.vTop); v(x0, yb, r.uLo, r.vBottom)
-        v(x0, yb, r.uLo, r.vBottom); v(x1, yt, r.uHi, r.vTop); v(x1, yb, r.uHi, r.vBottom)
-    }
-
     /// Measured pixel width of a string at a given cell height.
     func width(_ text: String, pxHeight: Float) -> Float { Float(text.count) * pxHeight * atlas.cellAspect }
 
