@@ -152,7 +152,7 @@ final class Renderer {
         let from = SceneRegistry.ids[sceneIndex]
         let to = SceneRegistry.ids[((sceneIndex + delta) % n + n) % n]
         guard to != from else { return }
-        beginTransition(TransitionProfiles.profileFor(from: from, to: to)) { [weak self] in
+        beginTransition(TransitionProfiles.profileFor(from: from, to: to, calm: settings.reducedMotion)) { [weak self] in
             guard let s = self else { return }
             s.pulse(.warp); s.swapSceneTo(to)
             if let line = Script.arrivalLine(to, s.phaseCounter) { s.hud.terminal.pushLine(line, .hq) }
@@ -172,7 +172,7 @@ final class Renderer {
         }
         let next = film.sceneAt(phaseCounter, phase: phase, prev: currentFilmScene)
         if next != SceneRegistry.ids[sceneIndex] {
-            beginTransition(TransitionProfiles.profileFor(from: SceneRegistry.ids[sceneIndex], to: next)) { [weak self] in
+            beginTransition(TransitionProfiles.profileFor(from: SceneRegistry.ids[sceneIndex], to: next, calm: settings.reducedMotion)) { [weak self] in
                 guard let s = self else { return }
                 s.pulse(.warp); s.swapSceneTo(next)
                 if let line = Script.arrivalLine(next, s.phaseCounter) { s.hud.terminal.pushLine(line, .hq) }

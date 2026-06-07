@@ -3,6 +3,7 @@
 // immediately (read fresh per activation — no host caching like the .saver).
 
 import Foundation
+import AppKit
 
 enum AppSettings {
     private static let store = UserDefaults.standard   // NOT the bundle id (invalid as a suite)
@@ -69,6 +70,8 @@ enum AppSettings {
         s.matrix = matrix
         s.reactiveWorld = reactiveWorld
         s.weather = Settings.Weather(rawValue: weather) ?? .clear
+        // a11y: honour System Settings → Accessibility → Reduce Motion (CALM transitions).
+        s.reducedMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         return (s, autoCycle)
     }
 }
