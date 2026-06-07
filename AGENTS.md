@@ -1,6 +1,22 @@
 # AGENTS.md
 
+> **Workspace-Standards:** Die verbindliche Leitkonvention steht in `_docs/CONVENTIONS.md`
+> (am Workspace-Root `/Users/Shared/code/`), Modell comply-or-explain. Offene Punkte fuer
+> dieses Repo siehe Abschnitt "Offene Konventions-Punkte".
+
 Conventions for AI assistants working in this repo.
+
+## Offene Konventions-Punkte
+
+- [ ] CORE-META-02 — Badge-Zeile um Release- + CI-Badge ergaenzen, Reihenfolge Lizenz·Release·CI·Plattform·Downloads herstellen.
+- [ ] CORE-META-04 — User-Manual nach Diátaxis (Tutorial/How-to/Reference/Explanation) anlegen und aus README verlinken.
+- [ ] CORE-META-06 — `CHANGELOG.md` (keep-a-changelog), `CONTRIBUTING.md`, `SECURITY.md` ergaenzen.
+- [ ] CORE-META-07 — `LICENSING.md` (Dual-License-Option) + `CLA.md` ergaenzen.
+- [ ] CORE-META-08 — `LICENSE-DOCS` (CC BY-SA 4.0) fuer Doku/Texte hinzufuegen.
+- [ ] CORE-META-10 — `keywords` in `package.json` setzen und Forge-Topics konsistent pflegen.
+- [ ] CORE-AGENT-01 — Abschnitt "## Abweichungen von der Leitkonvention" in dieser Datei ergaenzen.
+- [ ] CORE-AGENT-06 — `.editorconfig` (UTF-8, LF, trim-trailing, final-newline; 2-space default, 4-space TOML, Markdown ohne trim) anlegen.
+- [ ] PROF-TS-01 — npm-Scripts `test` und `lint` ergaenzen (typecheck/build/dev vorhanden).
 
 ## What this is
 
