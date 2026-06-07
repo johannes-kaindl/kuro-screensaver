@@ -141,12 +141,11 @@ final class Renderer {
 
     /// Manually switch scene with the same warp/crash transition the film director
     /// uses. delta>0 = next, <0 = previous. No-op while a transition is already
-    /// running. Driven by the app's fullscreen scene-switch hotkey (←/→).
+    /// running. Driven by the app's fullscreen scene-switch hotkey (←/→). Works during
+    /// film mode too — the narrative keeps running and we sync currentFilmScene so the
+    /// director's next auto-pick doesn't fight the manual choice.
     func cycleScene(by delta: Int) {
-        // Only when the film director isn't driving scenes — a manual swap would fight
-        // onFilmPhase and desync phaseCounter/script arrivals. (The app also gates the
-        // hotkey to autoCycle-off, so this is belt-and-suspenders.)
-        guard !filmMode, delta != 0, !director.inTransition else { return }
+        guard delta != 0, !director.inTransition else { return }
         let n = SceneRegistry.ids.count
         guard n > 1 else { return }
         let from = SceneRegistry.ids[sceneIndex]
@@ -155,6 +154,7 @@ final class Renderer {
         beginTransition(TransitionProfiles.profileFor(from: from, to: to, calm: settings.reducedMotion)) { [weak self] in
             guard let s = self else { return }
             s.pulse(.warp); s.swapSceneTo(to)
+            s.currentFilmScene = to   // keep the film director in step with the manual choice
             if let line = Script.arrivalLine(to, s.phaseCounter) { s.hud.terminal.pushLine(line, .hq) }
         }
     }

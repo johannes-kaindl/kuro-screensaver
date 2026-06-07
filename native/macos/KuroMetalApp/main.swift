@@ -273,10 +273,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if returnToConfig { dismissTarget = .config }
         else if mode == .oneShot { dismissTarget = .terminate }
         else { dismissTarget = .resume }
-        // Scene-switch hotkey only in deliberately-viewed fullscreen (config preview or
-        // --screensaver) AND only when the scene is otherwise static (autoCycle off). On
-        // agent/idle activation, or while film mode is auto-advancing, any input dismisses.
-        sceneHotkeyEnabled = (returnToConfig || mode == .oneShot) && cycleSec == 0
+        // Scene-switch hotkey in any deliberately-launched fullscreen (config preview/
+        // menu or --screensaver) — works whether or not film mode is auto-advancing, so
+        // the user can browse scenes without ending the animation. Only the idle-agent
+        // activation is excluded (there any input must wake/dismiss the screensaver).
+        sceneHotkeyEnabled = (mode != .agent)
     }
 
     private enum DismissTarget { case config, resume, terminate }
