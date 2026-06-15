@@ -158,5 +158,23 @@ do {
           "foreshadow fires ~0.6s (scaled) before phase end, not hardcoded 6s (got progress \(firedAtProgress))")
 }
 
+// --- Terminal: deterministic golden stream (additive-invariant guard for arc work) ---
+// A fixed seed + tiny durationScale drives several phases fast; we FNV-1a-hash the
+// visible line stream. Slice 2 (arc layer) must keep this byte-identical when no arc
+// is selected. Capture step prints; the assertion below pins count+hash.
+do {
+    let term = Terminal(seed: 1337)
+    term.durationScale = 0.05
+    let persona0 = term.promptLine(t: 0)              // persona is fixed at init (seed-derived)
+    var t = 0.0
+    while t < 12 { term.update(t: t); t += 0.02 }
+    let visible = term.visibleLines(max: 60).map { $0.text }
+    var h: UInt64 = 1469598103934665603
+    for byte in visible.joined(separator: "\n").utf8 { h = (h ^ UInt64(byte)) &* 1099511628211 }
+    check(visible.count == 12 && h == 15657498981793719251,
+          "golden narrative stream stable (got count \(visible.count) hash \(h))")
+    check(persona0 == "TEL-4747@SCT-7.4-N11:~ █", "golden persona stable (got \(persona0))")
+}
+
 if failures > 0 { print("\n\(failures) FAILURE(S)"); exit(1) }
 print("\nALL PASS (\(failures == 0))")
