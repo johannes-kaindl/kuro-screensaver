@@ -14,8 +14,12 @@ final class Terminal {
 
     private(set) var lines: [Line] = []
     private var typed = ""
-    private var rng = LCG(seed: freshSeed())
-    private var persona = Persona.make()
+    private var rng: LCG
+    private var persona: Persona
+
+    /// Scales every phase's duration AND the foreshadow lead (web parity:
+    /// narrative.ts:147/157). 1 = full ~6-9 min shift; <1 for video/test speed.
+    var durationScale: Double = 1
 
     private var phase: ShiftPhase = .routine
     private var phaseStartedAt: Double = 0
@@ -49,7 +53,12 @@ final class Terminal {
     private var restUntil: Double = 0
 
     /// Open with a BIOS boot log already on screen (reads as "machine just woke").
-    init() {
+    init() { rng = LCG(seed: freshSeed()); persona = Persona.make(); bootLog() }
+
+    /// Deterministic init for tests / reproducible shifts (persona derives from the seed).
+    init(seed: Int32) { rng = LCG(seed: seed); persona = Persona.make(&rng); bootLog() }
+
+    private func bootLog() {
         for b in Script.boot.prefix(7) { lines.append(Line(text: prefix(.status) + b, category: .status)) }
     }
 
@@ -57,7 +66,7 @@ final class Terminal {
 
     func update(t: Double) {
         if phaseEndsAt < 0 { enterPhase(.routine, t: t) }
-        if !foreshadowed && phaseEndsAt > 0 && t >= phaseEndsAt - 6 {   // Brick C: foreshadow next scene
+        if !foreshadowed && phaseEndsAt > 0 && t >= phaseEndsAt - 6 * durationScale {   // Brick C: foreshadow next scene
             foreshadowed = true
             if let line = sceneForeshadow?(Terminal.nextPhase(phase)) {
                 lines.append(Line(text: prefix(.hq) + line, category: .hq))
@@ -149,10 +158,12 @@ final class Terminal {
     // MARK: - phases
 
     private func dur(_ p: ShiftPhase) -> Double {
+        let base: Double
         switch p {
-        case .routine: return rngIn(70, 110); case .intrusion: return rngIn(110, 160)
-        case .alarm: return rngIn(120, 180); case .panic: return rngIn(60, 100); case .silence: return rngIn(25, 45)
+        case .routine: base = rngIn(70, 110); case .intrusion: base = rngIn(110, 160)
+        case .alarm: base = rngIn(120, 180); case .panic: base = rngIn(60, 100); case .silence: base = rngIn(25, 45)
         }
+        return base * durationScale
     }
     private func phaseRest() -> Double {
         switch phase {

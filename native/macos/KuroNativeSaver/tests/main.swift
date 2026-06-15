@@ -139,5 +139,24 @@ if let device = MTLCreateSystemDefaultDevice() {
     print("ok   - (combat test skipped — no Metal device)")
 }
 
+// --- Terminal: foreshadow lead scales with durationScale (web parity narrative.ts:157) ----
+// Pre-fix the lead was a hardcoded `- 6` seconds while dur() didn't scale at all; with a
+// scaled phase the foreshadow would fire at the wrong elapsed fraction (web↔native desync).
+do {
+    let term = Terminal(seed: 42)
+    term.durationScale = 0.1                 // routine phase ~7-11s, foreshadow ~0.6s before end
+    var firedAtProgress: Double = -1
+    var fired = false
+    term.sceneForeshadow = { _ in fired = true; return "x" }
+    var t = 0.0
+    while t < 60 && firedAtProgress < 0 {
+        term.update(t: t)
+        if fired && firedAtProgress < 0 { firedAtProgress = term.phaseProgress(t) }
+        t += 0.05
+    }
+    check(firedAtProgress > 0.90 && firedAtProgress < 0.99,
+          "foreshadow fires ~0.6s (scaled) before phase end, not hardcoded 6s (got progress \(firedAtProgress))")
+}
+
 if failures > 0 { print("\n\(failures) FAILURE(S)"); exit(1) }
 print("\nALL PASS (\(failures == 0))")
