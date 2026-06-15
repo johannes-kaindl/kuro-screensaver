@@ -78,6 +78,23 @@ export function profileFor(trait: OperatorPersona['trait']): TraitProfile {
  */
 export type PhaseName = 'ROUTINE' | 'INTRUSION' | 'ALARM' | 'PANIC' | 'SILENCE';
 
+/**
+ * Substitute persona tokens into a content string. Twin of the native
+ * `Terminal.subst()` (Terminal.swift:140-147): the shared JSON content SSOT stores
+ * UNSUBSTITUTED token strings; both platforms resolve them the same way. Replace
+ * `{hqlower}` before `{hq}` to mirror native order (harmless either way — `{hq}` is
+ * not a substring of `{hqlower}`). A no-op when no token is present.
+ */
+export function subst(persona: OperatorPersona, s: string): string {
+  if (!s.includes('{') && !s.includes('$P')) return s;
+  return s
+    .replaceAll('{node}', persona.node)
+    .replaceAll('{hqlower}', persona.hq.toLowerCase())
+    .replaceAll('{hq}', persona.hq)
+    .replaceAll('{sector}', String(persona.sector))
+    .replaceAll('$P', persona.hq);
+}
+
 export function phaseModulate(p: TraitProfile, phase: PhaseName): TraitProfile {
   switch (phase) {
     case 'ROUTINE':

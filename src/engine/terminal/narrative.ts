@@ -12,7 +12,7 @@ import type { Hud } from '../hud';
 import type { LineCategory } from '../data/dictionary';
 import { typeInto, typeAndErase } from './typing';
 import type { OperatorPersona } from './persona';
-import { makePersona, profileFor, phaseModulate } from './persona';
+import { makePersona, profileFor, phaseModulate, subst } from './persona';
 import {
   ROUTINE_BEATS, HQ_INBOUND_ROUTINE, HQ_REPLY_ROUTINE,
   INTRUSIONS_QUOTES, INTRUSIONS_FRAGMENTS,
@@ -306,16 +306,18 @@ export class NarrativeRunner {
       return;
     }
     const beat = pick(ROUTINE_BEATS);
-    const cmdText = typeof beat.cmd === 'string' ? beat.cmd : beat.cmd(this.persona);
+    // cmd carries persona tokens ({node}/{hqlower}/{sector}) — resolve via subst, the
+    // twin of native Terminal.subst (content now lives in the shared JSON SSOT).
+    const cmdText = subst(this.persona, beat.cmd);
     await this.typeAtPrompt(cmdText);
     await this.sleep(180 + Math.random() * 260);
     this.commit('CMD');
     for (const r of beat.resp) {
-      const text = typeof r === 'string' ? r : (typeof r.text === 'string' ? r.text : (r.text as any)(this.persona));
+      const text = typeof r === 'string' ? r : r.text;
       const cat: LineCategory = typeof r === 'string' ? 'RESP'
                               : (r.cat === 'OK' ? 'STATUS' : r.cat === 'WARN' ? 'WARNING' : 'RESP');
       await this.sleep(220 + Math.random() * 220);
-      await this.d.hud.addLine(text.replace('$P', this.persona.hq), cat);
+      await this.d.hud.addLine(subst(this.persona, text), cat);
     }
   }
 
