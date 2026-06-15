@@ -134,6 +134,27 @@ The point: capture the exact line stream the narrative produces for a fixed seed
 
 ## Slice 1 — JSON content SSOT
 
+> **Discovery (2026-06-15, during execution):** This slice is **NOT a verbatim move** on
+> the web side. `RoutineBeat.cmd` is `string | ((p: OperatorPersona) => string)`
+> (`script-bank.ts:16-18`) — several beats are **functions** that template `{node}/{hq}/…`
+> via JS. They cannot serialize to JSON. Native already stores the **token-string** form
+> (`Script.swift` + `Terminal.subst()`). Worse, the substitution models are **asymmetric**:
+> web resolves cmd tokens via the functions and only `replace('$P', …)` on resp
+> (`narrative.ts:309-318`), while native applies `subst()` (all tokens) to **every** line.
+> They agree today only because resp strings happen to contain no `{…}` tokens.
+>
+> **Revised approach:** the JSON stores token strings (native's form). Web gains a
+> `subst(persona, str)` twin of `Terminal.subst()` and applies it where it currently calls
+> the cmd function / `$P`-replaces (localized to `beatRoutine`, `narrative.ts:308-319`).
+> **Parity guard (write FIRST):** for a fixed-seed persona, hash the resolved cmd+resp
+> strings of every `ROUTINE_BEATS` entry via the *current* function logic, pin the hash;
+> after the token+`subst` migration the hash must be byte-identical. Other pools
+> (HQ/INTRUSIONS/REACTIONS/HESITATIONS/DRAFTS/FAREWELLS/MENTOR/SCENE/COMBAT) are plain
+> strings — verbatim. `genHash`/`foreshadowLine`/`arrivalLine`/`combatLine` stay code-side.
+>
+> **Native 1.3 has an on-device dependency:** `Bundle.main` resource loading is unproven
+> (zero current resource loads). Step 1 of Task 1.3 is Johannes' on-device confirmation.
+
 ### Task 1.1: Define `StoryContent` TS types + extract content to JSON
 
 **Files:**
