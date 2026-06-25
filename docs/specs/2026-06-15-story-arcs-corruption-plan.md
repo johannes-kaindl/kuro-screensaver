@@ -154,6 +154,20 @@ The point: capture the exact line stream the narrative produces for a fixed seed
 >
 > **Native 1.3 has an on-device dependency:** `Bundle.main` resource loading is unproven
 > (zero current resource loads). Step 1 of Task 1.3 is Johannes' on-device confirmation.
+>
+> **Discovery (2026-06-25, Slice 1b — presets+dict move, 5-lens adversarial review):**
+> - `presets` is stored as an **ordered ARRAY of `{ id, ...fields }`** (per design §2),
+>   NOT an object-keyed-by-id. This matches the native `Palette.swift` ordered
+>   `[ColorPreset]` (id + `presets[3]` default), so 1.3 decodes straight into it; a JSON
+>   object would decode to an unordered Swift `[String:ColorPreset]` and scramble the
+>   swatch/dropdown order. The web facade strips `id` on rebuild → `PRESETS` byte-identical.
+> - **No `story-content.ts` typed facade** was created (Task 1.1/1.2 listed it) — dropped,
+>   consistent with shipped 1a: facades `import story from './story-content.json'` + `as`.
+> - **1.3 decoder notes:** `commandSessions[].resp` is heterogeneous (`string | {cat,text}`)
+>   → needs a custom `Decodable` `RespItem` enum (string-first fallthrough) + an
+>   uppercase-`cat`→`Cat` mapper (no uniform-object precedent in `beats`). `boot.headers`
+>   is one **string** per scene (not an array) → `[String:String]`. `Palette.swift` only
+>   consumes `darkAccent.color`→`accentHex` (UInt32) and drops `lightAccent`/`rgb`.
 
 ### Task 1.1: Define `StoryContent` TS types + extract content to JSON
 
