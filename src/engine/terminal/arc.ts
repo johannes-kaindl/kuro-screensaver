@@ -66,3 +66,22 @@ export function pickArc<T>(pool: readonly T[], arc?: ArcState): T {
   const f = pool.filter((b) => arcAllows((b as { tags?: string[] }).tags, arc.arc.beatTags));
   return pick(f.length ? f : pool);
 }
+
+/** Weighted arc selection; damp ids in the last-3 completed ring so none repeats within 3. */
+export function selectArc(arcs: readonly ArcTemplate[], completed: readonly string[]): ArcTemplate {
+  const recent = new Set(completed.slice(-3));
+  const survivors = arcs.filter((a) => !recent.has(a.id));
+  const pool = survivors.length ? survivors : arcs.slice();
+  const total = pool.reduce((s, a) => s + a.weight, 0);
+  let r = Math.random() * total;
+  for (const a of pool) { r -= a.weight; if (r < 0) return a; }
+  return pool[pool.length - 1];
+}
+
+/** Resolve the ending: first divert whose atStage ≤ peakStage, else default. */
+export function resolveEnding(arc: ArcTemplate, peakStage: Stage): EndingId {
+  for (const d of arc.ending.divertOnThreat ?? []) {
+    if (peakStage >= d.atStage) return d.to;
+  }
+  return arc.ending.default;
+}

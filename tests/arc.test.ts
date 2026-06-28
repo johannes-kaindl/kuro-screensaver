@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { pick, pickArc, arcAllows, type ArcState, type ArcTemplate } from '../src/engine/terminal/arc';
+import { selectArc, resolveEnding, quantizeThreat } from '../src/engine/terminal/arc';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -61,5 +62,63 @@ describe('pickArc RNG-neutrality (the additive invariant)', () => {
     const arc = STATE(ARC({ beatTags: { include: ['wraith'] } }));
     seedMathRandom(1);
     expect(pickArc(pool, arc).text).toBe('d');
+  });
+});
+
+describe('quantizeThreat', () => {
+  it('steps at 0.15 / 0.40 / 0.70', () => {
+    expect(quantizeThreat(0.0, false)).toBe(0);
+    expect(quantizeThreat(0.14, false)).toBe(0);
+    expect(quantizeThreat(0.15, false)).toBe(1);
+    expect(quantizeThreat(0.39, false)).toBe(1);
+    expect(quantizeThreat(0.40, false)).toBe(2);
+    expect(quantizeThreat(0.69, false)).toBe(2);
+    expect(quantizeThreat(0.70, false)).toBe(3);
+    expect(quantizeThreat(1.0, false)).toBe(3);
+  });
+  it('calm forces stage 0', () => {
+    expect(quantizeThreat(0.99, true)).toBe(0);
+  });
+});
+
+describe('resolveEnding', () => {
+  const arc = ARC({
+    ending: { default: 'harmonized', divertOnThreat: [{ atStage: 3, to: 'cold-path' }] },
+  });
+  it('returns default below the divert stage', () => {
+    expect(resolveEnding(arc, 0)).toBe('harmonized');
+    expect(resolveEnding(arc, 2)).toBe('harmonized');
+  });
+  it('diverts at/above the divert stage', () => {
+    expect(resolveEnding(arc, 3)).toBe('cold-path');
+  });
+  it('first matching divert wins; no divert → default', () => {
+    const a2 = ARC({ ending: { default: 'wraith' } });
+    expect(resolveEnding(a2, 3)).toBe('wraith');
+  });
+});
+
+describe('selectArc', () => {
+  const arcs: ArcTemplate[] = [
+    ARC({ id: 'a', weight: 1 }), ARC({ id: 'b', weight: 1 }), ARC({ id: 'c', weight: 1 }),
+    ARC({ id: 'd', weight: 1 }),
+  ];
+  it('never returns an id present in the last-3 completed', () => {
+    seedMathRandom(99);
+    for (let i = 0; i < 30; i++) {
+      const got = selectArc(arcs, ['a', 'b', 'c']);
+      expect(got.id).toBe('d');   // only survivor
+    }
+  });
+  it('cold history → weighted over all arcs (deterministic for a fixed seed)', () => {
+    seedMathRandom(2025);
+    const first = selectArc(arcs, []);
+    seedMathRandom(2025);
+    expect(selectArc(arcs, []).id).toBe(first.id);  // reproducible
+  });
+  it('all arcs recently completed → falls back to full set (no starve)', () => {
+    seedMathRandom(3);
+    const got = selectArc(arcs, ['a', 'b', 'c', 'd']);
+    expect(arcs.map((a) => a.id)).toContain(got.id);
   });
 });
