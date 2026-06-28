@@ -7,7 +7,8 @@ export type FlightEventKind =
   | 'manoeuvre'    // a director manoeuvre fired (for narrative/world to react to, later)
   | 'incomingFire' // antagonist fired a tracer at the camera (Brick D)
   | 'unitArrive'   // a CORP support unit arrived
-  | 'unitCrash';   // a support unit went down
+  | 'unitCrash'    // a support unit went down
+  | 'sceneChange'; // Slice 5: a user-initiated scene change (←/→ or 1-9) — dir: -1|0|+1
 
 export interface FlightEvent {
   kind: FlightEventKind;

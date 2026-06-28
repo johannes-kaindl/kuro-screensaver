@@ -56,6 +56,7 @@ export class ScreensaverController {
   private autoCycleTimer = 0;
   private film: FilmDirector | null = null;
   private phaseCounter = 0;
+  private currentPhase: Phase = 'ROUTINE';
   private currentFilmScene: SceneId | null = null;
   private idleTimer = 0;
   private lastActivity = 0;
@@ -291,7 +292,7 @@ export class ScreensaverController {
           this.crt?.playCrash(clearScreen) ?? Promise.resolve(),
         // Brick C: the narrative phase arc drives the film's scene itinerary.
         // Brick E: each phase change can also trigger multi-speaker radio chatter.
-        onPhaseEnter: (phase) => { this.chatter?.fire(`phase:${phase}`); this.onFilmPhase(phase); },
+        onPhaseEnter: (phase) => { this.currentPhase = phase; this.chatter?.fire(`phase:${phase}`); this.onFilmPhase(phase); },
         sceneForeshadow: (nextPhase) => this.foreshadowFor(nextPhase),
         // Slice 3: seed from + force-flush to the persisted story memory.
         story: this.s.story,
@@ -327,6 +328,11 @@ export class ScreensaverController {
         }
         if (e.kind === 'incomingFire' || e.kind === 'unitArrive' || e.kind === 'unitCrash') {
           this.chatter?.fire(e.kind);
+        }
+        if (e.kind === 'sceneChange') {
+          // Slice 5: course-correction chatter — phase-keyed, calm-gated + cooldown'd.
+          const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+          this.chatter?.fireSceneChange(this.currentPhase, reduceMotion, now);
         }
       });
     }
@@ -768,9 +774,16 @@ export class ScreensaverController {
       const idx = parseInt(k, 10) - 1;
       if (idx < SCENES.length) {
         e.preventDefault(); e.stopPropagation();
-        this.switchScene(SCENES[idx]);
+        this.switchScene(SCENES[idx], { user: true, dir: 0 });   // Slice 5: manual pick = course-correction
         return true;
       }
+    }
+    // Slice 5: ←/→ steer the flight (course-correction). MUST preventDefault + return
+    // true so the arrow does not fall through to the any-key-closes path.
+    if (k === 'ArrowLeft' || k === 'ArrowRight') {
+      e.preventDefault(); e.stopPropagation();
+      this.cycleScene(k === 'ArrowLeft' ? -1 : 1);
+      return true;
     }
     if (k === 'm' || k === 'M') {
       e.preventDefault(); e.stopPropagation();
@@ -804,8 +817,11 @@ export class ScreensaverController {
     return false;
   }
 
-  switchScene(id: SceneId) {
+  switchScene(id: SceneId, opts?: { user?: boolean; dir?: number }) {
     if (!this.engine || !this.hud) return;
+    // Slice 5: only USER-initiated scene changes emit sceneChange (auto film-mode warps
+    // and the startup transition pass no opts → never emit → golden stream untouched).
+    if (opts?.user) this.engine.bus.emit({ kind: 'sceneChange', dir: opts.dir ?? 0 });
     this.audio?.sceneSwitch();
     // Brick B — warp transition (replaces the old fade-to-black cut). The director
     // accelerates into a warp; the scene swap happens at the peak, hidden under the
@@ -852,12 +868,14 @@ export class ScreensaverController {
     return foreshadowLine(sc, this.phaseCounter);
   }
 
-  cycleScene() {
+  cycleScene(dir: number = 1) {
     if (!this.engine) return;
     if (this.engine.director.inTransition) return;   // don't stack transitions
+    const step = dir < 0 ? -1 : 1;                    // Slice 5: ←/→ steer back/forward
     const cur = this.engine.currentScene;
     const idx = ALL_SCENES.indexOf(cur as any);
-    const next = ALL_SCENES[(idx + 1) % ALL_SCENES.length];
+    const n = ALL_SCENES.length;
+    const next = ALL_SCENES[((idx + step) % n + n) % n];
 
     // v1.2 — cool-idea: when autoCycle is on, also rotate the screensaver
     // palette through the 4 KSP aspects in sync with the scene change.
@@ -868,7 +886,9 @@ export class ScreensaverController {
     if (this.s.autoCycle?.on) {
       const ASPECT_PRESETS = ['phosphor', 'spectre', 'crimson', 'ember'] as const;
       const curIdx = ASPECT_PRESETS.indexOf(this.s.colorPreset as any);
-      const nextPreset = ASPECT_PRESETS[((curIdx >= 0 ? curIdx : -1) + 1) % ASPECT_PRESETS.length];
+      const base = curIdx >= 0 ? curIdx : 0;
+      const m = ASPECT_PRESETS.length;
+      const nextPreset = ASPECT_PRESETS[((base + step) % m + m) % m];
       this.s.aspectPaletteMode = 'inherit';
       this.s.colorMode = 'kuro-preset';
       this.s.colorPreset = nextPreset;
@@ -877,7 +897,7 @@ export class ScreensaverController {
       this.hud?.applyColor(newColor);
     }
 
-    this.switchScene(next);
+    this.switchScene(next, { user: true, dir: step });
   }
 
   takeScreenshot() {
