@@ -28,8 +28,8 @@ import {
 } from './script-bank';
 import type { MentorExchange } from './script-bank';
 import {
-  pick, pickArc, selectArc, resolveEnding,
-  type ArcState, type ArcTemplate, type Stage, type EndingId,
+  pick, pickArc, selectArc, resolveEnding, freshStoryMemory, applyShiftMemory,
+  type ArcState, type ArcTemplate, type Stage, type EndingId, type StoryMemory,
 } from './arc';
 
 export type Phase = 'ROUTINE' | 'INTRUSION' | 'ALARM' | 'PANIC' | 'SILENCE';
@@ -69,6 +69,10 @@ export interface NarrativeRunnerDeps {
   onPhaseEnter?: (phase: Phase) => void;
   /** Resolve a foreshadow line for the NEXT phase's scene (null = none). */
   sceneForeshadow?: (nextPhase: Phase) => string | null;
+  /** Persisted story memory to seed this runner (Slice 3). Omit → fresh. */
+  story?: StoryMemory;
+  /** Force-flush the updated story memory at each shift boundary (non-debounced). */
+  persistStory?: (story: StoryMemory) => void;
 }
 
 export class NarrativeRunner {
@@ -87,8 +91,8 @@ export class NarrativeRunner {
 
   /** Selected arc for the current shift (undefined = today's behaviour, inert). */
   private arc: ArcState | undefined;
-  /** Recently-selected arc ids (in-memory ring; persistence is Slice 3). */
-  private arcsCompleted: string[] = [];
+  /** Persisted across sessions (Slice 3): ring of recent arcs + ending counts + shift count. */
+  private story: StoryMemory;
   /** Ending resolved at SILENCE entry; selects the farewells/lastWords set. */
   private endingId: EndingId = 'normal';
 
@@ -105,6 +109,7 @@ export class NarrativeRunner {
               private arcs: readonly ArcTemplate[] = []) {
     this.persona = makePersona(rng);
     this.refreshPrompt();
+    this.story = d.story ?? freshStoryMemory();
   }
 
   // ── Reactive-world signal (read by ReactiveWorld each frame) ───────────
@@ -205,10 +210,11 @@ export class NarrativeRunner {
           this.persona = makePersona(Math.random);
           this.refreshPrompt();
           if (this.arcs.length) {
-            const tmpl = selectArc(this.arcs, this.arcsCompleted);
+            const tmpl = selectArc(this.arcs, this.story.arcsCompleted);
             this.arc = { arc: tmpl, threatStage: 0, peakStage: 0 };
-            this.arcsCompleted.push(tmpl.id);
-            if (this.arcsCompleted.length > 3) this.arcsCompleted.shift();
+            // Record the ending just reached + the new arc, then force-flush (rare event).
+            this.story = applyShiftMemory(this.story, this.endingId, tmpl.id);
+            this.d.persistStory?.(this.story);
           }
           this.enterPhase('ROUTINE');
         });
