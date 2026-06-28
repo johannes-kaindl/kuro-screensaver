@@ -21,7 +21,7 @@ import {
   HQ_ESCALATION_DRAFTS, HQ_NON_RESPONSES,
   REACTIONS_PANIC, REACTIONS_PANIC_RESP,
   PANIC_DRAFTS, SYSTEM_FINAL,
-  FAREWELLS, LAST_WORDS, ENDINGS,
+  ENDINGS,
   MENTOR_NAME, GHOSTLINK_HANDSHAKE, MENTOR_EXCHANGES,
   GHOSTLINK_TRANSMIT_LINES, GHOSTLINK_INBOUND, GHOSTLINK_TIMEOUT,
   genHash,
@@ -129,6 +129,13 @@ export class NarrativeRunner {
     return this.arc?.arc.phaseRouting?.[p] ?? NEXT_PHASE[p];
   }
 
+  /** Is the mentor reachable this phase? No arc → today's behaviour (always). */
+  private mentorAvailable(phase: Phase): boolean {
+    if (!this.arc) return true;
+    const m = this.arc.arc.mentor;
+    return !!m && m.availablePhases.includes(phase);
+  }
+
   // ── Lifecycle ──────────────────────────────────────────────────────────
   start() {
     this.alive = true;
@@ -165,6 +172,9 @@ export class NarrativeRunner {
     this.generation++;
     const myGen = this.generation;
     this.phase = p;
+    if (p === 'SILENCE') {
+      this.endingId = this.arc ? resolveEnding(this.arc.arc, this.arc.peakStage) : 'normal';
+    }
     this.d.onPhaseEnter?.(p);
     const [lo, hi] = PHASE_DURATION[p];
     const arcScale = this.arc?.arc.durationScale?.[p] ?? 1;
@@ -194,6 +204,12 @@ export class NarrativeRunner {
         this.silentReset(() => {
           this.persona = makePersona(Math.random);
           this.refreshPrompt();
+          if (this.arcs.length) {
+            const tmpl = selectArc(this.arcs, this.arcsCompleted);
+            this.arc = { arc: tmpl, threatStage: 0, peakStage: 0 };
+            this.arcsCompleted.push(tmpl.id);
+            if (this.arcsCompleted.length > 3) this.arcsCompleted.shift();
+          }
           this.enterPhase('ROUTINE');
         });
       } else {
@@ -315,7 +331,7 @@ export class NarrativeRunner {
   // ── Routine: pick a random command, type it, show responses ────────────
   private async beatRoutine() {
     // 12% chance of mentor exchange in routine — friendly check-ins
-    if (Math.random() < 0.12) {
+    if (this.mentorAvailable('ROUTINE') && Math.random() < 0.12) {
       await this.beatMentor('ROUTINE');
       return;
     }
@@ -349,7 +365,7 @@ export class NarrativeRunner {
   // ── Intrusion: occasional quote + small reaction ───────────────────────
   private async beatIntrusion() {
     // 22% chance of mentor exchange — operator reaches out about what he's seeing
-    if (Math.random() < 0.22) {
+    if (this.mentorAvailable('INTRUSION') && Math.random() < 0.22) {
       await this.beatMentor('INTRUSION');
       return;
     }
@@ -392,7 +408,7 @@ export class NarrativeRunner {
   // ── Alarm: drafts to HQ, refused commands, faster intrusions ───────────
   private async beatAlarm() {
     // 28% chance of mentor exchange — operator turns to trusted mentor
-    if (Math.random() < 0.28) {
+    if (this.mentorAvailable('ALARM') && Math.random() < 0.28) {
       await this.beatMentor('ALARM');
       return;
     }
@@ -432,7 +448,7 @@ export class NarrativeRunner {
   // ── Panic: heavy backspacing, refused everything ───────────────────────
   private async beatPanic() {
     // 22% chance of mentor exchange — last attempts to reach out
-    if (Math.random() < 0.22) {
+    if (this.mentorAvailable('PANIC') && Math.random() < 0.22) {
       await this.beatMentor('PANIC');
       return;
     }
@@ -471,14 +487,17 @@ export class NarrativeRunner {
 
   // ── Silence: final farewell, abandoned typing ──────────────────────────
   private async beatSilence() {
+    // Ending resolved at SILENCE entry; `normal` (the arc-undefined case) is today's set.
+    const farewells = ENDINGS.farewells[this.endingId] ?? ENDINGS.farewells.normal;
+    const lastWords = ENDINGS.lastWords[this.endingId] ?? ENDINGS.lastWords.normal;
     if (Math.random() < 0.5) {
-      const lw = pick(LAST_WORDS);
+      const lw = pick(lastWords);
       // Type but never finish — just a half-thought
       await this.typeAtPrompt(lw.typed);
       // Don't commit — leave it hanging in the prompt
       await this.sleep(3000 + Math.random() * 2000);
     } else {
-      const f = pick(FAREWELLS);
+      const f = pick(farewells);
       await this.d.hud.addLine(f, 'QUOTES');
       await this.sleep(2400 + Math.random() * 1600);
     }
