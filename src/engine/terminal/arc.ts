@@ -85,3 +85,26 @@ export function resolveEnding(arc: ArcTemplate, peakStage: Stage): EndingId {
   }
   return arc.ending.default;
 }
+
+// ── Cross-session story memory (Slice 3; persisted in ScreensaverSettings.story) ──────
+export interface StoryMemory {
+  schema: number;
+  layerCounter: number;                        // completed shifts → escalation baseline
+  arcsCompleted: string[];                      // ring buffer, last 3 → anti-repeat
+  endingsReached: Partial<Record<EndingId, number>>;
+}
+
+/** A fresh, empty story memory (schema 1). */
+export function freshStoryMemory(): StoryMemory {
+  return { schema: 1, layerCounter: 0, arcsCompleted: [], endingsReached: {} };
+}
+
+/** Pure shift-boundary update: record the ending just reached + the newly-selected arc. */
+export function applyShiftMemory(story: StoryMemory, endingId: EndingId, newArcId: string): StoryMemory {
+  return {
+    schema: story.schema,
+    layerCounter: story.layerCounter + 1,
+    arcsCompleted: [...story.arcsCompleted, newArcId].slice(-3),
+    endingsReached: { ...story.endingsReached, [endingId]: (story.endingsReached[endingId] ?? 0) + 1 },
+  };
+}

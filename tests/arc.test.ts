@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { pick, pickArc, arcAllows, type ArcState, type ArcTemplate } from '../src/engine/terminal/arc';
 import { selectArc, resolveEnding, quantizeThreat } from '../src/engine/terminal/arc';
+import { applyShiftMemory, freshStoryMemory } from '../src/engine/terminal/arc';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -120,5 +121,30 @@ describe('selectArc', () => {
     seedMathRandom(3);
     const got = selectArc(arcs, ['a', 'b', 'c', 'd']);
     expect(arcs.map((a) => a.id)).toContain(got.id);
+  });
+});
+
+describe('applyShiftMemory', () => {
+  it('increments layerCounter, records the ending, appends the new arc', () => {
+    const s0 = freshStoryMemory();
+    const s1 = applyShiftMemory(s0, 'normal', 'wraith');
+    expect(s1.layerCounter).toBe(1);
+    expect(s1.endingsReached.normal).toBe(1);
+    expect(s1.arcsCompleted).toEqual(['wraith']);
+  });
+  it('rings arcsCompleted at the last 3', () => {
+    let s = freshStoryMemory();
+    for (const id of ['a', 'b', 'c', 'd']) s = applyShiftMemory(s, 'normal', id);
+    expect(s.arcsCompleted).toEqual(['b', 'c', 'd']);
+    expect(s.layerCounter).toBe(4);
+    expect(s.endingsReached.normal).toBe(4);
+  });
+  it('accumulates distinct ending counts and does not mutate the input', () => {
+    const s0 = freshStoryMemory();
+    const s1 = applyShiftMemory(s0, 'wraith', 'wraith');
+    const s2 = applyShiftMemory(s1, 'wraith', 'karsen');
+    expect(s2.endingsReached.wraith).toBe(2);
+    expect(s0.layerCounter).toBe(0);          // input untouched (pure)
+    expect(s0.arcsCompleted).toEqual([]);
   });
 });
