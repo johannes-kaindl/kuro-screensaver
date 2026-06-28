@@ -3,7 +3,7 @@
 // Handlers run on emit (settled within the frame). Any randomness a handler needs
 // is drawn from the seeded LCG by the EMITTER (e.g. the Renderer), never here.
 
-enum FlightEventKind: Int { case intrusion = 0, manoeuvre = 1, incomingFire = 2, unitArrive = 3, unitCrash = 4 }
+enum FlightEventKind: Int { case intrusion = 0, manoeuvre = 1, incomingFire = 2, unitArrive = 3, unitCrash = 4, sceneChange = 5 }
 
 struct FlightEvent {
     var kind: FlightEventKind
@@ -15,7 +15,7 @@ struct FlightEvent {
 
 final class EventBus {
     // One handler bucket per kind (indexed by rawValue) — small + alloc-free on emit.
-    private var buckets: [[(FlightEvent) -> Void]] = [[], [], [], [], []]
+    private var buckets: [[(FlightEvent) -> Void]] = [[], [], [], [], [], []]
 
     func subscribe(_ kind: FlightEventKind, _ fn: @escaping (FlightEvent) -> Void) {
         buckets[kind.rawValue].append(fn)

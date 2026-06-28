@@ -158,6 +158,7 @@ final class Renderer {
         let from = SceneRegistry.ids[sceneIndex]
         let to = SceneRegistry.ids[((sceneIndex + delta) % n + n) % n]
         guard to != from else { return }
+        bus.emit(FlightEvent(kind: .sceneChange, dir: delta > 0 ? 1 : -1))   // Slice 5: user-initiated only
         beginTransition(TransitionProfiles.profileFor(from: from, to: to, calm: settings.reducedMotion)) { [weak self] in
             guard let s = self else { return }
             s.pulse(.warp); s.swapSceneTo(to)
@@ -207,6 +208,11 @@ final class Renderer {
         // Brick E: multi-speaker radio chatter replaces the single-speaker combat line.
         let key = kind == .incomingFire ? "incomingFire" : (kind == .unitArrive ? "unitArrive" : "unitCrash")
         chatter.fire(key, t: t)
+    }
+
+    /// React to a user-initiated scene change: phase-keyed course-correction chatter.
+    private func onSceneChange() {
+        chatter.fireSceneChange(phase: phaseKey(hud.terminal.currentPhase), calm: settings.reducedMotion, t: t)
     }
 
     private func phaseKey(_ p: ShiftPhase) -> String {
@@ -365,6 +371,7 @@ final class Renderer {
             bus.subscribe(.incomingFire) { [weak self] _ in self?.onCombat(.incomingFire) }
             bus.subscribe(.unitArrive) { [weak self] _ in self?.onCombat(.unitArrive) }
             bus.subscribe(.unitCrash) { [weak self] _ in self?.onCombat(.unitCrash) }
+            bus.subscribe(.sceneChange) { [weak self] _ in self?.onSceneChange() }   // Slice 5
             combatWired = true
         }
         let st = settings.reactiveWorld ? stormScalar : 0

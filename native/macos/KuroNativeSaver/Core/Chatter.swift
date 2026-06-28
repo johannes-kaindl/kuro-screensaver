@@ -59,6 +59,36 @@ enum Chatter {
         "phase:SILENCE": [
             [ChatterLine(speaker: "RADIO", cat: .hq, text: "...is anyone still receiving?")],
         ],
+        // Slice 5: course-correction chatter (hand-mirror of story-content.json `chatter`).
+        "sceneChange": [
+            [ChatterLine(speaker: "RADIO", cat: .hq, text: "VECTOR CHANGE LOGGED — ADJUSTING FEED")],
+            [ChatterLine(speaker: "RADIO", cat: .hq, text: "NEW HEADING ACKNOWLEDGED")],
+        ],
+        "sceneChange:ROUTINE": [
+            [ChatterLine(speaker: "RADIO", cat: .hq, text: "COURSE CORRECTION NOTED — ALL NOMINAL"),
+             ChatterLine(speaker: "UNIT-A", cat: .hq, text: "EYES ADJUSTING. STEADY.")],
+            [ChatterLine(speaker: "RADIO", cat: .hq, text: "REROUTING OPTICS — STAND BY")],
+            [ChatterLine(speaker: "UNIT-A", cat: .hq, text: "FOLLOWING YOUR LEAD.")],
+        ],
+        "sceneChange:INTRUSION": [
+            [ChatterLine(speaker: "RADIO", cat: .hq, text: "VECTOR SHIFT MID-ANOMALY — CONFIRM INTENT"),
+             ChatterLine(speaker: "WRAITH", cat: .ghost, text: "running already?")],
+            [ChatterLine(speaker: "UNIT-A", cat: .hq, text: "CHANGING LOOK ANGLE — KEEP IT TIGHT")],
+        ],
+        "sceneChange:ALARM": [
+            [ChatterLine(speaker: "RADIO", cat: .hq, text: "MANUAL OVERRIDE DURING ALERT — RISKY"),
+             ChatterLine(speaker: "UNIT-A", cat: .hq, text: "WHATEVER YOU'RE DOING, DO IT FAST")],
+            [ChatterLine(speaker: "WRAITH", cat: .ghost, text: "you can't steer away from me.")],
+        ],
+        "sceneChange:PANIC": [
+            [ChatterLine(speaker: "UNIT-A", cat: .hq, text: "NO TIME FOR THIS — HOLD SOMETHING"),
+             ChatterLine(speaker: "WRAITH", cat: .ghost, text: "twist all you like.")],
+            [ChatterLine(speaker: "RADIO", cat: .hq, text: "FEED UNSTABLE — CAN'T TRACK THE SWITCH")],
+        ],
+        "sceneChange:SILENCE": [
+            [ChatterLine(speaker: "RADIO", cat: .hq, text: "...still steering. someone's still there.")],
+            [ChatterLine(speaker: "WRAITH", cat: .ghost, text: "...why bother.")],
+        ],
     ]
 }
 
@@ -80,6 +110,24 @@ final class ChatterDirector {
         for (i, line) in pool[idx].enumerated() {
             pending.append(Pending(dueT: t + Double(i) * 0.52, line: line))
         }
+    }
+
+    private var lastSceneChange: Double = -Double.greatestFiniteMagnitude
+
+    /// True if a non-empty pool exists for `key`.
+    func has(_ key: String) -> Bool { (Chatter.pools[key]?.isEmpty == false) }
+
+    /// Course-correction chatter for a user-initiated scene change: phase-keyed
+    /// (`sceneChange:<PHASE>`, falling back to base `sceneChange`), suppressed under
+    /// reduced-motion, throttled to one firing per `cooldown` seconds. Returns whether it fired.
+    @discardableResult
+    func fireSceneChange(phase: String, calm: Bool, t: Double, cooldown: Double = 1.2) -> Bool {
+        if calm { return false }
+        if t - lastSceneChange < cooldown { return false }
+        lastSceneChange = t
+        let phaseKey = "sceneChange:\(phase)"
+        fire(has(phaseKey) ? phaseKey : "sceneChange", t: t)
+        return true
     }
 
     /// Flush due lines into the terminal (call each frame).
