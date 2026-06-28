@@ -10,7 +10,7 @@ import { DEFAULT_SCREENSAVER } from '../engine/data/defaults';
 const STORAGE_KEY = 'kuro-screensaver:settings';
 const LEGACY_KEY = 'kuro-animation:settings';   // pre-rename (commit dcf4b7f) — migrated on load/save
 
-function deepMerge<T extends object>(base: T, overrides: any): T {
+export function deepMerge<T extends object>(base: T, overrides: any): T {
   if (!overrides || typeof overrides !== 'object') return base;
   const out: any = Array.isArray(base) ? [...(base as any)] : { ...base };
   for (const k of Object.keys(overrides)) {

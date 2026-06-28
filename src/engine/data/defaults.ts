@@ -1,6 +1,8 @@
 // Default settings for the screensaver subsystem.
 // Additive merge into legacy DEFAULT_SETTINGS via main.ts.
 
+import type { StoryMemory } from '../terminal/arc';
+
 export interface ScreensaverSettings {
   defaultScene: 'terrain' | 'city' | 'rift' | 'tunnel' | 'void' | 'wreckage' | 'matrix';
   speed: 'slow' | 'norm' | 'fast';
@@ -130,6 +132,9 @@ export interface ScreensaverSettings {
     scenesLoaded: number;
     perScene: Record<string, number>;
   };
+
+  // Cross-session story memory (Slice 3). Forward-safe via deepMerge on load.
+  story: StoryMemory;
 }
 
 export const DEFAULT_SCREENSAVER: ScreensaverSettings = {
@@ -211,6 +216,7 @@ export const DEFAULT_SCREENSAVER: ScreensaverSettings = {
   perfAdapt: true,
 
   stats: { totalUptimeMs: 0, scenesLoaded: 0, perScene: {} },
+  story: { schema: 1, layerCounter: 0, arcsCompleted: [], endingsReached: {} },
 };
 
 export type SceneId = ScreensaverSettings['defaultScene'];
