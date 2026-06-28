@@ -855,7 +855,7 @@ export class ScreensaverController {
       this.phaseCounter++;
       return;
     }
-    const next = this.film.sceneAt(this.phaseCounter, phase, this.currentFilmScene);
+    const next = this.film.sceneAt(this.phaseCounter, phase, this.currentFilmScene, this.narrative?.currentArc);
     if (next !== this.engine.currentScene) this.switchScene(next);
     this.currentFilmScene = next;
     this.phaseCounter++;
@@ -864,7 +864,7 @@ export class ScreensaverController {
   /** Foreshadow line for the upcoming phase's scene (matches the arrival query). */
   private foreshadowFor(nextPhase: Phase): string | null {
     if (!this.engine || !this.film || !this.s.autoCycle?.on) return null;
-    const sc = this.film.sceneAt(this.phaseCounter, nextPhase, this.currentFilmScene);
+    const sc = this.film.sceneAt(this.phaseCounter, nextPhase, this.currentFilmScene, this.narrative?.currentArc);
     return foreshadowLine(sc, this.phaseCounter);
   }
 

@@ -129,6 +129,9 @@ export class NarrativeRunner {
     if (stage > this.arc.peakStage) this.arc.peakStage = stage;
   }
 
+  /** The shift's selected arc (Slice 7: lets the FilmDirector bias its itinerary). */
+  get currentArc(): ArcState | undefined { return this.arc; }
+
   /** Arc-aware phase routing (falls back to the linear default). */
   private nextPhaseOf(p: Phase): Phase {
     return this.arc?.arc.phaseRouting?.[p] ?? NEXT_PHASE[p];
