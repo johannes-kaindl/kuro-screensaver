@@ -8,6 +8,7 @@
 // Design: docs/superpowers/specs/2026-06-04-reactive-narrative-world-design.md
 import type { Engine } from '../engine/core';
 import type { NarrativeRunner, Phase } from '../terminal/narrative';
+import { quantizeThreat } from '../terminal/arc';
 import type { CrtSim } from './crt-sim';
 import type { ScreensaverSettings } from '../data/defaults';
 
@@ -106,6 +107,9 @@ export class ReactiveWorld {
     }
 
     const threat = this.threat;
+    // Feed the quantized corruption stage to the narrative so the ending can divert
+    // (Slice 2). Inert when no arc is selected; calm/reduced-motion forces stage 0.
+    this.d.narrative?.updateThreatStage(quantizeThreat(threat, calm));
     const storm = calm ? 0 : smoothstep(0.70, 1.00, threat);
     e.threat = threat;
     e.storm = storm;
