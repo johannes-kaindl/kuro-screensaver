@@ -533,7 +533,7 @@ export class ScreensaverController {
 
     // SCENE
     sep(); lbl('SCENE');
-    SCENES.forEach(sc => btn(SCENE_LABELS[sc], this.engine?.currentScene === sc, () => this.switchScene(sc)));
+    SCENES.forEach(sc => btn(SCENE_LABELS[sc], this.engine?.currentScene === sc, () => this.switchScene(sc, { user: true, dir: 0 })));
 
     // SPD
     sep(); lbl('SPD');
