@@ -293,6 +293,9 @@ export class ScreensaverController {
         // Brick E: each phase change can also trigger multi-speaker radio chatter.
         onPhaseEnter: (phase) => { this.chatter?.fire(`phase:${phase}`); this.onFilmPhase(phase); },
         sceneForeshadow: (nextPhase) => this.foreshadowFor(nextPhase),
+        // Slice 3: seed from + force-flush to the persisted story memory.
+        story: this.s.story,
+        persistStory: (story) => { this.s.story = story; void this.plugin.saveData(this.plugin.settings); },
       }, mkRng(freshSeed()), opts.storyScale, ARCS);
       this.narrative.start();
     }
