@@ -75,4 +75,12 @@ describe('FilmDirector arc bias', () => {
       expect(fd.sceneAt(index, 'PANIC', 'wreckage', arc)).not.toBe('wreckage');
     }
   });
+
+  it('returns the only scene of a single-id override even when it equals prev (no alternative)', () => {
+    const fd = new FilmDirector(5);
+    const arc = arcWith({ PANIC: [{ scene: 'tunnel', weight: 4 }] });
+    for (let index = 0; index < 12; index++) {
+      expect(fd.sceneAt(index, 'PANIC', 'tunnel', arc)).toBe('tunnel'); // anti-repeat guard exhausts, returns prev
+    }
+  });
 });
