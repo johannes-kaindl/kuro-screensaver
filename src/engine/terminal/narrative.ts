@@ -21,12 +21,16 @@ import {
   HQ_ESCALATION_DRAFTS, HQ_NON_RESPONSES,
   REACTIONS_PANIC, REACTIONS_PANIC_RESP,
   PANIC_DRAFTS, SYSTEM_FINAL,
-  FAREWELLS, LAST_WORDS,
+  FAREWELLS, LAST_WORDS, ENDINGS,
   MENTOR_NAME, GHOSTLINK_HANDSHAKE, MENTOR_EXCHANGES,
   GHOSTLINK_TRANSMIT_LINES, GHOSTLINK_INBOUND, GHOSTLINK_TIMEOUT,
   genHash,
 } from './script-bank';
 import type { MentorExchange } from './script-bank';
+import {
+  pick, pickArc, selectArc, resolveEnding,
+  type ArcState, type ArcTemplate, type Stage, type EndingId,
+} from './arc';
 
 export type Phase = 'ROUTINE' | 'INTRUSION' | 'ALARM' | 'PANIC' | 'SILENCE';
 
@@ -81,6 +85,13 @@ export class NarrativeRunner {
   /** Track which mentor exchanges have already been used this shift to prevent repeats. */
   private usedExchanges = new Set<MentorExchange>();
 
+  /** Selected arc for the current shift (undefined = today's behaviour, inert). */
+  private arc: ArcState | undefined;
+  /** Recently-selected arc ids (in-memory ring; persistence is Slice 3). */
+  private arcsCompleted: string[] = [];
+  /** Ending resolved at SILENCE entry; selects the farewells/lastWords set. */
+  private endingId: EndingId = 'normal';
+
   // Persona for the current shift
   persona: OperatorPersona;
 
@@ -90,7 +101,8 @@ export class NarrativeRunner {
    *   tiny values (~0.04) run a whole cycle in seconds for crash-seam testing.
    *   Does NOT speed up typing or beats — only how long each phase lasts.
    */
-  constructor(public d: NarrativeRunnerDeps, rng: () => number, private durationScale = 1) {
+  constructor(public d: NarrativeRunnerDeps, rng: () => number, private durationScale = 1,
+              private arcs: readonly ArcTemplate[] = []) {
     this.persona = makePersona(rng);
     this.refreshPrompt();
   }
@@ -103,6 +115,18 @@ export class NarrativeRunner {
     const span = this.phaseEndsAt - this.phaseStartedAt;
     if (span <= 0) return 0;
     return Math.min(1, Math.max(0, (Date.now() - this.phaseStartedAt) / span));
+  }
+
+  /** Fed each frame by ReactiveWorld; tracks the shift's peak corruption stage. */
+  updateThreatStage(stage: Stage): void {
+    if (!this.arc) return;
+    this.arc.threatStage = stage;
+    if (stage > this.arc.peakStage) this.arc.peakStage = stage;
+  }
+
+  /** Arc-aware phase routing (falls back to the linear default). */
+  private nextPhaseOf(p: Phase): Phase {
+    return this.arc?.arc.phaseRouting?.[p] ?? NEXT_PHASE[p];
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────
@@ -143,8 +167,9 @@ export class NarrativeRunner {
     this.phase = p;
     this.d.onPhaseEnter?.(p);
     const [lo, hi] = PHASE_DURATION[p];
+    const arcScale = this.arc?.arc.durationScale?.[p] ?? 1;
     this.phaseStartedAt = Date.now();
-    this.phaseEndsAt = this.phaseStartedAt + (lo + Math.random() * (hi - lo)) * 1000 * this.durationScale;
+    this.phaseEndsAt = this.phaseStartedAt + (lo + Math.random() * (hi - lo)) * 1000 * this.durationScale * arcScale;
     this.scheduleTransition();
     this.runPhaseLoop(myGen);
   }
@@ -158,13 +183,13 @@ export class NarrativeRunner {
     if (wait > lead + 1500) {
       this.timers.push(window.setTimeout(() => {
         if (!this.alive || this.generation !== gen) return;
-        const line = this.d.sceneForeshadow?.(NEXT_PHASE[this.phase]);
+        const line = this.d.sceneForeshadow?.(this.nextPhaseOf(this.phase));
         if (line) void this.d.hud.addLine(line, 'HQ');
       }, wait - lead));
     }
     this.timers.push(window.setTimeout(() => {
       if (!this.alive) return;
-      if (NEXT_PHASE[this.phase] === 'ROUTINE') {
+      if (this.nextPhaseOf(this.phase) === 'ROUTINE') {
         // Reset between shifts — fresh persona, brief blank moment
         this.silentReset(() => {
           this.persona = makePersona(Math.random);
@@ -172,7 +197,7 @@ export class NarrativeRunner {
           this.enterPhase('ROUTINE');
         });
       } else {
-        this.enterPhase(NEXT_PHASE[this.phase]);
+        this.enterPhase(this.nextPhaseOf(this.phase));
       }
     }, wait));
   }
@@ -296,16 +321,16 @@ export class NarrativeRunner {
     }
     if (Math.random() < 0.18) {
       // HQ ping inbound — operator replies briefly
-      const ping = pick(HQ_INBOUND_ROUTINE);
+      const ping = pickArc(HQ_INBOUND_ROUTINE, this.arc);
       await this.d.hud.addLine(ping, 'HQ');
       await this.sleep(800 + Math.random() * 1400);
-      const reply = pick(HQ_REPLY_ROUTINE);
+      const reply = pickArc(HQ_REPLY_ROUTINE, this.arc);
       await this.typeAtPrompt(reply);
       await this.sleep(300);
       this.commit('CMD');
       return;
     }
-    const beat = pick(ROUTINE_BEATS);
+    const beat = pickArc(ROUTINE_BEATS, this.arc);
     // cmd carries persona tokens ({node}/{hqlower}/{sector}) — resolve via subst, the
     // twin of native Terminal.subst (content now lives in the shared JSON SSOT).
     const cmdText = subst(this.persona, beat.cmd);
@@ -330,7 +355,7 @@ export class NarrativeRunner {
     }
     // 60% intrusion event, 40% follow-up reaction or routine command
     if (Math.random() < 0.6) {
-      const ev = pick([...INTRUSIONS_QUOTES, ...INTRUSIONS_FRAGMENTS]);
+      const ev = pickArc([...INTRUSIONS_QUOTES, ...INTRUSIONS_FRAGMENTS], this.arc);
       this.d.onIntrusion?.();
       await this.d.hud.addLine(ev.text, 'QUOTES');
       if (ev.followup) {
@@ -340,20 +365,20 @@ export class NarrativeRunner {
       // Operator reaction: hesitation typed-and-deleted, or a check command
       await this.sleep(900 + Math.random() * 1200);
       if (Math.random() < 0.45) {
-        const h = pick(HESITATIONS);
+        const h = pickArc(HESITATIONS, this.arc);
         await this.typeAndDelete(h.typed, h.replacement);
         await this.sleep(220);
         this.commit('CMD');
-        const resp = pick(REACTIONS_FIRST_RESP);
+        const resp = pickArc(REACTIONS_FIRST_RESP, this.arc);
         const cat: LineCategory = resp.cat === 'OK' ? 'STATUS' : resp.cat === 'WARN' ? 'WARNING' : 'RESP';
         await this.sleep(420);
         await this.d.hud.addLine(resp.text, cat);
       } else {
-        const cmd = pick(REACTIONS_FIRST);
+        const cmd = pickArc(REACTIONS_FIRST, this.arc);
         await this.typeAtPrompt(cmd);
         await this.sleep(220);
         this.commit('CMD');
-        const resp = pick(REACTIONS_FIRST_RESP);
+        const resp = pickArc(REACTIONS_FIRST_RESP, this.arc);
         const cat: LineCategory = resp.cat === 'OK' ? 'STATUS' : resp.cat === 'WARN' ? 'WARNING' : 'RESP';
         await this.sleep(420);
         await this.d.hud.addLine(resp.text, cat);
@@ -374,7 +399,7 @@ export class NarrativeRunner {
     const choice = Math.random();
     if (choice < 0.35) {
       // HQ escalation reformulation — drafts then final
-      const draft = pick(HQ_ESCALATION_DRAFTS);
+      const draft = pickArc(HQ_ESCALATION_DRAFTS, this.arc);
       for (const d of draft.drafts) {
         await this.typeAndDelete(d, '');
         await this.sleep(400 + Math.random() * 400);
@@ -382,23 +407,23 @@ export class NarrativeRunner {
       await this.typeAtPrompt(draft.final);
       await this.sleep(280);
       this.commit('CMD');
-      const resp = pick(HQ_NON_RESPONSES);
+      const resp = pickArc(HQ_NON_RESPONSES, this.arc);
       await this.sleep(700 + Math.random() * 800);
       const cat: LineCategory = resp.cat === 'AUTO' ? 'WARNING' : resp.cat === 'INFO' ? 'RESP' : 'STATUS';
       await this.d.hud.addLine(resp.text, cat);
     } else if (choice < 0.7) {
       // Reaction command, often denied
-      const cmd = pick(REACTIONS_ALARM);
+      const cmd = pickArc(REACTIONS_ALARM, this.arc);
       await this.typeAtPrompt(cmd);
       await this.sleep(280);
       this.commit('CMD');
-      const resp = pick(REACTIONS_ALARM_RESP);
+      const resp = pickArc(REACTIONS_ALARM_RESP, this.arc);
       const cat: LineCategory = resp.cat === 'INFO' ? 'RESP' : resp.cat === 'DENY' ? 'DENY' : 'WARNING';
       await this.sleep(440);
       await this.d.hud.addLine(resp.text, cat);
     } else {
       // Intrusion event
-      const ev = pick(INTRUSIONS_QUOTES);
+      const ev = pickArc(INTRUSIONS_QUOTES, this.arc);
       this.d.onIntrusion?.();
       await this.d.hud.addLine(ev.text, 'QUOTES');
     }
@@ -414,7 +439,7 @@ export class NarrativeRunner {
     const choice = Math.random();
     if (choice < 0.4) {
       // Panic draft pattern — short, getting shorter
-      const p = pick(PANIC_DRAFTS);
+      const p = pickArc(PANIC_DRAFTS, this.arc);
       for (const d of p.drafts) {
         await this.typeAndDelete(d, '');
         await this.sleep(250 + Math.random() * 350);
@@ -422,15 +447,15 @@ export class NarrativeRunner {
       await this.typeAtPrompt(p.final);
       await this.sleep(220);
       this.commit('CMD');
-      const r = pick(SYSTEM_FINAL);
+      const r = pickArc(SYSTEM_FINAL, this.arc);
       await this.sleep(800 + Math.random() * 1000);
       await this.d.hud.addLine(r.text, r.cat === 'AUTO' ? 'WARNING' : 'WARNING');
     } else if (choice < 0.75) {
-      const cmd = pick(REACTIONS_PANIC);
+      const cmd = pickArc(REACTIONS_PANIC, this.arc);
       await this.typeAtPrompt(cmd);
       await this.sleep(180);
       this.commit('CMD');
-      const r = pick(REACTIONS_PANIC_RESP);
+      const r = pickArc(REACTIONS_PANIC_RESP, this.arc);
       await this.sleep(360);
       const cat: LineCategory = r.cat === 'DENY' ? 'DENY' : 'WARNING';
       await this.d.hud.addLine(r.text, cat);
@@ -438,7 +463,7 @@ export class NarrativeRunner {
       // Multiple rapid intrusions
       for (let i = 0; i < 2 + Math.floor(Math.random() * 2); i++) {
         this.d.onIntrusion?.();
-        await this.d.hud.addLine(pick(INTRUSIONS_QUOTES).text, 'QUOTES');
+        await this.d.hud.addLine(pickArc(INTRUSIONS_QUOTES, this.arc).text, 'QUOTES');
         await this.sleep(280 + Math.random() * 220);
       }
     }
@@ -531,7 +556,3 @@ const PHASE_REST: Record<Phase, [number, number]> = {
   PANIC:     [600, 1600],
   SILENCE:   [2500, 4500],
 };
-
-function pick<T>(arr: readonly T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
