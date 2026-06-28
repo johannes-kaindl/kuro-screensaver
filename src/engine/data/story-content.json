@@ -1690,6 +1690,35 @@
     ],
     "phase:SILENCE": [
       [{ "speaker": "RADIO", "category": "HQ", "text": "...is anyone still receiving?" }]
+    ],
+    "sceneChange": [
+      [{ "speaker": "RADIO", "category": "HQ", "text": "VECTOR CHANGE LOGGED — ADJUSTING FEED" }],
+      [{ "speaker": "RADIO", "category": "HQ", "text": "NEW HEADING ACKNOWLEDGED" }]
+    ],
+    "sceneChange:ROUTINE": [
+      [{ "speaker": "RADIO", "category": "HQ", "text": "COURSE CORRECTION NOTED — ALL NOMINAL" },
+       { "speaker": "UNIT-A", "category": "HQ", "text": "EYES ADJUSTING. STEADY." }],
+      [{ "speaker": "RADIO", "category": "HQ", "text": "REROUTING OPTICS — STAND BY" }],
+      [{ "speaker": "UNIT-A", "category": "HQ", "text": "FOLLOWING YOUR LEAD." }]
+    ],
+    "sceneChange:INTRUSION": [
+      [{ "speaker": "RADIO", "category": "HQ", "text": "VECTOR SHIFT MID-ANOMALY — CONFIRM INTENT" },
+       { "speaker": "WRAITH", "category": "GHOSTLINK", "text": "running already?" }],
+      [{ "speaker": "UNIT-A", "category": "HQ", "text": "CHANGING LOOK ANGLE — KEEP IT TIGHT" }]
+    ],
+    "sceneChange:ALARM": [
+      [{ "speaker": "RADIO", "category": "HQ", "text": "MANUAL OVERRIDE DURING ALERT — RISKY" },
+       { "speaker": "UNIT-A", "category": "HQ", "text": "WHATEVER YOU'RE DOING, DO IT FAST" }],
+      [{ "speaker": "WRAITH", "category": "GHOSTLINK", "text": "you can't steer away from me." }]
+    ],
+    "sceneChange:PANIC": [
+      [{ "speaker": "UNIT-A", "category": "HQ", "text": "NO TIME FOR THIS — HOLD SOMETHING" },
+       { "speaker": "WRAITH", "category": "GHOSTLINK", "text": "twist all you like." }],
+      [{ "speaker": "RADIO", "category": "HQ", "text": "FEED UNSTABLE — CAN'T TRACK THE SWITCH" }]
+    ],
+    "sceneChange:SILENCE": [
+      [{ "speaker": "RADIO", "category": "HQ", "text": "...still steering. someone's still there." }],
+      [{ "speaker": "WRAITH", "category": "GHOSTLINK", "text": "...why bother." }]
     ]
   }
 }

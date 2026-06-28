@@ -30,4 +30,28 @@ export class ChatterDirector {
       setTimeout(() => void this.hud.addLine(line.text, line.category, line.speaker), i * 520);
     });
   }
+
+  private lastSceneChange = Number.NEGATIVE_INFINITY;
+
+  /** True if a non-empty pool exists for `key`. */
+  has(key: string): boolean {
+    const pool = CHATTER[key];
+    return !!pool && pool.length > 0;
+  }
+
+  /**
+   * Course-correction chatter for a user-initiated scene change. Phase-keyed
+   * (`sceneChange:<PHASE>`, falling back to the base `sceneChange` pool), suppressed
+   * under reduced-motion (`calm`), and throttled to one firing per `cooldownMs`.
+   * `now` is a monotonic millisecond timestamp supplied by the caller. Returns whether
+   * it fired (so callers/tests can assert).
+   */
+  fireSceneChange(phase: string, calm: boolean, now: number, cooldownMs = 1200): boolean {
+    if (calm) return false;
+    if (now - this.lastSceneChange < cooldownMs) return false;
+    this.lastSceneChange = now;
+    const phaseKey = `sceneChange:${phase}`;
+    this.fire(this.has(phaseKey) ? phaseKey : 'sceneChange');
+    return true;
+  }
 }
