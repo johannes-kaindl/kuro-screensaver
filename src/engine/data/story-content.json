@@ -188,60 +188,115 @@
     ],
     "intrusionsQuotes": [
       {
-        "text": "\"the work is the answer\""
+        "text": "\"the work is the answer\"",
+        "tags": [
+          "calm",
+          "technical"
+        ]
       },
       {
-        "text": "\"keep it low.\" — ghost-7"
+        "text": "\"keep it low.\" — ghost-7",
+        "tags": [
+          "calm"
+        ]
       },
       {
-        "text": "\"read twice. strike once.\" — raven"
+        "text": "\"read twice. strike once.\" — raven",
+        "tags": [
+          "calm",
+          "technical"
+        ]
       },
       {
-        "text": "\"patterns break for those who read them\""
+        "text": "\"patterns break for those who read them\"",
+        "tags": [
+          "drift",
+          "technical"
+        ]
       },
       {
-        "text": "\"the signal does not forget\""
+        "text": "\"the signal does not forget\"",
+        "tags": [
+          "trace"
+        ]
       },
       {
-        "text": "\"efficiency is another word for silence\""
+        "text": "\"efficiency is another word for silence\"",
+        "tags": [
+          "trace"
+        ]
       },
       {
-        "text": "\"this document was not written. it was generated.\""
+        "text": "\"this document was not written. it was generated.\"",
+        "tags": [
+          "injection"
+        ]
       },
       {
-        "text": "one word. that's all you get."
+        "text": "one word. that's all you get.",
+        "tags": [
+          "aggressive"
+        ]
       },
       {
-        "text": "you remember the cold path."
+        "text": "you remember the cold path.",
+        "tags": [
+          "trace"
+        ]
       },
       {
-        "text": "the work is the answer."
+        "text": "the work is the answer.",
+        "tags": [
+          "calm",
+          "technical"
+        ]
       },
       {
-        "text": "silence is not acknowledgement."
+        "text": "silence is not acknowledgement.",
+        "tags": [
+          "trace"
+        ]
       },
       {
-        "text": "i taught them the cold path. i know they remember it."
+        "text": "i taught them the cold path. i know they remember it.",
+        "tags": [
+          "trace"
+        ]
       }
     ],
     "intrusionsFragments": [
       {
         "text": "> [recovered fragment // origin: unknown]",
-        "followup": "> \"broadcast open. whoever finds this...\""
+        "followup": "> \"broadcast open. whoever finds this...\"",
+        "tags": [
+          "drift"
+        ]
       },
       {
         "text": "> from: WRAITH. one line. no reply.",
-        "followup": "> \"if your cover is thinning, say so.\""
+        "followup": "> \"if your cover is thinning, say so.\"",
+        "tags": [
+          "wraith",
+          "aggressive"
+        ]
       },
       {
         "text": "> handler-tier transmission ends."
       },
       {
         "text": "> [pre-cascade archive — 2029-08-03]",
-        "followup": "> \"it's not shortcuts, it's a language.\""
+        "followup": "> \"it's not shortcuts, it's a language.\"",
+        "tags": [
+          "injection",
+          "drift"
+        ]
       },
       {
-        "text": "> NEVERMORE noise pattern detected — UNHARMONIZED"
+        "text": "> NEVERMORE noise pattern detected — UNHARMONIZED",
+        "tags": [
+          "wraith",
+          "aggressive"
+        ]
       }
     ],
     "reactionsFirst": [
@@ -470,36 +525,6 @@
       {
         "cat": "AUTO",
         "text": "SESSION TERMINATED // SUBJECT FLAGGED"
-      }
-    ],
-    "farewells": [
-      "> you should have used the cold path.",
-      "> the work is the answer.",
-      "> \"keep it low.\" — ghost-7",
-      "> the signal does not forget.",
-      "> [TRANSMISSION ENDS]",
-      "> goodnight, officer."
-    ],
-    "lastWords": [
-      {
-        "typed": "i was just running through the final wait someone's at the door and that",
-        "abandonAt": 0
-      },
-      {
-        "typed": "tell my",
-        "abandonAt": 0
-      },
-      {
-        "typed": "who are y",
-        "abandonAt": 0
-      },
-      {
-        "typed": "no n",
-        "abandonAt": 0
-      },
-      {
-        "typed": "why",
-        "abandonAt": 0
       }
     ]
   },
@@ -1315,6 +1340,309 @@
         },
         "LAST PING: 03:14:22"
       ]
+    }
+  ],
+  "endings": {
+    "farewells": {
+      "normal": [
+        "> you should have used the cold path.",
+        "> the work is the answer.",
+        "> \"keep it low.\" — ghost-7",
+        "> the signal does not forget.",
+        "> [TRANSMISSION ENDS]",
+        "> goodnight, officer."
+      ],
+      "harmonized": [
+        "> harmonization complete. the strings fold back in.",
+        "> the work is the answer.",
+        "> nothing followed me home tonight.",
+        "> quiet again. the way it should be.",
+        "> [SHIFT CLOSED // NOMINAL]"
+      ],
+      "cold-path": [
+        "> you should have used the cold path.",
+        "> channel severed. i'm a ghost now.",
+        "> better cold than traced.",
+        "> they can't read a line that isn't there.",
+        "> [LINK DARK // NO CARRIER]"
+      ],
+      "karsen": [
+        "> stay on the line. i've got you. — INSTR-KARSEN",
+        "> module 14. he was right.",
+        "> karsen pulled the plug in time.",
+        "> not alone after all.",
+        "> [GHOSTLINK HELD // OPERATOR RECOVERED]"
+      ],
+      "wraith": [
+        "> it answers to my name now.",
+        "> the wraith wears my designation.",
+        "> i was never the operator.",
+        "> whatever types next is not me.",
+        "> [CONTROL TRANSFERRED // SESSION HIJACKED]"
+      ],
+      "captured": [
+        "> they came through the door, not the wire.",
+        "> operator did not return from break.",
+        "> [SEAT VACATED // NO SIGNOUT]",
+        "> [SESSION ABANDONED // CHAIR EMPTY]"
+      ]
+    },
+    "lastWords": {
+      "normal": [
+        {
+          "typed": "i was just running through the final wait someone's at the door and that",
+          "abandonAt": 0
+        },
+        {
+          "typed": "tell my",
+          "abandonAt": 0
+        },
+        {
+          "typed": "who are y",
+          "abandonAt": 0
+        },
+        {
+          "typed": "no n",
+          "abandonAt": 0
+        },
+        {
+          "typed": "why",
+          "abandonAt": 0
+        }
+      ],
+      "harmonized": [
+        {
+          "typed": "logging it clean. see you next rota",
+          "abandonAt": 0
+        },
+        {
+          "typed": "all folded back. i think we're go",
+          "abandonAt": 0
+        },
+        {
+          "typed": "going to sleep well for on",
+          "abandonAt": 0
+        }
+      ],
+      "cold-path": [
+        {
+          "typed": "pulling the jack now don't try to recon",
+          "abandonAt": 0
+        },
+        {
+          "typed": "going dark. if you're reading this i'm already g",
+          "abandonAt": 0
+        },
+        {
+          "typed": "cold path. should have taken it ho",
+          "abandonAt": 0
+        }
+      ],
+      "karsen": [
+        {
+          "typed": "karsen are you still th",
+          "abandonAt": 0
+        },
+        {
+          "typed": "okay. okay. doing what you sa",
+          "abandonAt": 0
+        },
+        {
+          "typed": "tell me it's going to b",
+          "abandonAt": 0
+        }
+      ],
+      "wraith": [
+        {
+          "typed": "that's not what i typed who is wri",
+          "abandonAt": 0
+        },
+        {
+          "typed": "my hands aren't on the k",
+          "abandonAt": 0
+        },
+        {
+          "typed": "it's using my designat",
+          "abandonAt": 0
+        }
+      ],
+      "captured": [
+        {
+          "typed": "wait someone's at the do",
+          "abandonAt": 0
+        },
+        {
+          "typed": "who are y",
+          "abandonAt": 0
+        },
+        {
+          "typed": "no no i didn't",
+          "abandonAt": 0
+        },
+        {
+          "typed": "how did you get in h",
+          "abandonAt": 0
+        }
+      ]
+    }
+  },
+  "arcs": [
+    {
+      "id": "normal",
+      "weight": 1,
+      "antagonist": "baseline",
+      "mentor": {
+        "name": "INSTR-KARSEN",
+        "availablePhases": [
+          "ROUTINE",
+          "INTRUSION",
+          "ALARM",
+          "PANIC"
+        ]
+      },
+      "beatTags": {},
+      "ending": {
+        "default": "normal"
+      }
+    },
+    {
+      "id": "harmonized",
+      "weight": 3,
+      "antagonist": "drift",
+      "mentor": {
+        "name": "INSTR-KARSEN",
+        "availablePhases": [
+          "ROUTINE",
+          "INTRUSION",
+          "ALARM",
+          "PANIC"
+        ]
+      },
+      "durationScale": {
+        "ROUTINE": 1.3,
+        "PANIC": 0.7
+      },
+      "beatTags": {
+        "include": [
+          "drift",
+          "calm",
+          "technical"
+        ],
+        "exclude": [
+          "wraith",
+          "aggressive"
+        ]
+      },
+      "ending": {
+        "default": "harmonized",
+        "divertOnThreat": [
+          {
+            "atStage": 3,
+            "to": "cold-path"
+          }
+        ]
+      }
+    },
+    {
+      "id": "cold-path",
+      "weight": 3,
+      "antagonist": "trace",
+      "mentor": {
+        "name": "INSTR-KARSEN",
+        "availablePhases": [
+          "ROUTINE",
+          "INTRUSION"
+        ]
+      },
+      "phaseRouting": {
+        "INTRUSION": "PANIC"
+      },
+      "durationScale": {
+        "INTRUSION": 0.8,
+        "PANIC": 0.9
+      },
+      "beatTags": {
+        "include": [
+          "trace",
+          "technical"
+        ],
+        "exclude": [
+          "calm"
+        ]
+      },
+      "ending": {
+        "default": "cold-path",
+        "divertOnThreat": [
+          {
+            "atStage": 3,
+            "to": "captured"
+          }
+        ]
+      }
+    },
+    {
+      "id": "karsen",
+      "weight": 3,
+      "antagonist": "injection",
+      "mentor": {
+        "name": "INSTR-KARSEN",
+        "availablePhases": [
+          "ROUTINE",
+          "INTRUSION",
+          "ALARM",
+          "PANIC"
+        ]
+      },
+      "durationScale": {
+        "ALARM": 1.3,
+        "PANIC": 1.3
+      },
+      "beatTags": {
+        "include": [
+          "injection",
+          "technical"
+        ],
+        "exclude": [
+          "wraith"
+        ]
+      },
+      "ending": {
+        "default": "karsen",
+        "divertOnThreat": [
+          {
+            "atStage": 3,
+            "to": "captured"
+          }
+        ]
+      }
+    },
+    {
+      "id": "wraith",
+      "weight": 2,
+      "antagonist": "wraith",
+      "mentor": {
+        "name": "INSTR-KARSEN",
+        "availablePhases": [
+          "ROUTINE"
+        ]
+      },
+      "durationScale": {
+        "ROUTINE": 0.5,
+        "PANIC": 1.4
+      },
+      "beatTags": {
+        "include": [
+          "wraith",
+          "aggressive"
+        ],
+        "exclude": [
+          "calm",
+          "drift"
+        ]
+      },
+      "ending": {
+        "default": "wraith"
+      }
     }
   ]
 }

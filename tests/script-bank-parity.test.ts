@@ -87,6 +87,9 @@ describe('script-bank SSOT migration parity', () => {
   });
 
   it('plain pools survive the move into story-content.json unchanged', () => {
-    expect(fnv1a(plainPools())).toBe(16533446474660952139n);
+    // Re-pinned in Slice 2: intrusionsQuotes/intrusionsFragments gained optional `tags`
+    // for arc filtering (intentional content change). FAREWELLS/LAST_WORDS values are
+    // unchanged (aliased to endings.normal). Pre-Slice-2 hash was 16533446474660952139n.
+    expect(fnv1a(plainPools())).toBe(14557456953217978135n);
   });
 });

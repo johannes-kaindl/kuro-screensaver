@@ -9,6 +9,7 @@
 // Worldbuilding sources: NeuroVim FRAGMENTS 01-10, Mission briefings, THE RAVEN.
 
 import story from '../data/story-content.json';
+import type { ArcTemplate, EndingId } from './arc';
 
 type Cat3 = 'OK' | 'WARN' | 'INFO';
 
@@ -18,6 +19,7 @@ type Cat3 = 'OK' | 'WARN' | 'INFO';
 export interface RoutineBeat {
   cmd: string;
   resp: ReadonlyArray<string | { cat: Cat3; text: string }>;
+  tags?: string[];   // Slice 2 — arc beat-tag filter (optional; untagged = universal)
 }
 export const ROUTINE_BEATS = story.beats.routine as readonly RoutineBeat[];
 export const HQ_INBOUND_ROUTINE = story.beats.hqInboundRoutine as readonly string[];
@@ -27,6 +29,7 @@ export const HQ_REPLY_ROUTINE = story.beats.hqReplyRoutine as readonly string[];
 export interface IntrusionEvent {
   text: string;
   followup?: string;
+  tags?: string[];   // Slice 2 — arc beat-tag filter (optional; untagged = universal)
 }
 export const INTRUSIONS_QUOTES = story.beats.intrusionsQuotes as readonly IntrusionEvent[];
 export const INTRUSIONS_FRAGMENTS = story.beats.intrusionsFragments as readonly IntrusionEvent[];
@@ -55,9 +58,18 @@ export const SYSTEM_FINAL =
   story.beats.systemFinal as readonly { cat: 'DENY' | 'WARN' | 'AUTO'; text: string }[];
 
 // ── PHASE 5: SILENCE ──────────────────────────────────────────────────────────
-export const FAREWELLS = story.beats.farewells as readonly string[];
+// SILENCE content moved under `endings` (keyed by EndingId) in Slice 2. FAREWELLS /
+// LAST_WORDS alias the `normal` set so their values are unchanged (parity guard stays
+// green); the arc-aware narrative picks ENDINGS[endingId] instead.
+export const FAREWELLS = story.endings.farewells.normal as readonly string[];
 export const LAST_WORDS =
-  story.beats.lastWords as readonly { typed: string; abandonAt: number }[];
+  story.endings.lastWords.normal as readonly { typed: string; abandonAt: number }[];
+
+export const ENDINGS = story.endings as {
+  farewells: Record<EndingId, readonly string[]>;
+  lastWords: Record<EndingId, readonly { typed: string; abandonAt: number }[]>;
+};
+export const ARCS = story.arcs as readonly ArcTemplate[];
 
 // ── MENTOR (ghostlink) ────────────────────────────────────────────────────────
 export const MENTOR_NAME = story.mentor.name;
