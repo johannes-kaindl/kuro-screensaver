@@ -1538,6 +1538,10 @@
         "INTRUSION": [{ "scene": "city", "weight": 2 }, { "scene": "rift", "weight": 1 }],
         "SILENCE": [{ "scene": "void", "weight": 3 }, { "scene": "wreckage", "weight": 1 }]
       },
+      "threatCurve": {
+        "ALARM": [0.30, 0.55],
+        "PANIC": [0.55, 0.62]
+      },
       "ending": {
         "default": "harmonized",
         "divertOnThreat": [
@@ -1579,6 +1583,10 @@
         "ROUTINE": [{ "scene": "city", "weight": 2 }, { "scene": "terrain", "weight": 1 }],
         "PANIC": [{ "scene": "tunnel", "weight": 3 }, { "scene": "void", "weight": 1 }, { "scene": "wreckage", "weight": 1 }]
       },
+      "threatCurve": {
+        "INTRUSION": [0.12, 0.55],
+        "PANIC": [0.80, 1.00]
+      },
       "ending": {
         "default": "cold-path",
         "divertOnThreat": [
@@ -1619,6 +1627,10 @@
         "ALARM": [{ "scene": "rift", "weight": 1 }, { "scene": "tunnel", "weight": 3 }],
         "PANIC": [{ "scene": "tunnel", "weight": 2 }, { "scene": "void", "weight": 2 }, { "scene": "wreckage", "weight": 1 }]
       },
+      "threatCurve": {
+        "ALARM": [0.45, 0.72],
+        "PANIC": [0.85, 1.00]
+      },
       "ending": {
         "default": "karsen",
         "divertOnThreat": [
@@ -1657,6 +1669,10 @@
         "ROUTINE": [{ "scene": "city", "weight": 2 }, { "scene": "terrain", "weight": 1 }],
         "PANIC": [{ "scene": "wreckage", "weight": 3 }, { "scene": "void", "weight": 2 }, { "scene": "tunnel", "weight": 1 }],
         "SILENCE": [{ "scene": "wreckage", "weight": 3 }, { "scene": "void", "weight": 1 }]
+      },
+      "threatCurve": {
+        "ROUTINE": [0.00, 0.05],
+        "PANIC": [0.90, 1.00]
       },
       "ending": {
         "default": "wraith"
