@@ -31,7 +31,7 @@ import { NarrativeRunner, type Phase } from './terminal/narrative';
 import { ReactiveWorld } from './fx/reactive-world';
 import { profileFor } from './modes/transition-profiles';
 import { FilmDirector } from './modes/film-director';
-import { foreshadowLine, arrivalLine } from './terminal/script-bank';
+import { foreshadowLine, arrivalLine, ARCS } from './terminal/script-bank';
 import { ChatterDirector } from './modes/chatter-director';
 import { mkRng, freshSeed } from './engine/rng';
 import { CrtSim } from './fx/crt-sim';
@@ -293,7 +293,7 @@ export class ScreensaverController {
         // Brick E: each phase change can also trigger multi-speaker radio chatter.
         onPhaseEnter: (phase) => { this.chatter?.fire(`phase:${phase}`); this.onFilmPhase(phase); },
         sceneForeshadow: (nextPhase) => this.foreshadowFor(nextPhase),
-      }, mkRng(freshSeed()), opts.storyScale);
+      }, mkRng(freshSeed()), opts.storyScale, ARCS);
       this.narrative.start();
     }
 
