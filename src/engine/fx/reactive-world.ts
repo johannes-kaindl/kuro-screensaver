@@ -92,7 +92,8 @@ export class ReactiveWorld {
       if (phase === 'ROUTINE' && this.lastPhase !== 'ROUTINE') this.relaxing = true;
       if (phase !== 'ROUTINE') this.relaxing = false;
       this.lastPhase = phase;
-      const [lo, hi] = BAND[phase];
+      // Slice 8: an arc may override the per-phase band; absent/partial → BAND (additive).
+      const [lo, hi] = this.d.narrative.currentArc?.arc.threatCurve?.[phase] ?? BAND[phase];
       target = lo + (hi - lo) * smoothstep(0, 1, this.d.narrative.phaseProgress);
     } else {
       target = 0;
