@@ -3,8 +3,11 @@
 // Used by the native OS-screensaver wrappers (macOS .saver / Windows .scr),
 // which load this page in an embedded WebView and inject options as URL
 // query params:
-//   ?scene=random|terrain|city|rift|tunnel|void   (default: random)
-//   ?audio=on|off                                  (default: off)
+//   ?scene=random|terrain|city|rift|tunnel|void|wreckage|matrix  (default: random)
+//   ?preset=<colour-preset-key>                                  (default: toxic-haze)
+//   ?audio=on|off                                                (default: off)
+//   plus the persistent FX/HUD/speed toggles handled in params.ts
+//   (?speed, ?bloom, ?trails, ?scan, ?crt, ?matrix, ?terminal, ?radar, ?crosshair)
 //
 // Unlike the demo landing page (src/main.ts), there is no Start button —
 // the controller opens immediately. In a real screensaver the OS exits on
@@ -17,6 +20,7 @@ import { WebHost } from '../host-web/persistence';
 import { makePluginShim } from '../host-web/plugin-shim';
 import { SCENES, type SceneId } from '../engine/data/defaults';
 import { PRESETS } from '../engine/data/presets';
+import { applyParamOverrides } from './params';
 
 const params = new URLSearchParams(location.search);
 
@@ -42,10 +46,6 @@ const storyScale = Number.isFinite(scaleParam)
   : 1;
 
 const audioOn = params.get('audio') === 'on';
-
-// Cinematic matrix rain — ?matrix=1|on enables the in-monitor rain fx (bloomed +
-// CRT-curved). Off by default; also reachable via the Matrix Look / FX toggle.
-const matrixOn = params.get('matrix') === '1' || params.get('matrix') === 'on';
 
 // Reactive-world tuning — ?threat=<0..1> pins the narrative threat level so each
 // escalation state (fog/CRT/storm) is screenshot-able without the 6-9 min cycle.
@@ -76,7 +76,9 @@ const host = new WebHost({
 // partially through it without a type error, so toggle audio directly on the
 // merged settings (deepMerge has already run in the WebHost constructor).
 host.getSettings().sound.master = audioOn;
-if (matrixOn) host.getSettings().fx.matrix.on = true;
+// Persistent user toggles bridged from the native config dialog (speed, FX, HUD,
+// matrix-rain). See src/screensaver/params.ts — pinned by screensaver-params.test.ts.
+applyParamOverrides(host.getSettings(), params);
 // The screensaver IS the procedural film: run the phase-driven scene itinerary by
 // default (Brick C film mode). prefers-reduced-motion turns it back off in open().
 host.getSettings().autoCycle.on = true;

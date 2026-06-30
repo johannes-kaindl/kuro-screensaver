@@ -73,25 +73,52 @@ internal static class Program
     }
 }
 
-/// <summary>Persisted options (HKCU) + the query string handed to the web page.</summary>
+/// <summary>Persisted options (HKCU) + the query string handed to the web page.
+///
+/// A screensaver exits on any input, so the web build's live control bar / hotkeys
+/// are unreachable. Instead the user's persistent choices live here and are passed
+/// to screensaver.html as query params; the web side maps them in src/screensaver/
+/// params.ts (applyParamOverrides). Boolean defaults mirror the engine defaults in
+/// src/engine/data/defaults.ts so an unset registry reproduces the web defaults.</summary>
 internal static class Options
 {
     private const string RegPath = @"Software\KuroScreensaver";
 
-    public static string Scene
-    {
-        get => Read("Scene", "random");
-        set => Write("Scene", value);
-    }
+    // Opening scene + colour preset + flight speed.
+    public static string Scene  { get => Read("Scene", "random");      set => Write("Scene", value); }
+    public static string Preset { get => Read("Preset", "toxic-haze"); set => Write("Preset", value); }
+    public static string Speed  { get => Read("Speed", "norm");        set => Write("Speed", value); }
 
-    public static bool Audio
-    {
-        get => Read("Audio", "off") == "on";
-        set => Write("Audio", value ? "on" : "off");
-    }
+    // Audio + FX/HUD toggles (defaults = engine defaults in defaults.ts).
+    public static bool Audio     { get => Flag("Audio", false);    set => SetFlag("Audio", value); }
+    public static bool Bloom     { get => Flag("Bloom", true);     set => SetFlag("Bloom", value); }
+    public static bool Trails    { get => Flag("Trails", false);   set => SetFlag("Trails", value); }
+    public static bool Scan      { get => Flag("Scan", true);      set => SetFlag("Scan", value); }
+    public static bool Crt       { get => Flag("Crt", true);       set => SetFlag("Crt", value); }
+    public static bool Matrix    { get => Flag("Matrix", false);   set => SetFlag("Matrix", value); }
+    public static bool Terminal  { get => Flag("Terminal", true);  set => SetFlag("Terminal", value); }
+    public static bool Radar     { get => Flag("Radar", true);     set => SetFlag("Radar", value); }
+    public static bool Crosshair { get => Flag("Crosshair", true); set => SetFlag("Crosshair", value); }
 
     public static string QueryString()
-        => $"?scene={Uri.EscapeDataString(Scene)}&audio={(Audio ? "on" : "off")}";
+    {
+        static string On(bool b) => b ? "on" : "off";
+        return $"?scene={Uri.EscapeDataString(Scene)}" +
+               $"&preset={Uri.EscapeDataString(Preset)}" +
+               $"&speed={Uri.EscapeDataString(Speed)}" +
+               $"&audio={On(Audio)}" +
+               $"&bloom={On(Bloom)}" +
+               $"&trails={On(Trails)}" +
+               $"&scan={On(Scan)}" +
+               $"&crt={On(Crt)}" +
+               $"&matrix={On(Matrix)}" +
+               $"&terminal={On(Terminal)}" +
+               $"&radar={On(Radar)}" +
+               $"&crosshair={On(Crosshair)}";
+    }
+
+    private static bool Flag(string name, bool def) => Read(name, def ? "on" : "off") == "on";
+    private static void SetFlag(string name, bool value) => Write(name, value ? "on" : "off");
 
     private static string Read(string name, string def)
     {
@@ -257,10 +284,15 @@ internal sealed class PreviewForm : Form
     }
 }
 
-/// <summary>Configuration dialog: scene + audio, persisted to the registry.</summary>
+/// <summary>Configuration dialog: scene / colour preset / speed plus audio and the
+/// FX & HUD toggles, persisted to the registry and bridged to the web build via the
+/// query string. Mirrors the persistent (non-live) settings of the web control bar —
+/// the live bar/hotkeys themselves can't exist in a screensaver (any input exits).</summary>
 internal sealed class ConfigForm : Form
 {
-    private static readonly string[] Scenes = { "random", "terrain", "city", "rift", "tunnel", "void" };
+    private static readonly string[] Scenes  = { "random", "terrain", "city", "rift", "tunnel", "void", "wreckage", "matrix" };
+    private static readonly string[] Presets = { "kuro", "neural-bleed", "rust-signal", "toxic-haze", "biolink", "ghost-protocol", "voidwitch", "circuit", "crimson", "phosphor", "ember", "spectre", "pearl" };
+    private static readonly string[] Speeds  = { "slow", "norm", "fast" };
 
     public ConfigForm()
     {
@@ -268,39 +300,72 @@ internal sealed class ConfigForm : Form
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
-        ClientSize = new Size(300, 160);
+        ClientSize = new Size(340, 320);
         StartPosition = FormStartPosition.CenterScreen;
 
-        var sceneLabel = new Label { Text = "Scene:", Left = 16, Top = 22, Width = 70 };
-        var sceneCombo = new ComboBox
-        {
-            Left = 96, Top = 18, Width = 180,
-            DropDownStyle = ComboBoxStyle.DropDownList,
-        };
-        sceneCombo.Items.AddRange(Scenes);
-        sceneCombo.SelectedItem = Options.Scene;
-        if (sceneCombo.SelectedIndex < 0) sceneCombo.SelectedIndex = 0;
+        ComboBox sceneCombo  = MakeCombo(Scenes,  Options.Scene,  96, 16);
+        ComboBox presetCombo = MakeCombo(Presets, Options.Preset, 96, 48);
+        ComboBox speedCombo  = MakeCombo(Speeds,  Options.Speed,  96, 80);
 
-        var audioCheck = new CheckBox
-        {
-            Text = "Enable audio",
-            Left = 96, Top = 58, Width = 180,
-            Checked = Options.Audio,
-        };
+        Label sceneLabel  = MakeLabel("Scene:", 16, 20);
+        Label presetLabel = MakeLabel("Color:", 16, 52);
+        Label speedLabel  = MakeLabel("Speed:", 16, 84);
 
-        var ok = new Button { Text = "OK", Left = 96, Top = 110, Width = 84, DialogResult = DialogResult.OK };
-        var cancel = new Button { Text = "Cancel", Left = 192, Top = 110, Width = 84, DialogResult = DialogResult.Cancel };
+        // FX / HUD toggles, two columns. Defaults follow the engine (defaults.ts).
+        CheckBox audio     = MakeCheck("Audio",          Options.Audio,     20, 124);
+        CheckBox bloom     = MakeCheck("Bloom",          Options.Bloom,     20, 150);
+        CheckBox scan      = MakeCheck("Scanlines",      Options.Scan,      20, 176);
+        CheckBox crt       = MakeCheck("CRT simulation", Options.Crt,       20, 202);
+        CheckBox crosshair = MakeCheck("Crosshair",      Options.Crosshair, 20, 228);
+
+        CheckBox matrix   = MakeCheck("Matrix rain",    Options.Matrix,   180, 124);
+        CheckBox trails   = MakeCheck("Afterburn",      Options.Trails,   180, 150);
+        CheckBox terminal = MakeCheck("Story terminal", Options.Terminal, 180, 176);
+        CheckBox radar    = MakeCheck("Radar",          Options.Radar,    180, 202);
+
+        var ok     = new Button { Text = "OK",     Left = 110, Top = 272, Width = 100, DialogResult = DialogResult.OK };
+        var cancel = new Button { Text = "Cancel", Left = 220, Top = 272, Width = 100, DialogResult = DialogResult.Cancel };
 
         ok.Click += (_, _) =>
         {
-            Options.Scene = (string)sceneCombo.SelectedItem!;
-            Options.Audio = audioCheck.Checked;
+            Options.Scene     = (string)sceneCombo.SelectedItem!;
+            Options.Preset    = (string)presetCombo.SelectedItem!;
+            Options.Speed     = (string)speedCombo.SelectedItem!;
+            Options.Audio     = audio.Checked;
+            Options.Bloom     = bloom.Checked;
+            Options.Scan      = scan.Checked;
+            Options.Crt       = crt.Checked;
+            Options.Crosshair = crosshair.Checked;
+            Options.Matrix    = matrix.Checked;
+            Options.Trails    = trails.Checked;
+            Options.Terminal  = terminal.Checked;
+            Options.Radar     = radar.Checked;
             Close();
         };
         cancel.Click += (_, _) => Close();
 
-        Controls.AddRange(new Control[] { sceneLabel, sceneCombo, audioCheck, ok, cancel });
+        Controls.AddRange(new Control[]
+        {
+            sceneLabel, sceneCombo, presetLabel, presetCombo, speedLabel, speedCombo,
+            audio, bloom, scan, crt, crosshair, matrix, trails, terminal, radar,
+            ok, cancel,
+        });
         AcceptButton = ok;
         CancelButton = cancel;
     }
+
+    private static Label MakeLabel(string text, int left, int top)
+        => new() { Text = text, Left = left, Top = top, Width = 72 };
+
+    private static ComboBox MakeCombo(string[] items, string current, int left, int top)
+    {
+        var combo = new ComboBox { Left = left, Top = top, Width = 220, DropDownStyle = ComboBoxStyle.DropDownList };
+        combo.Items.AddRange(items);
+        combo.SelectedItem = current;
+        if (combo.SelectedIndex < 0) combo.SelectedIndex = 0;
+        return combo;
+    }
+
+    private static CheckBox MakeCheck(string text, bool isChecked, int left, int top)
+        => new() { Text = text, Left = left, Top = top, Width = 150, Checked = isChecked };
 }
