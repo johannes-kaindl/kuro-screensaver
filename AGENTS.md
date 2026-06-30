@@ -113,7 +113,14 @@ instance — no shim needed there.
   locally via `scripts/package-native-app.sh`. Dev tools live alongside Core:
   `harness/` (headless PNG renders), `tests/`, `tools/`.
 - **Windows** — a real `.scr` (`native/windows/`, .NET WinForms + WebView2 hosting
-  `screensaver.html`). Cross-builds on macOS/Linux via `dotnet publish -r win-x64`.
+  `screensaver.html`). Cross-builds on macOS/Linux via `dotnet publish -r win-x64`
+  (`scripts/package-windows.sh` → `dist-native/KuroScreensaver-windows.zip`). An
+  optional one-click installer (`native/windows/installer/KuroScreensaver.iss`,
+  built by `scripts/package-windows-installer.sh`) needs the Inno Setup compiler
+  (ISCC), so it only compiles on Windows / wine / CI — not in the plain macOS build.
+  Persistent settings (scene/colour/speed/FX/HUD) are bridged web↔.scr via query
+  params (`src/screensaver/params.ts` ⇄ `Program.cs` config dialog). Install steps:
+  `docs/WINDOWS-INSTALL.md`.
 
 **Deprecated 2026-06-03 (v0.5.0):** all macOS `.saver` paths were removed — the
 WebGL `.saver`/`.app` scaffold (`KuroScreensaverApp`/`KuroScreensaver`), the live

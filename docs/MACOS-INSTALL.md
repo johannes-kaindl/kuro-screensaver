@@ -30,9 +30,10 @@ a fresh Mac — no internet round-trip to Apple on first launch.
 
 ## Windows (`.scr`)
 
-The Windows `.scr` is unsigned — SmartScreen may show a blue warning. Click
-**"More info" → "Run anyway"**, then right-click `KuroScreensaver.scr` →
-**Install**. (Needs the WebView2 runtime, preinstalled on current Win10/11.)
+On Windows, unzip into a folder you keep, then right-click `KuroScreensaver.scr`
+→ **Install**. The `.scr` is unsigned, so SmartScreen may warn on first run —
+click **"More info" → "Run anyway"**. (Needs the WebView2 runtime, present on
+almost all current Win10/11 machines.) Full steps + troubleshooting: **[WINDOWS-INSTALL.md](WINDOWS-INSTALL.md)**.
 
 ---
 

@@ -114,14 +114,14 @@ every CRT effect, the whole narrative.
 
 | Platform | Download | Run |
 |---|---|---|
-| **Windows** (`.scr`) | [↓ windows.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest) | Unzip, right-click `KuroScreensaver.scr` → **Install**. Needs the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/). |
+| **Windows** (`.scr`) | [↓ windows.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest) | Unzip into a folder you keep, right-click `KuroScreensaver.scr` → **Install**. Needs the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/). Full steps: **[docs/WINDOWS-INSTALL.md](docs/WINDOWS-INSTALL.md)**. |
 
 Or just play it in a browser: **[jkaindl.codeberg.page/kuro-screensaver](https://jkaindl.codeberg.page/kuro-screensaver/)**.
 
 All versions: **[releases page](https://codeberg.org/jkaindl/kuro-screensaver/releases)**.
 
 > The Windows `.scr` is unsigned, so SmartScreen warns on first run — click
-> **"More info" → "Run anyway"** (once). Full notes: [docs/MACOS-INSTALL.md](docs/MACOS-INSTALL.md).
+> **"More info" → "Run anyway"** (once). Full notes: [docs/WINDOWS-INSTALL.md](docs/WINDOWS-INSTALL.md).
 >
 > The old macOS `.saver` builds (pre-rendered video `.saver`s + the legacy WebGL
 > `.app`/`.saver`) were **retired in v0.5.0** — the notarized native app above
