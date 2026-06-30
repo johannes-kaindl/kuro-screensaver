@@ -6,8 +6,10 @@
 # macOS deliverable = the standalone native Metal app (KuroMetalApp). It is notarized
 # + uploaded to the release LOCALLY (CI has no Developer ID cert) via
 # scripts/package-native-app.sh. CI therefore only *compile-checks* the macOS app and
-# ships the Windows .scr. The legacy .saver paths (WebView .saver, native live .saver,
-# pre-rendered video .savers) were deprecated 2026-06-03 — the native app replaces them.
+# ships the Windows .scr + a one-click Inno Setup installer (built on a Windows runner;
+# ISCC is Windows-only — the .scr itself still cross-builds on Linux). The legacy .saver
+# paths (WebView .saver, native live .saver, pre-rendered video .savers) were deprecated
+# 2026-06-03 — the native app replaces them.
 #
 # SETUP (one-time, user side):
 #   1. Codeberg → Settings → Push Mirror to the GitHub repo (incl. tags).
@@ -77,8 +79,50 @@ jobs:
           name: dist-windows
           path: dist-native/KuroScreensaver-windows.zip
 
+  windows-installer:
+    runs-on: windows-latest
+    # Optional convenience deliverable: the one-click Inno Setup installer. ISCC is
+    # Windows-only, so this job needs a Windows runner (the .scr itself still
+    # cross-builds on Linux in the `windows` job). continue-on-error keeps a flaky
+    # Inno step from blocking the release — the .scr is the required artifact.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build web bundle + publish the .scr folder
+        shell: bash
+        run: |
+          npm ci
+          bash scripts/bundle-web.sh
+          dotnet publish native/windows/KuroScreensaver.csproj -c Release -r win-x64 --self-contained false -p:DebugType=none
+          OUT="native/windows/bin/Release/net8.0-windows/win-x64/publish"
+          rm -rf "$OUT/web"
+          cp -R native/windows/web "$OUT/web"
+      - name: Compile installer (Inno Setup / ISCC)
+        shell: pwsh
+        run: |
+          $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup*\ISCC.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $iscc) {
+            choco install innosetup -y --no-progress
+            $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup*\ISCC.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+          if (-not $iscc) { throw "ISCC (Inno Setup) not found on the runner" }
+          $ver = (node -p "require('./package.json').version")
+          New-Item -ItemType Directory -Force -Path dist-native | Out-Null
+          & $iscc.FullName "/DMyAppVersion=$ver" "/Odist-native" "native\windows\installer\KuroScreensaver.iss"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows-installer
+          if-no-files-found: ignore
+          path: dist-native/KuroScreensaver-Setup-*.exe
+
   publish:
-    needs: [macos, windows]
+    needs: [macos, windows, windows-installer]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -104,20 +148,34 @@ jobs:
             | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
           test -n "$rel_id"
 
-          f=artifacts/dist-windows/KuroScreensaver-windows.zip
-          [ -f "$f" ] || { echo "::error::missing $f"; exit 1; }
-          name=$(basename "$f")
+          # Upload a file with retry (transient Codeberg 5xx). Delete any same-name
+          # asset first so re-runs are idempotent. $2=1 → required (fail if missing),
+          # $2=0 → optional (warn + skip if missing).
+          attach() {
+            local f="$1" required="$2" name
+            if [ ! -f "$f" ]; then
+              if [ "$required" = 1 ]; then echo "::error::missing required asset $f"; exit 1; fi
+              echo "::warning::optional asset not found, skipping: $f"; return 0
+            fi
+            name=$(basename "$f")
+            for attempt in 1 2 3 4; do
+              existing=$(curl -sS "$API/releases/$rel_id/assets" -H "Authorization: token $TOKEN" \
+                | python3 -c "import sys,json; print(next((a['id'] for a in json.load(sys.stdin) if a['name']=='$name'), ''))")
+              [ -n "$existing" ] && curl -sS -X DELETE "$API/releases/$rel_id/assets/$existing" -H "Authorization: token $TOKEN" -o /dev/null
+              code=$(curl -sS -X POST "$API/releases/$rel_id/assets?name=$name" \
+                -H "Authorization: token $TOKEN" -F "attachment=@$f" -o /dev/null -w "%{http_code}")
+              echo "upload $name HTTP $code (attempt $attempt)"
+              case "$code" in 2*) return 0;; esac
+              [ "$attempt" = 4 ] && { echo "::error::upload $name failed after 4 attempts (last HTTP $code)"; exit 1; }
+              sleep $((attempt * 10))
+            done
+          }
 
-          # Upload with retry (transient Codeberg 5xx). Delete any same-name asset
-          # first so re-runs are idempotent.
-          for attempt in 1 2 3 4; do
-            existing=$(curl -sS "$API/releases/$rel_id/assets" -H "Authorization: token $TOKEN" \
-              | python3 -c "import sys,json; print(next((a['id'] for a in json.load(sys.stdin) if a['name']=='$name'), ''))")
-            [ -n "$existing" ] && curl -sS -X DELETE "$API/releases/$rel_id/assets/$existing" -H "Authorization: token $TOKEN" -o /dev/null
-            code=$(curl -sS -X POST "$API/releases/$rel_id/assets?name=$name" \
-              -H "Authorization: token $TOKEN" -F "attachment=@$f" -o /dev/null -w "%{http_code}")
-            echo "upload $name HTTP $code (attempt $attempt)"
-            case "$code" in 2*) break;; esac
-            [ "$attempt" = 4 ] && { echo "::error::upload $name failed after 4 attempts (last HTTP $code)"; exit 1; }
-            sleep $((attempt * 10))
+          # Required: the .scr ZIP. Optional: the one-click installer (.exe), which
+          # the windows-installer job uploads only when the Inno compile succeeds.
+          attach artifacts/dist-windows/KuroScreensaver-windows.zip 1
+          shopt -s nullglob
+          for inst in artifacts/dist-windows-installer/KuroScreensaver-Setup-*.exe; do
+            attach "$inst" 0
           done
+          shopt -u nullglob
