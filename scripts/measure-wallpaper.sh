@@ -21,7 +21,8 @@ sleep 8   # settle: boot overlay + window setup
 
 echo "sampling ${DUR}s (pid $PID)…"
 samples="$(for _ in $(seq 1 "$DUR"); do ps -o %cpu= -p "$PID" 2>/dev/null || break; sleep 1; done)"
-echo "$samples" | awk '{s+=$1; if ($1>m) m=$1; n++}
+[ -n "$samples" ] || { echo "no samples — app died?" >&2; exit 1; }
+echo "$samples" | awk 'NF>0 {s+=$1; if ($1>m) m=$1; n++}
   END {if (n==0) {print "no samples — app died?"; exit 1}
        printf "CPU avg %.1f%%  max %.1f%%  (n=%d)\n", s/n, m, n}'
 
