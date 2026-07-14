@@ -28,3 +28,4 @@ render-out/
 
 # bump-version.sh staging temp files (trap-cleaned; ignored as defense-in-depth)
 .bump.*
+.superpowers/
