@@ -21,6 +21,7 @@ echo "compiling app…"
 core_src=("$SRC"/Core/*.swift)
 app_src=("$APPSRC"/*.swift)
 swiftc -O \
+  -target arm64-apple-macos14.0 \
   "${core_src[@]}" "${app_src[@]}" \
   -o "$APP/Contents/MacOS/KuroMetalApp" \
   -framework Metal -framework MetalPerformanceShaders -framework AVFoundation -framework QuartzCore \
