@@ -64,6 +64,16 @@ final class Renderer {
     private var gpuMsSmoothed: Double = 0
     private(set) var qualityTier = 0   // 0 full · 1 no matrix · 2 +no trails · 3 +no bloom
 
+    /// Harness/tests set this: draw() then blocks until the GPU finished, so a
+    /// texture readback right after draw() sees the completed frame. The app
+    /// leaves it false (async timing, no per-frame CPU⇄GPU serialisation).
+    var synchronousDraws = false
+    // Cap the CPU's lead over the GPU; signalled by each command buffer's
+    // completed handler. 2 = current frame encoding + one in flight.
+    private let inFlight = DispatchSemaphore(value: 2)
+    private let gpuMsLock = NSLock()
+    private var pendingGpuMs: Double = 0
+
     static let hdrFormat: MTLPixelFormat = .rgba16Float
 
     init(device: MTLDevice, settings: Settings, scene: Scene,
@@ -412,6 +422,12 @@ final class Renderer {
     func draw(into target: MTLTexture) {
         ensureTextures(target.width, target.height)
         guard let sceneHDR, let depthTex else { return }
+        // Quality controller: consume the newest async GPU-time sample (written
+        // by a completed handler; one frame of latency is irrelevant for the
+        // hysteretic controller).
+        gpuMsLock.lock(); let gpuSample = pendingGpuMs; pendingGpuMs = 0; gpuMsLock.unlock()
+        if gpuSample > 0 { updateQuality(gpuMs: gpuSample) }
+        inFlight.wait()
         let cb = queue.makeCommandBuffer()!
 
         // --- scene pass → HDR ---
@@ -570,9 +586,18 @@ final class Renderer {
             benc.endEncoding()
         }
 
+        // Semaphore captured directly (not self): a buffer completing after the
+        // renderer is gone must still signal, and the handler's strong reference
+        // keeps the semaphore alive until then (value back at 2 before dispose).
+        let sem = inFlight
+        cb.addCompletedHandler { [weak self] done in
+            sem.signal()
+            guard let self else { return }
+            let ms = (done.gpuEndTime - done.gpuStartTime) * 1000
+            self.gpuMsLock.lock(); self.pendingGpuMs = ms; self.gpuMsLock.unlock()
+        }
         cb.commit()
-        cb.waitUntilCompleted()
-        updateQuality(gpuMs: (cb.gpuEndTime - cb.gpuStartTime) * 1000)
+        if synchronousDraws { cb.waitUntilCompleted() }
     }
 
     /// Hysteretic quality controller: step down a tier when the GPU sustains
