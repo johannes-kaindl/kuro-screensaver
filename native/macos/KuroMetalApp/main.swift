@@ -93,6 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let view = MetalHostView(frame: NSRect(origin: .zero, size: screen.frame.size),
                                      settings: s, autoCycleSec: cycleSec)
             view.autoresizingMask = [.width, .height]
+            view.setRenderScale(CGFloat(AppSettings.wallpaperRenderScale))
             win.contentView = view
             win.orderFrontRegardless()
             NotificationCenter.default.addObserver(self, selector: #selector(occlusionChanged),
@@ -157,6 +158,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.items.forEach { $0.target = self }
         item.menu = menu
         statusItem = item
+    }
+
+    /// Live-apply a changed wallpaper render scale from the config UI (no rebuild).
+    func refreshWallpaperScale() {
+        wallpaperViews.forEach { $0.setRenderScale(CGFloat(AppSettings.wallpaperRenderScale)) }
     }
 
     /// Remove the wallpaper: disable the KeepAlive LaunchAgent first (else launchd would

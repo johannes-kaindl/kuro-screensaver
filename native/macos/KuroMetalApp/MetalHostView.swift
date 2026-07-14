@@ -23,6 +23,7 @@ final class MetalHostView: NSView {
     private var minFrameInterval: CFTimeInterval = 1.0 / 61.0
     private var frameRange = CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60)
     private var paused = false
+    private var renderScale: CGFloat = 1
 
     private let settings: Settings
     private let autoCycleSec: Double
@@ -37,6 +38,13 @@ final class MetalHostView: NSView {
     /// Power policy: pause the display link entirely (0 wakeups). The last
     /// rendered frame stays on the layer (= the "frozen" still).
     func setPaused(_ p: Bool) { paused = p; link?.isPaused = p }
+    /// Wallpaper: render at a fraction of the backing size; the CAMetalLayer
+    /// upscales to the window. The CRT look hides it, cost drops quadratically.
+    /// Fullscreen/preview never call this (stay at 1).
+    func setRenderScale(_ s: CGFloat) {
+        renderScale = min(1, max(0.25, s))
+        updateDrawableSize()
+    }
     /// Manual scene-switch hotkey (deliberate fullscreen only): +1 next, -1 previous.
     func cycleScene(by delta: Int) { renderer?.cycleScene(by: delta) }
 
@@ -83,8 +91,8 @@ final class MetalHostView: NSView {
         let scale = window?.backingScaleFactor ?? 2.0
         ml.frame = bounds
         ml.contentsScale = scale
-        ml.drawableSize = CGSize(width: max(1, bounds.width * scale),
-                                 height: max(1, bounds.height * scale))
+        ml.drawableSize = CGSize(width: max(1, bounds.width * scale * renderScale),
+                                 height: max(1, bounds.height * scale * renderScale))
     }
 
     override func viewDidMoveToWindow() {
