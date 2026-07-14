@@ -16,6 +16,10 @@ switching, every CRT effect — the same engine the browser runs.
 ## Requirements
 
 - **Windows 10 (x64) or Windows 11.**
+- **No .NET install needed** — the build is *self-contained* and ships its own
+  .NET runtime (that's most of the download size). Versions **before 0.7.1**
+  were framework-dependent by mistake and silently died without the .NET 8
+  Desktop Runtime — if Preview/Settings "do nothing", update.
 - **WebView2 runtime** — Microsoft ships it with Windows 11, so it's present on
   almost every machine (and on Windows 10 with a recent Edge) — but it isn't
   guaranteed on *every* device. If the screen stays black, install the free
@@ -45,8 +49,9 @@ switching, every CRT effect — the same engine the browser runs.
      **Install / Configure / Test**.
 5. **Open Screen Saver Settings** to set the idle time and preview — the Install
    verb registers the saver but doesn't reliably pop the dialog itself. Press the
-   Windows key, type **"screen saver"**, open **"Change screen saver"** (or run
-   `desk.cpl,,@screensaver`). Confirm *Kuro Screensaver* is selected, set the
+   Windows key, type **"screen saver"**, open **"Change screen saver"** (or
+   <kbd>Win</kbd>+<kbd>R</kbd> → `control desk.cpl,screensaver,@screensaver`).
+   Confirm *Kuro Screensaver* is selected, set the
    **Wait** time (idle minutes), optionally tick **On resume, display logon
    screen**, then click **OK**.
 
@@ -109,6 +114,7 @@ screensaver behaviour).
 
 | Symptom | Fix |
 |---|---|
+| **Preview/Settings/Test do nothing — the process dies instantly** | You're on **v0.7.0 or older**: those builds were framework-dependent and need the .NET 8 Desktop Runtime, which Windows doesn't ship. Update to **v0.7.1+** (self-contained), or install the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0). |
 | **Black screen, nothing renders** | The WebView2 runtime is missing, or the folder was moved/incomplete. Install [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/), and make sure the `.scr` still sits next to its DLLs + `web/` folder. |
 | **"Windows protected your PC" (SmartScreen)** | The `.scr` is **unsigned** (the project has no Windows code-signing cert). Click **More info → Run anyway**. To avoid it entirely, **Unblock the ZIP before extracting** (see step 2). |
 | **No "Install" in the right-click menu (Win 11)** | Click **Show more options** (or <kbd>Shift</kbd>+<kbd>F10</kbd>) to get the classic menu. |
@@ -161,4 +167,6 @@ bash scripts/package-windows.sh   # → dist-native/KuroScreensaver-windows.zip
 ```
 
 This bundles a fresh web build (`scripts/bundle-web.sh`) next to the `.scr` and
-zips the distributable folder. Requires the .NET 8 SDK on `PATH`.
+zips the distributable folder. Requires the .NET 8 SDK on `PATH`. The publish is
+**self-contained** (bundled .NET runtime) — don't switch it back to
+framework-dependent; end-user machines don't have the .NET 8 Desktop Runtime.

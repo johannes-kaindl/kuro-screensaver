@@ -1,8 +1,10 @@
 ; Inno Setup script for the Kuro Screensaver Windows .scr.
 ;
 ; Builds a single-file, no-admin installer that copies the multi-file screensaver
-; (KuroScreensaver.scr + WebView2 DLLs + web/ assets) into a stable per-user
-; location and registers it. Solves the manual-install footgun: the .scr loads its
+; (KuroScreensaver.scr + bundled self-contained .NET runtime + WebView2 DLLs +
+; web/ assets) into a stable per-user location and registers it. The publish MUST
+; be self-contained: Windows does not ship the .NET 8 Desktop Runtime, and a
+; framework-dependent .scr dies instantly on machines without it (v0.7.0 bug). Solves the manual-install footgun: the .scr loads its
 ; DLLs and web/ folder from its own directory, so it must live somewhere it won't
 ; be moved — which is exactly what this installer guarantees.
 ;
@@ -71,7 +73,9 @@ Root: HKCU; Subkey: "Control Panel\Desktop"; ValueType: string; ValueName: "SCRN
 
 [Run]
 ; Offer to open the Screen Saver settings so the user can set the idle wait time.
-Filename: "{sys}\rundll32.exe"; Parameters: "desk.cpl,,@screensaver"; Description: "Open Screen Saver settings (set the idle time)"; Flags: postinstall skipifsilent nowait
+; Must go through control.exe — rundll32 treats ",,@screensaver" as a (missing)
+; DLL export and errors with "Fehler in desk.cpl: Eintrag fehlt: @screensaver".
+Filename: "{sys}\control.exe"; Parameters: "desk.cpl,screensaver,@screensaver"; Description: "Open Screen Saver settings (set the idle time)"; Flags: postinstall skipifsilent nowait
 
 [Code]
 function WebView2Installed(): Boolean;

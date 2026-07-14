@@ -96,13 +96,13 @@ jobs:
           dotnet-version: "8.0.x"
       - name: Build web bundle + publish the .scr folder
         shell: bash
+        # Same script as the `windows` job so the publish flags can never diverge
+        # again (v0.7.0 shipped a framework-dependent installer because this step
+        # duplicated the dotnet publish call). Git-Bash on the Windows runner has
+        # no `zip`; the script skips the zip and leaves the publish/ folder.
         run: |
           npm ci
-          bash scripts/bundle-web.sh
-          dotnet publish native/windows/KuroScreensaver.csproj -c Release -r win-x64 --self-contained false -p:DebugType=none
-          OUT="native/windows/bin/Release/net8.0-windows/win-x64/publish"
-          rm -rf "$OUT/web"
-          cp -R native/windows/web "$OUT/web"
+          bash scripts/package-windows.sh
       - name: Compile installer (Inno Setup / ISCC)
         shell: pwsh
         run: |
