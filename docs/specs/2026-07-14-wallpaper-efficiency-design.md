@@ -128,3 +128,17 @@ CAMetalDisplayLink-Experiment, keine Änderung an Web-/Windows-Targets, keine
 1. Baseline-Messung → 2. §1 Frame-Pacing → 3. §2 PowerPolicy → 4. §3
 Render-Scale — jeweils mit Messung + Golden-Check dazwischen, einzeln
 committbar und einzeln rückrollbar.
+
+## Ergebnisse (gemessen 2026-07-15, M5 Pro, AC, terrain/toxic-haze, 60 s)
+
+| Stand | CPU avg | CPU max | Bemerkung |
+|---|---|---|---|
+| Baseline (v0.7.1) | 3.4% | 4.5% | CVDisplayLink 120 Hz, waitUntilCompleted |
+| + async GPU-Timing | 2.0% | 2.7% | Renderer async GPU-Timing, 2-frames-in-flight-Semaphore; Harness synchronousDraws=true |
+| + CADisplayLink | 2.8% | 6.7% | Delta zu vorher = Messrauschen (Review-Einschätzung); Wakeup-Effekt nur via powermetrics messbar |
+| + PowerPolicy | — | — | 0.0% im gesperrten Hintergrundlauf — Policy pausiert korrekt; Normalbetriebs-Wert = Endstand-Zeile |
+| + Render-Scale 0,66 (Endstand) | ausstehend (on-device) | ausstehend (on-device) | frische on-device-Messung erforderlich; Bildschirm bei Background-Lauf gesperrt → Rendering pausiert (Policy funktioniert) |
+
+**GPU-Power/Wakeups (sudo powermetrics):** steht aus — Kommando siehe `scripts/measure-wallpaper.sh`, Ausführung durch Johannes on-device.
+
+**Messung-Caveat:** ps-basiertes CPU-Sampling (top-Tool) unter AC-Power; Wallpaper-Modus mit Preset terrain/toxic-haze über 60 Sekunden (plus 8 s Settle-Zeit).
