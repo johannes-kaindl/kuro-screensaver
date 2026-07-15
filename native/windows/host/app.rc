@@ -1,0 +1,44 @@
+// Win32 resources for the Kuro Screensaver .scr.
+//
+// Two things live here, both previously missing from the C++ micro-host:
+//   1. The static preview bitmap (RCDATA) the `/p` mini-preview paints — the
+//      live WebView2 can't render into the control panel's cross-process
+//      child window, so the preview shows a bundled still frame instead.
+//   2. VERSIONINFO so Windows shows "Kuro Screensaver" as the FileDescription
+//      (the screensaver picker reads it); without it the picker fell back to
+//      an unlabelled entry, which made duplicate installs indistinguishable.
+
+#include <windows.h>
+
+#include "src/resource.h"
+
+IDR_PREVIEW_IMAGE RCDATA "assets/preview.jpg"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 0, 9, 0, 0
+ PRODUCTVERSION 0, 9, 0, 0
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"  // U.S. English, Unicode
+        BEGIN
+            VALUE "CompanyName", "Kuro"
+            VALUE "FileDescription", "Kuro Screensaver"
+            VALUE "FileVersion", "0.9.0.0"
+            VALUE "InternalName", "KuroScreensaver"
+            VALUE "LegalCopyright", "Johannes Kaindl"
+            VALUE "OriginalFilename", "KuroScreensaver.scr"
+            VALUE "ProductName", "Kuro Screensaver"
+            VALUE "ProductVersion", "0.9.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

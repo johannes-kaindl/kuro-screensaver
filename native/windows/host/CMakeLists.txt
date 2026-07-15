@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 project(KuroScreensaverHost CXX)
+enable_language(RC)  # app.rc: preview bitmap + VERSIONINFO
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -31,9 +32,9 @@ add_library(host_lib STATIC
 target_include_directories(host_lib PUBLIC src "${WEBVIEW2_DIR}/build/native/include")
 target_link_libraries(host_lib PUBLIC
   "${WEBVIEW2_DIR}/build/native/x64/WebView2LoaderStatic.lib"
-  user32 gdi32 shell32 shlwapi ole32 oleaut32 advapi32 version)
+  user32 gdi32 gdiplus shell32 shlwapi ole32 oleaut32 advapi32 version)
 
-add_executable(KuroScreensaver WIN32 src/main.cpp)
+add_executable(KuroScreensaver WIN32 src/main.cpp app.rc)
 target_link_libraries(KuroScreensaver PRIVATE host_lib)
 
 add_executable(options_test tests/options_test.cpp)
