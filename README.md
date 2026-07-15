@@ -3,12 +3,13 @@
 > A retro-CRT 3D screensaver: six seeded procedural scenes, a full synthetic
 > CRT signal-degradation pass, a self-typing operator-under-attack terminal, and
 > a procedural audio layer. Runs as a **native macOS screensaver** (live-rendered
-> in Metal) and in **any browser**.
+> in Metal), a **real Windows `.scr`**, and in **any browser**.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-8a4dff?style=flat-square)](LICENSE)
 [![macOS — Metal](https://img.shields.io/badge/macOS-Metal-39ff7a?style=flat-square&logo=apple&logoColor=060709)](native/macos)
 [![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square&logo=swift&logoColor=fff)](native/macos)
 [![Web — three.js](https://img.shields.io/badge/Web-three.js-16e0e0?style=flat-square)](https://threejs.org)
+[![Windows — .scr](https://img.shields.io/badge/Windows-.scr-0078d4?style=flat-square)](native/windows)
 
 <p align="center">
   <a href="https://codeberg.org/jkaindl/kuro-screensaver/releases/latest">
@@ -110,11 +111,19 @@ every CRT effect, the whole narrative.
 > Notarized + stapled with a Developer ID — it opens cleanly, no Gatekeeper
 > warning. Requires macOS 14+ (Apple Silicon).
 
-### Windows (`.scr`)
+### Windows 11 (`.scr`)
 
-| Platform | Download | Run |
-|---|---|---|
-| **Windows** (`.scr`) | [↓ windows.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest) | Unzip into a folder you keep, right-click `KuroScreensaver.scr` → **Install**. Needs the [WebView2 runtime](https://developer.microsoft.com/microsoft-edge/webview2/). Full steps: **[docs/WINDOWS-INSTALL.md](docs/WINDOWS-INSTALL.md)**. |
+A real `.scr` — since **v0.9.0** a tiny native host (~270 KB zip, no bundled
+runtime; the old ~65 MB .NET package is history). WebView2 does the rendering
+and is built into Windows 11 (on Windows 10 the host shows a download link if
+it's missing).
+
+| Download | Run |
+|---|---|
+| [↓ KuroScreensaver-Setup.exe](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest) | Easiest: one-click installer, per-user, no admin rights. |
+| [↓ KuroScreensaver-windows.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest) | Manual: unzip into a folder you keep, right-click `KuroScreensaver.scr` → **Install**. |
+
+Full steps + troubleshooting: **[docs/WINDOWS-INSTALL.md](docs/WINDOWS-INSTALL.md)**.
 
 Or just play it in a browser: **[jkaindl.codeberg.page/kuro-screensaver](https://jkaindl.codeberg.page/kuro-screensaver/)**.
 
