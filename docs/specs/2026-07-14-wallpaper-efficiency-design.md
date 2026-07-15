@@ -45,6 +45,9 @@ GPU-Zeit, 13/7-ms-Band), Textur-Wiederverwendung, keine Per-Frame-Allokationen,
 - fps-Cap deklarativ via `preferredFrameRateRange`
   (Wallpaper: min 10 / preferred = Policy-fps; Vollbild: 60). System bündelt
   Wakeups, ProMotion-Panel kann heruntertakten.
+  (Implementierung: Range-Minimum = fps/3 — bei 30-fps-Cap exakt die
+  spezifizierten min 10; beim 10-fps-Batterie-Cap darf das System bis ~3 fps
+  runter, also nur sparsamer, nie aggressiver.)
 - `setPaused(true)` → `displayLink.isPaused = true` (heute läuft der Link beim
   Freeze weiter und verwirft Frames).
 - Start/Stop/Render auf demselben Thread → Teardown-Barriere entfällt ersatzlos.
@@ -54,8 +57,13 @@ GPU-Zeit, 13/7-ms-Band), Textur-Wiederverwendung, keine Per-Frame-Allokationen,
 - `waitUntilCompleted()` entfernen. GPU-Zeit via `addCompletedHandler` in eine
   atomare Variable; Qualitätsregler konsumiert das Sample beim nächsten Frame
   (ein Frame Latenz ist für den hysteretischen Regler irrelevant).
-- Rückstau-Schutz: `DispatchSemaphore(value: 2)` — max. 2 Frames in flight.
-  Kein Triple-Buffering-Umbau (Uniforms sind `setBytes`-Kopien).
+- Frame-Slot statt Rückstau-Puffer *(korrigiert 2026-07-15 im Final-Review)*:
+  Szenen mutieren `.storageModeShared`-Vertex-Buffer in `advance()` — die
+  ursprüngliche Annahme „keine CPU/GPU-Hazards" galt nur für die
+  `setBytes`-Uniforms. Deshalb `DispatchSemaphore(value: 1)`: der Host
+  akquiriert den Slot VOR `advance()`; im Normalfall (GPU schneller als das
+  fps-Ziel) ist das wartefrei und der CPU-Gewinn bleibt, nur GPU-gebundene
+  Hardware re-serialisiert — genau dort, wo Korrektheit es verlangt.
 
 **Voraussetzung:** `LSMinimumSystemVersion` 11.0 → **14.0** (Info.plist) +
 explizites `-target` im Build-Skript. Kein `#available`-Doppelpfad; alter
@@ -102,6 +110,9 @@ ergänzt, nie aggressiver animiert als heute.
    einzeln im Delta zeigen, sonst fliegt sie raus.
 3. **Golden-PNG-Harness** (`harness/`): §1+§2 müssen pixelidentische Frames
    liefern; §3 wird separat on-device beurteilt.
+   Goldens laufen mit `synchronousDraws = true` — sie beweisen
+   Encoding-Determinismus, nicht das asynchrone In-Flight-Verhalten; letzteres
+   deckt nur der on-device-Test ab.
 4. `bash scripts/run-native-tests.sh` + CI-Compile-Check wie gehabt.
 5. **Manueller Testplan (on-device, Johannes):** Vollbild-App drüber,
    Space-Wechsel, Deckel zu/auf, Sperren/Entsperren, Netzteil ziehen/stecken,

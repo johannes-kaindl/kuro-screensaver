@@ -192,6 +192,8 @@ do {
     check(renderState(i) == .animating(fps: 10), "policy thermal serious → 10fps on AC")
     i.thermalCritical = true
     check(renderState(i) == .frozen, "policy thermal critical → frozen")
+    i = RenderPolicyInputs(); i.onBattery = true; i.animateOnBattery = true; i.thermalCritical = true
+    check(renderState(i) == .frozen, "policy critical beats battery opt-in")
     i = RenderPolicyInputs(); i.occluded = true; i.animateOnBattery = true
     check(renderState(i) == .hidden, "policy occluded beats everything")
     i = RenderPolicyInputs(); i.screenLocked = true

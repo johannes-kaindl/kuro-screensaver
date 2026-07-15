@@ -123,11 +123,17 @@ final class MetalHostView: NSView {
         guard !paused, let ml = metalLayer, let renderer else { return }
         let now = CACurrentMediaTime()
         if lastTime != 0, now - lastTime < minFrameInterval { return }
+        // Acquire the frame slot BEFORE advance(): scenes write shared vertex
+        // buffers there, which must never overlap a frame still on the GPU.
+        renderer.waitFrameSlot()
         if lastTime == 0 { lastTime = now }
         let dt = min(0.05, max(0, now - lastTime))
         lastTime = now
         renderer.advance(dt: dt)
-        guard let drawable = ml.nextDrawable() else { return }
+        guard let drawable = ml.nextDrawable() else {
+            renderer.releaseFrameSlot()   // no draw → release manually
+            return
+        }
         renderer.draw(into: drawable.texture)
         drawable.present()
     }
