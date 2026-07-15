@@ -26,7 +26,8 @@ add_library(host_lib STATIC
   src/options.cpp
   src/webview_host.cpp
   src/saver_window.cpp
-  src/preview_window.cpp)
+  src/preview_window.cpp
+  src/settings_window.cpp)
 target_include_directories(host_lib PUBLIC src "${WEBVIEW2_DIR}/build/native/include")
 target_link_libraries(host_lib PUBLIC
   "${WEBVIEW2_DIR}/build/native/x64/WebView2LoaderStatic.lib"

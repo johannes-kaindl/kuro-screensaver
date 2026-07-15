@@ -24,6 +24,7 @@
 #include "options.h"
 #include "preview_window.h"
 #include "saver_window.h"
+#include "settings_window.h"
 #include "webview_host.h"
 
 namespace {
@@ -55,7 +56,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
 
     int rc = 0;
     if (flag == L"/c") {
-        rc = 0;  // settings dialog lands in the next task
+        rc = RunSettings();
     } else if (flag == L"/p") {
         HWND parent = ParsePreviewHandle(arg, argc, argv);
         rc = parent ? RunPreview(parent) : 0;
