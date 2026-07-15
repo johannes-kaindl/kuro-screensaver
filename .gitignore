@@ -30,3 +30,6 @@ render-out/
 # bump-version.sh staging temp files (trap-cleaned; ignored as defense-in-depth)
 .bump.*
 .superpowers/
+
+# Local, untracked push helper (reads CODEBERG_TOKEN from the environment)
+scripts/push-codeberg.sh
