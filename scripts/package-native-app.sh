@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Package the standalone Metal screensaver app for distribution: build (Developer
-# ID + hardened runtime), notarize, staple, and produce a notarized .zip that
-# opens cleanly on any Mac (no Gatekeeper warning).
+# ID + hardened runtime), notarize, staple, and wrap it in a signed + notarized
+# .dmg (drag-to-Applications) that opens cleanly on any Mac (no Gatekeeper
+# warning). Distribution switched zip → dmg with v0.9.1 (2026-07-15).
 #
 # Unlike a .saver bundle, an .app CAN be stapled — so the notarization ticket
-# travels with the artifact and works offline on the target machine.
+# travels with the artifact and works offline on the target machine. The dmg
+# gets its own notarization + staple on top (Gatekeeper assesses the container
+# too, and a stapled dmg validates offline).
 #
 #   scripts/package-native-app.sh                       # uses profile 'jkaindl'
 #   KURO_NOTARY_PROFILE=other scripts/package-native-app.sh
@@ -18,7 +21,7 @@ BUILD="$ROOT/native/macos/build"
 APP="$BUILD/KuroMetalApp.app"
 DIST="$ROOT/dist-native"
 # Asset name kept stable across releases + matching README/MACOS-INSTALL.md.
-OUT="$DIST/KuroScreensaver-native-app-macos.zip"
+OUT="$DIST/KuroScreensaver-native-app-macos.dmg"
 NOTARY_PROFILE="${KURO_NOTARY_PROFILE:-jkaindl}"
 SIGN_ID="${KURO_SIGN_ID:-Developer ID Application: Johannes Kaindl (U9X7M39R56)}"
 
@@ -71,12 +74,33 @@ xcrun stapler staple "$APP"
 xcrun stapler validate "$APP"
 spctl -a -vvv -t exec "$APP" 2>&1 | head -3 || true   # Gatekeeper assessment (informational)
 
-# 4. Zip the stapled app as the distributable.
-echo "── packaging ──"
+# 4. Wrap the stapled app in a signed + notarized dmg (drag-to-Applications).
+echo "── building dmg ──"
+STAGE="$BUILD/dmg-stage"
+rm -rf "$STAGE"
+mkdir -p "$STAGE"
+ditto "$APP" "$STAGE/KuroMetalApp.app"
+ln -s /Applications "$STAGE/Applications"
 rm -f "$OUT"
-ditto -c -k --keepParent "$APP" "$OUT"
+hdiutil create -volname "Kuro Screensaver" -srcfolder "$STAGE" -ov -format UDZO "$OUT" >/dev/null
+rm -rf "$STAGE"
+codesign --force --sign "$SIGN_ID" "$OUT"
+
+echo "── notarizing dmg (profile $NOTARY_PROFILE) ──"
+dmg_notarized=0
+for attempt in 1 2 3 4; do
+  if xcrun notarytool submit "$OUT" --keychain-profile "$NOTARY_PROFILE" --wait; then
+    dmg_notarized=1; break
+  fi
+  echo "⚠ dmg notarization attempt $attempt failed" >&2
+  if [ "$attempt" = 4 ]; then break; fi
+  sleep $((attempt * 10))
+done
+[ "$dmg_notarized" = 1 ] || { echo "✗ dmg notarization failed after 4 attempts — re-run to resume" >&2; exit 1; }
+xcrun stapler staple "$OUT"
+xcrun stapler validate "$OUT"
 
 echo
 echo "✓ notarized + stapled: $OUT"
-echo "  Distribute this zip; users unzip → drag KuroMetalApp.app to /Applications → open."
+echo "  Distribute this dmg; users open it → drag KuroMetalApp.app to /Applications → open."
 ls -lh "$OUT"

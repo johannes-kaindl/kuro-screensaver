@@ -106,7 +106,7 @@ seamless loop point — the loop is diegetic, not a hidden crossfade.</sub>
 The live Metal screensaver as a standalone app — full procedural variation,
 every CRT effect, the whole narrative.
 
-**[↓ KuroScreensaver-native-app-macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** → unzip, drag **KuroMetalApp.app** to `/Applications`, open. Turn on **auto-start-on-idle** in its settings to use it as a real screensaver.
+**[↓ KuroScreensaver-native-app-macos.dmg](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** → open, drag **KuroMetalApp.app** to `Applications`, launch. Turn on **auto-start-on-idle** in its settings to use it as a real screensaver.
 
 > Notarized + stapled with a Developer ID — it opens cleanly, no Gatekeeper
 > warning. Requires macOS 14+ (Apple Silicon).

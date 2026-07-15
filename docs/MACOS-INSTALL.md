@@ -13,9 +13,10 @@ The macOS build is the **native Metal app** (`KuroMetalApp.app`). It is
 
 ## Native app — `KuroMetalApp.app`
 
-1. Download `KuroScreensaver-native-app-macos.zip` from the
+1. Download `KuroScreensaver-native-app-macos.dmg` from the
    [latest release](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest),
-   unzip → `KuroMetalApp.app`, and drag it into `/Applications`.
+   open it, and drag `KuroMetalApp.app` into the `Applications` shortcut.
+   (Releases up to v0.9.0 shipped a `.zip` instead — unzip, then drag.)
 2. **Double-click to open.** It's notarized, so it launches straight away — no
    "cannot verify" prompt, no quarantine fiddling.
 3. In its window, pick a scene / preset / Look / effects (live preview), and turn
