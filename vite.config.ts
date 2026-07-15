@@ -11,6 +11,7 @@ export default defineConfig({
       input: {
         main: 'index.html',
         screensaver: 'screensaver.html',
+        settings: 'settings.html',
       },
       output: {
         manualChunks: {

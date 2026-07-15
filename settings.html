@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kuro Screensaver — Settings</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0; padding: 20px 24px;
+        background: #050807; color: #9dffb0;
+        font-family: "Cascadia Mono", Consolas, monospace; font-size: 13px;
+        user-select: none;
+      }
+      h1 { font-size: 14px; letter-spacing: 2px; margin: 0 0 16px; color: #d4ffdd; }
+      .row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+      .row label { width: 64px; opacity: 0.8; }
+      select {
+        flex: 1; background: #0a120d; color: #9dffb0;
+        border: 1px solid #1e3a28; padding: 5px 6px; font: inherit;
+      }
+      .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; margin: 16px 0; }
+      .toggles label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+      input[type="checkbox"] { accent-color: #3ddc84; }
+      .buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+      button {
+        background: #0a120d; color: #9dffb0; border: 1px solid #2c5a3c;
+        padding: 6px 22px; font: inherit; letter-spacing: 1px; cursor: pointer;
+      }
+      button:hover { background: #12241a; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/settings/main.ts"></script>
+  </body>
+</html>
