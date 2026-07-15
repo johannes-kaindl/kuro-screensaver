@@ -180,6 +180,7 @@ do {
     renderer = try Renderer(device: device, settings: settings, scene: scene,
                             targetFormat: target.pixelFormat)
 } catch { die("renderer init failed: \(error)") }
+renderer.synchronousDraws = true   // getBytes() reads right after draw()
 if let th = args.threat { renderer.forcedThreat = th }
 if let g = args.forceGlitch { renderer.debugForceGlitch(g) }
 if args.crash >= 0 { renderer.debugForceCrash(args.crash) }

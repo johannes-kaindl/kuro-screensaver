@@ -74,9 +74,15 @@ Expected: eine Zeile wie `CPU avg 12.3%  max 18.0%  (n=60)` — Werte in `.claud
 
 - [ ] **Step 3: Golden-Baseline rendern + Hashes sichern**
 
+> **Determinismus-Pins (Befund 2026-07-15):** Der Harness ist ohne sie NICHT
+> byte-stabil — `Terminal.init()` seedet mit `freshSeed()` (→ `threat`-Jitter in
+> den CRT-Uniforms), die HUD rendert die Wanduhr, die Persona ist zufällig.
+> `--threat 0 --no-hud --noterm` pinnt/versteckt alle drei Quellen (verifiziert:
+> 3× identische Hashes). Alle Golden-Kommandos in diesem Plan tragen diese Flags.
+
 ```bash
-bash scripts/build-native-harness.sh --out /tmp/kuro-golden-base --scene terrain --at 8 --seed 1337
-bash scripts/build-native-harness.sh --out /tmp/kuro-golden-base-city --scene city --at 8 --seed 1337
+bash scripts/build-native-harness.sh --out /tmp/kuro-golden-base --scene terrain --at 8 --seed 1337 --threat 0 --no-hud --noterm
+bash scripts/build-native-harness.sh --out /tmp/kuro-golden-base-city --scene city --at 8 --seed 1337 --threat 0 --no-hud --noterm
 (cd /tmp/kuro-golden-base && shasum -a 256 *.png) > /tmp/kuro-golden-base/hashes.txt
 (cd /tmp/kuro-golden-base-city && shasum -a 256 *.png) >> /tmp/kuro-golden-base/hashes.txt
 cat /tmp/kuro-golden-base/hashes.txt
@@ -190,8 +196,8 @@ Expected: alle `ok - …`-Zeilen, Smoke `rendered … bytes`, Exit 0.
 - [ ] **Step 5: Golden-Vergleich — muss pixelidentisch sein**
 
 ```bash
-bash scripts/build-native-harness.sh --out /tmp/kuro-golden-t2 --scene terrain --at 8 --seed 1337
-bash scripts/build-native-harness.sh --out /tmp/kuro-golden-t2-city --scene city --at 8 --seed 1337
+bash scripts/build-native-harness.sh --out /tmp/kuro-golden-t2 --scene terrain --at 8 --seed 1337 --threat 0 --no-hud --noterm
+bash scripts/build-native-harness.sh --out /tmp/kuro-golden-t2-city --scene city --at 8 --seed 1337 --threat 0 --no-hud --noterm
 { (cd /tmp/kuro-golden-t2 && shasum -a 256 *.png); (cd /tmp/kuro-golden-t2-city && shasum -a 256 *.png); } | diff /tmp/kuro-golden-base/hashes.txt -
 ```
 
@@ -392,8 +398,8 @@ Expected: „codesign verify OK", Tests ok, Smoke ok.
 Golden (Core unverändert — trotzdem prüfen):
 
 ```bash
-bash scripts/build-native-harness.sh --out /tmp/kuro-golden-t3 --scene terrain --at 8 --seed 1337
-bash scripts/build-native-harness.sh --out /tmp/kuro-golden-t3-city --scene city --at 8 --seed 1337
+bash scripts/build-native-harness.sh --out /tmp/kuro-golden-t3 --scene terrain --at 8 --seed 1337 --threat 0 --no-hud --noterm
+bash scripts/build-native-harness.sh --out /tmp/kuro-golden-t3-city --scene city --at 8 --seed 1337 --threat 0 --no-hud --noterm
 { (cd /tmp/kuro-golden-t3 && shasum -a 256 *.png); (cd /tmp/kuro-golden-t3-city && shasum -a 256 *.png); } | diff /tmp/kuro-golden-base/hashes.txt -
 ```
 

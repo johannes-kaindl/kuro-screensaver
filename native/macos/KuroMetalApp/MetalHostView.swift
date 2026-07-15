@@ -1,7 +1,11 @@
-// MetalHostView — an NSView that hosts the shared Core renderer in a CAMetalLayer
-// driven by a CVDisplayLink. Used by the standalone fullscreen app (the robust
-// path on macOS 26, which avoids the buggy legacyScreenSaver host entirely).
-// Same render loop as the .saver view, including the critical autoreleasepool.
+// MetalHostView — an NSView that hosts the shared Core renderer in a CAMetalLayer,
+// driven by a CADisplayLink (NSView.displayLink(target:selector:), macOS 14+).
+// The system paces callbacks to preferredFrameRateRange (no manual vsync skipping,
+// ProMotion can down-clock), and everything — start/stop/render — runs on the main
+// thread, so the old display-thread teardown barrier is gone entirely.
+//
+// Invariant: hosts call stop() before dropping the view (CADisplayLink retains its
+// target); viewDidMoveToWindow(nil) is the safety net.
 
 import AppKit
 import Metal
@@ -11,29 +15,38 @@ final class MetalHostView: NSView {
     private let device = MTLCreateSystemDefaultDevice()
     private var metalLayer: CAMetalLayer?
     private var renderer: Renderer?
-    private var displayLink: CVDisplayLink?
+    private var link: CADisplayLink?
     private var lastTime: CFTimeInterval = 0
-    private var minFrameInterval: CFTimeInterval = 1.0 / 61.0   // ~60fps cap (battery/thermals on 120Hz displays)
-    private var paused = false                                  // wallpaper power policy (battery)
+    // Fallback cap for displays that don't honour the range hint exactly
+    // (fixed-rate external panels): skip callbacks that arrive early. dt stays
+    // correct (measured from the last *rendered* frame).
+    private var minFrameInterval: CFTimeInterval = 1.0 / 61.0
+    private var frameRange = CAFrameRateRange(minimum: 30, maximum: 60, preferred: 60)
+    private var paused = false
+    private var renderScale: CGFloat = 1
 
-    /// Wallpaper power policy: cap the frame rate (e.g. 30 on AC, 10 on battery).
-    func setFrameCap(_ fps: Double) { minFrameInterval = 1.0 / max(1, fps) }
-    /// Wallpaper power policy: freeze rendering (CVDisplayLink keeps running, frames skipped).
-    func setPaused(_ p: Bool) { paused = p }
-    /// Manual scene-switch hotkey (deliberate fullscreen only): +1 next, -1 previous.
-    func cycleScene(by delta: Int) { renderer?.cycleScene(by: delta) }
     private let settings: Settings
     private let autoCycleSec: Double
 
-    private let sizeLock = NSLock()
-    private var pendingDrawableSize: CGSize?
-
-    // Render-lifecycle barrier: the CVDisplayLink callback runs on the display
-    // thread and dereferences `self` via an unretained pointer. runLock + isRunning
-    // let stop() block until an in-flight callback returns, so the renderer/layer
-    // (and self) can be torn down without a use-after-free on the display thread.
-    private let runLock = NSLock()
-    private var isRunning = false
+    /// Wallpaper power policy: target frame rate (e.g. 30 on AC, 10 on battery).
+    func setFrameCap(_ fps: Double) {
+        let f = Float(max(1, fps))
+        frameRange = CAFrameRateRange(minimum: max(1, f / 3), maximum: f, preferred: f)
+        minFrameInterval = 1.0 / (Double(f) + 1)
+        link?.preferredFrameRateRange = frameRange
+    }
+    /// Power policy: pause the display link entirely (0 wakeups). The last
+    /// rendered frame stays on the layer (= the "frozen" still).
+    func setPaused(_ p: Bool) { paused = p; link?.isPaused = p }
+    /// Wallpaper: render at a fraction of the backing size; the CAMetalLayer
+    /// upscales to the window. The CRT look hides it, cost drops quadratically.
+    /// Fullscreen/preview never call this (stay at 1).
+    func setRenderScale(_ s: CGFloat) {
+        renderScale = min(1, max(0.25, s))
+        updateDrawableSize()
+    }
+    /// Manual scene-switch hotkey (deliberate fullscreen only): +1 next, -1 previous.
+    func cycleScene(by delta: Int) { renderer?.cycleScene(by: delta) }
 
     init(frame: NSRect, settings: Settings, autoCycleSec: Double) {
         self.settings = settings
@@ -78,68 +91,50 @@ final class MetalHostView: NSView {
         let scale = window?.backingScaleFactor ?? 2.0
         ml.frame = bounds
         ml.contentsScale = scale
-        let w = max(1, bounds.width * scale), h = max(1, bounds.height * scale)
-        sizeLock.lock(); pendingDrawableSize = CGSize(width: w, height: h); sizeLock.unlock()
+        ml.drawableSize = CGSize(width: max(1, bounds.width * scale * renderScale),
+                                 height: max(1, bounds.height * scale * renderScale))
     }
 
-    override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); updateDrawableSize() }
-    override func setFrameSize(_ newSize: NSSize) { super.setFrameSize(newSize); updateDrawableSize() }
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil { stop() } else { updateDrawableSize() }
+    }
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        updateDrawableSize()
+    }
 
     func start() {
-        guard displayLink == nil, renderer != nil, metalLayer != nil else { return }
+        guard link == nil, renderer != nil, metalLayer != nil else { return }
         lastTime = 0
-        var dl: CVDisplayLink?
-        CVDisplayLinkCreateWithActiveCGDisplays(&dl)
-        guard let dl else { return }
-        let cb: CVDisplayLinkOutputCallback = { (_, _, _, _, _, ctx) -> CVReturn in
-            let view = Unmanaged<MetalHostView>.fromOpaque(ctx!).takeUnretainedValue()
-            // Hold runLock across the whole frame so stop() can wait it out; isRunning
-            // gates a stray callback that fires after CVDisplayLinkStop.
-            view.runLock.lock()
-            if view.isRunning { view.renderFrame() }
-            view.runLock.unlock()
-            return kCVReturnSuccess
-        }
-        CVDisplayLinkSetOutputCallback(dl, cb, Unmanaged.passUnretained(self).toOpaque())
-        runLock.lock(); isRunning = true; runLock.unlock()   // publish before the link can fire
-        CVDisplayLinkStart(dl)
-        displayLink = dl
+        let l = displayLink(target: self, selector: #selector(tick))
+        l.preferredFrameRateRange = frameRange
+        l.isPaused = paused
+        l.add(to: .main, forMode: .common)
+        link = l
     }
 
     func stop() {
-        guard let dl = displayLink else { return }
-        // Order matters: stop the link FIRST, then take runLock — never the reverse.
-        // CVDisplayLinkStop can block until the current callback returns, so locking
-        // before it would deadlock against a callback already waiting on runLock.
-        // Taking the lock here waits out any in-flight frame (which renders harmlessly
-        // against still-live objects); isRunning=false then makes any straggler that
-        // acquires the lock afterwards a no-op. Once stop() returns, no callback runs
-        // again, so the renderer/layer (and self) are safe to free.
-        CVDisplayLinkStop(dl)
-        runLock.lock(); isRunning = false; runLock.unlock()
-        displayLink = nil
+        link?.invalidate()   // removes it from the run loop + drops its target ref
+        link = nil
     }
 
-    private func renderFrame() {
-        autoreleasepool {   // CVDisplayLink thread has no ambient pool — required
-            guard !paused, let ml = metalLayer, let renderer else { return }
-            let now = CACurrentMediaTime()
-            // 60fps cap: on a 120Hz display the link fires twice per target frame;
-            // skip the in-between callbacks. dt stays correct (measured from the
-            // last *rendered* frame, so skipped time accumulates).
-            if lastTime != 0, now - lastTime < minFrameInterval { return }
-            sizeLock.lock()
-            if let ps = pendingDrawableSize { ml.drawableSize = ps; pendingDrawableSize = nil }
-            sizeLock.unlock()
-            if lastTime == 0 { lastTime = now }
-            let dt = min(0.05, max(0, now - lastTime))
-            lastTime = now
-            renderer.advance(dt: dt)
-            guard let drawable = ml.nextDrawable() else { return }
-            renderer.draw(into: drawable.texture)
-            drawable.present()
+    @objc private func tick() {
+        guard !paused, let ml = metalLayer, let renderer else { return }
+        let now = CACurrentMediaTime()
+        if lastTime != 0, now - lastTime < minFrameInterval { return }
+        // Acquire the frame slot BEFORE advance(): scenes write shared vertex
+        // buffers there, which must never overlap a frame still on the GPU.
+        renderer.waitFrameSlot()
+        if lastTime == 0 { lastTime = now }
+        let dt = min(0.05, max(0, now - lastTime))
+        lastTime = now
+        renderer.advance(dt: dt)
+        guard let drawable = ml.nextDrawable() else {
+            renderer.releaseFrameSlot()   // no draw → release manually
+            return
         }
+        renderer.draw(into: drawable.texture)
+        drawable.present()
     }
-
-    deinit { stop() }
 }

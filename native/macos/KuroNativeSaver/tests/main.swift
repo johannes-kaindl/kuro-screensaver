@@ -176,5 +176,31 @@ do {
     check(persona0 == "TEL-4747@SCT-7.4-N11:~ █", "golden persona stable (got \(persona0))")
 }
 
+// --- wallpaper render policy (pure decision table) --------------------------
+do {
+    var i = RenderPolicyInputs()
+    check(renderState(i) == .animating(fps: 30), "policy default AC → 30fps")
+    i.onBattery = true
+    check(renderState(i) == .frozen, "policy battery default → frozen")
+    i.animateOnBattery = true
+    check(renderState(i) == .animating(fps: 10), "policy battery opt-in → 10fps")
+    i = RenderPolicyInputs(); i.lowPowerMode = true
+    check(renderState(i) == .frozen, "policy low-power behaves like battery")
+    i.animateOnBattery = true
+    check(renderState(i) == .animating(fps: 10), "policy low-power opt-in → 10fps")
+    i = RenderPolicyInputs(); i.thermalSerious = true
+    check(renderState(i) == .animating(fps: 10), "policy thermal serious → 10fps on AC")
+    i.thermalCritical = true
+    check(renderState(i) == .frozen, "policy thermal critical → frozen")
+    i = RenderPolicyInputs(); i.onBattery = true; i.animateOnBattery = true; i.thermalCritical = true
+    check(renderState(i) == .frozen, "policy critical beats battery opt-in")
+    i = RenderPolicyInputs(); i.occluded = true; i.animateOnBattery = true
+    check(renderState(i) == .hidden, "policy occluded beats everything")
+    i = RenderPolicyInputs(); i.screenLocked = true
+    check(renderState(i) == .hidden, "policy locked → hidden")
+    i = RenderPolicyInputs(); i.screensAsleep = true
+    check(renderState(i) == .hidden, "policy display sleep → hidden")
+}
+
 if failures > 0 { print("\n\(failures) FAILURE(S)"); exit(1) }
 print("\nALL PASS (\(failures == 0))")

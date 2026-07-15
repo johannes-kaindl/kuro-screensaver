@@ -64,6 +64,30 @@ final class Renderer {
     private var gpuMsSmoothed: Double = 0
     private(set) var qualityTier = 0   // 0 full · 1 no matrix · 2 +no trails · 3 +no bloom
 
+    /// Harness/tests set this: draw() then blocks until the GPU finished, so a
+    /// texture readback right after draw() sees the completed frame. The app
+    /// leaves it false (async timing, no per-frame CPU⇄GPU serialisation).
+    var synchronousDraws = false
+    /// Acquire the frame slot. Call BEFORE advance() when draws are
+    /// asynchronous; every acquisition is released by draw()'s completed
+    /// handler (commit path) or by draw()'s no-op guard.
+    func waitFrameSlot() { inFlight.wait() }
+    /// Counterpart for hosts that acquired the slot but skip the draw
+    /// (e.g. no drawable available this tick).
+    func releaseFrameSlot() { inFlight.signal() }
+    // Single frame slot: scenes mutate .storageModeShared vertex buffers in
+    // advance(), so the CPU must not run advance() while any frame is still
+    // executing on the GPU. Hosts acquire the slot via waitFrameSlot() BEFORE
+    // advance(); the completed handler releases it. In the common
+    // (non-GPU-bound) case the previous frame finished long ago and the wait
+    // returns immediately — the thread never blocks while the GPU works; only
+    // a GPU-bound machine re-serializes, which is exactly where correctness
+    // requires it. (The synchronous harness never acquires the slot; the
+    // counter just grows there, which is harmless.)
+    private let inFlight = DispatchSemaphore(value: 1)
+    private let gpuMsLock = NSLock()
+    private var pendingGpuMs: Double = 0
+
     static let hdrFormat: MTLPixelFormat = .rgba16Float
 
     init(device: MTLDevice, settings: Settings, scene: Scene,
@@ -411,7 +435,15 @@ final class Renderer {
     /// Draw the current state into `target`.
     func draw(into target: MTLTexture) {
         ensureTextures(target.width, target.height)
-        guard let sceneHDR, let depthTex else { return }
+        // Release the host's frame slot on the no-commit path (the completed
+        // handler that would normally release it never runs). The harness
+        // draws without acquiring — an extra signal only grows the counter.
+        guard let sceneHDR, let depthTex else { inFlight.signal(); return }
+        // Quality controller: consume the newest async GPU-time sample (written
+        // by a completed handler; one frame of latency is irrelevant for the
+        // hysteretic controller).
+        gpuMsLock.lock(); let gpuSample = pendingGpuMs; pendingGpuMs = 0; gpuMsLock.unlock()
+        if gpuSample > 0 { updateQuality(gpuMs: gpuSample) }
         let cb = queue.makeCommandBuffer()!
 
         // --- scene pass → HDR ---
@@ -570,9 +602,18 @@ final class Renderer {
             benc.endEncoding()
         }
 
+        // Semaphore captured directly (not self): a buffer completing after the
+        // renderer is gone must still signal, and the handler's strong reference
+        // keeps the semaphore alive until then (value back at 2 before dispose).
+        let sem = inFlight
+        cb.addCompletedHandler { [weak self] done in
+            sem.signal()
+            guard let self else { return }
+            let ms = (done.gpuEndTime - done.gpuStartTime) * 1000
+            self.gpuMsLock.lock(); self.pendingGpuMs = ms; self.gpuMsLock.unlock()
+        }
         cb.commit()
-        cb.waitUntilCompleted()
-        updateQuality(gpuMs: (cb.gpuEndTime - cb.gpuStartTime) * 1000)
+        if synchronousDraws { cb.waitUntilCompleted() }
     }
 
     /// Hysteretic quality controller: step down a tier when the GPU sustains

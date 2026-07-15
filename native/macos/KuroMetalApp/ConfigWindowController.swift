@@ -4,7 +4,7 @@
 import AppKit
 
 final class ConfigWindowController: NSWindowController {
-    private var lookPopup, scenePopup, presetPopup, speedPopup, altPopup, fogPopup, weatherPopup, cyclePopup, idlePopup, terminalPopup: NSPopUpButton!
+    private var lookPopup, scenePopup, presetPopup, speedPopup, altPopup, fogPopup, weatherPopup, cyclePopup, idlePopup, wallScalePopup, terminalPopup: NSPopUpButton!
     private var hudCheck, radarCheck, bootCheck, dayNightCheck, soundCheck, cycleCheck, autostartCheck, flatHudCheck, reactiveWorldCheck: NSButton!
     private var intensitySlider, curvSlider, maskSlider, bloomSlider, trailsSlider, ntscSlider, halSlider, termSlider, bandSlider, bankSlider: NSSlider!
     private var previewContainer: NSView!
@@ -18,6 +18,7 @@ final class ConfigWindowController: NSWindowController {
     private let cycleMins: [Double] = [0.5, 1, 2, 5]
     private let idleMins: [Double] = [1, 2, 5, 10, 15]
     private let termLayouts = [("Aus", "off"), ("Unten", "strip"), ("Leiste (unten)", "stripdark"), ("Fenster (Lisa)", "window")]
+    private let wallScales: [(String, Double)] = [("Voll (100 %)", 1.0), ("75 %", 0.75), ("66 % – Standard", 0.66), ("50 %", 0.5)]
 
     // Aligned label width across all field rows + a consistent control width.
     private let labelW: CGFloat = 118
@@ -122,6 +123,10 @@ final class ConfigWindowController: NSWindowController {
         halSlider = mkSlider(Double(AppSettings.halation), 0.6)
         cyclePopup = mkPopup(); cyclePopup.addItems(withTitles: ["30 Sek", "1 Min", "2 Min", "5 Min"]); cyclePopup.selectItem(at: cycleMins.firstIndex(of: AppSettings.cycleMinutes) ?? 0)
         idlePopup = mkPopup(); idlePopup.addItems(withTitles: idleMins.map { "\(Int($0)) Min" }); idlePopup.selectItem(at: idleMins.firstIndex(of: AppSettings.idleMinutes) ?? 2)
+        wallScalePopup = mkPopup(#selector(wallScaleChanged))
+        wallScalePopup.addItems(withTitles: wallScales.map { $0.0 })
+        wallScalePopup.selectItem(at: wallScales.firstIndex { $0.1 == AppSettings.wallpaperRenderScale } ?? 2)
+        wallScalePopup.toolTip = "Render-Auflösung des animierten Hintergrunds. Niedriger = sparsamer; die CRT-Optik kaschiert die Skalierung. Vollbild-Screensaver rendert immer voll."
         termSlider = mkSlider(Double(AppSettings.terminalScale), 4.8, 0.7)
         bandSlider = mkSlider(Double(AppSettings.terminalBandHeight), 0.5, 0.12)
         bankSlider = mkSlider(Double(AppSettings.bankStrength), 2.0, 0)
@@ -158,7 +163,8 @@ final class ConfigWindowController: NSWindowController {
         let secTerminal = section("Terminal", [termGrid])
         let secBehavior = section("Anzeige & Automatik", [
             hudCheck, radarCheck, bootCheck, dayNightCheck, soundCheck, cycleCheck,
-            grid([[lab("Wechsel:"), cyclePopup], [lab("Auto-Start:"), idlePopup]]), autostartCheck,
+            grid([[lab("Wechsel:"), cyclePopup], [lab("Auto-Start:"), idlePopup],
+                  [lab("Hintergrund:"), wallScalePopup]]), autostartCheck,
         ])
 
         let leftCol = NSStackView(views: [secBild, secCRT]); leftCol.orientation = .vertical; leftCol.spacing = 18; leftCol.alignment = .leading
@@ -204,6 +210,13 @@ final class ConfigWindowController: NSWindowController {
         changed()              // persist + rebuild preview + mark Look "custom"
         updateTerminalRows()
         fitWindow()
+    }
+
+    @objc private func wallScaleChanged() {
+        if wallScalePopup.indexOfSelectedItem >= 0 {
+            AppSettings.wallpaperRenderScale = wallScales[wallScalePopup.indexOfSelectedItem].1
+        }
+        (NSApp.delegate as? AppDelegate)?.refreshWallpaperScale()
     }
 
     /// A manual tweak of any slider/checkbox → the combo no longer matches a

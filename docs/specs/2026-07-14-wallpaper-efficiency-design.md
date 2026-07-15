@@ -45,6 +45,9 @@ GPU-Zeit, 13/7-ms-Band), Textur-Wiederverwendung, keine Per-Frame-Allokationen,
 - fps-Cap deklarativ via `preferredFrameRateRange`
   (Wallpaper: min 10 / preferred = Policy-fps; Vollbild: 60). System bündelt
   Wakeups, ProMotion-Panel kann heruntertakten.
+  (Implementierung: Range-Minimum = fps/3 — bei 30-fps-Cap exakt die
+  spezifizierten min 10; beim 10-fps-Batterie-Cap darf das System bis ~3 fps
+  runter, also nur sparsamer, nie aggressiver.)
 - `setPaused(true)` → `displayLink.isPaused = true` (heute läuft der Link beim
   Freeze weiter und verwirft Frames).
 - Start/Stop/Render auf demselben Thread → Teardown-Barriere entfällt ersatzlos.
@@ -54,8 +57,13 @@ GPU-Zeit, 13/7-ms-Band), Textur-Wiederverwendung, keine Per-Frame-Allokationen,
 - `waitUntilCompleted()` entfernen. GPU-Zeit via `addCompletedHandler` in eine
   atomare Variable; Qualitätsregler konsumiert das Sample beim nächsten Frame
   (ein Frame Latenz ist für den hysteretischen Regler irrelevant).
-- Rückstau-Schutz: `DispatchSemaphore(value: 2)` — max. 2 Frames in flight.
-  Kein Triple-Buffering-Umbau (Uniforms sind `setBytes`-Kopien).
+- Frame-Slot statt Rückstau-Puffer *(korrigiert 2026-07-15 im Final-Review)*:
+  Szenen mutieren `.storageModeShared`-Vertex-Buffer in `advance()` — die
+  ursprüngliche Annahme „keine CPU/GPU-Hazards" galt nur für die
+  `setBytes`-Uniforms. Deshalb `DispatchSemaphore(value: 1)`: der Host
+  akquiriert den Slot VOR `advance()`; im Normalfall (GPU schneller als das
+  fps-Ziel) ist das wartefrei und der CPU-Gewinn bleibt, nur GPU-gebundene
+  Hardware re-serialisiert — genau dort, wo Korrektheit es verlangt.
 
 **Voraussetzung:** `LSMinimumSystemVersion` 11.0 → **14.0** (Info.plist) +
 explizites `-target` im Build-Skript. Kein `#available`-Doppelpfad; alter
@@ -102,6 +110,9 @@ ergänzt, nie aggressiver animiert als heute.
    einzeln im Delta zeigen, sonst fliegt sie raus.
 3. **Golden-PNG-Harness** (`harness/`): §1+§2 müssen pixelidentische Frames
    liefern; §3 wird separat on-device beurteilt.
+   Goldens laufen mit `synchronousDraws = true` — sie beweisen
+   Encoding-Determinismus, nicht das asynchrone In-Flight-Verhalten; letzteres
+   deckt nur der on-device-Test ab.
 4. `bash scripts/run-native-tests.sh` + CI-Compile-Check wie gehabt.
 5. **Manueller Testplan (on-device, Johannes):** Vollbild-App drüber,
    Space-Wechsel, Deckel zu/auf, Sperren/Entsperren, Netzteil ziehen/stecken,
@@ -128,3 +139,17 @@ CAMetalDisplayLink-Experiment, keine Änderung an Web-/Windows-Targets, keine
 1. Baseline-Messung → 2. §1 Frame-Pacing → 3. §2 PowerPolicy → 4. §3
 Render-Scale — jeweils mit Messung + Golden-Check dazwischen, einzeln
 committbar und einzeln rückrollbar.
+
+## Ergebnisse (gemessen 2026-07-15, M5 Pro, AC, terrain/toxic-haze, 60 s)
+
+| Stand | CPU avg | CPU max | Bemerkung |
+|---|---|---|---|
+| Baseline (v0.7.1) | 3.4% | 4.5% | CVDisplayLink 120 Hz, waitUntilCompleted |
+| + async GPU-Timing | 2.0% | 2.7% | Renderer async GPU-Timing, 2-frames-in-flight-Semaphore; Harness synchronousDraws=true |
+| + CADisplayLink | 2.8% | 6.7% | Delta zu vorher = Messrauschen (Review-Einschätzung); Wakeup-Effekt nur via powermetrics messbar |
+| + PowerPolicy | — | — | 0.0% im gesperrten Hintergrundlauf — Policy pausiert korrekt; Normalbetriebs-Wert = Endstand-Zeile |
+| + Render-Scale 0,66 (Endstand) | ausstehend (on-device) | ausstehend (on-device) | frische on-device-Messung erforderlich; Bildschirm bei Background-Lauf gesperrt → Rendering pausiert (Policy funktioniert) |
+
+**GPU-Power/Wakeups (sudo powermetrics):** steht aus — Kommando siehe `scripts/measure-wallpaper.sh`, Ausführung durch Johannes on-device.
+
+**Messung-Caveat:** ps-basiertes CPU-Sampling (top-Tool) unter AC-Power; Wallpaper-Modus mit Preset terrain/toxic-haze über 60 Sekunden (plus 8 s Settle-Zeit).

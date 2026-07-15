@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // Wallpaper mode (desktop background)
     private var wallpaperWindows: [NSWindow] = []
     private var wallpaperViews: [MetalHostView] = []
-    private var power: PowerMonitor?
+    private var power: PowerPolicy?
     private var screenRebuildItem: DispatchWorkItem?
     private var startTime = CACurrentMediaTime()
     private var active = false
@@ -64,8 +64,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// a battery-aware power policy. No input-dismiss — it just lives there.
     private func startWallpaper() {
         buildWallpaperWindows()
-        let pm = PowerMonitor()
-        pm.onChange = { [weak self] _ in self?.applyPowerPolicy() }
+        let pm = PowerPolicy()
+        pm.onChange = { [weak self] in self?.applyPowerPolicy() }
         pm.start(); power = pm
         applyPowerPolicy()
         NotificationCenter.default.addObserver(self, selector: #selector(screensChanged),
@@ -74,6 +74,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func buildWallpaperWindows() {
+        wallpaperWindows.forEach { NotificationCenter.default.removeObserver(self,
+            name: NSWindow.didChangeOcclusionStateNotification, object: $0) }
         wallpaperViews.forEach { $0.stop() }; wallpaperViews.removeAll()
         wallpaperWindows.forEach { $0.orderOut(nil) }; wallpaperWindows.removeAll()
         let (s, cycle) = override ?? AppSettings.make()
@@ -91,8 +93,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let view = MetalHostView(frame: NSRect(origin: .zero, size: screen.frame.size),
                                      settings: s, autoCycleSec: cycleSec)
             view.autoresizingMask = [.width, .height]
+            view.setRenderScale(CGFloat(AppSettings.wallpaperRenderScale))
             win.contentView = view
             win.orderFrontRegardless()
+            NotificationCenter.default.addObserver(self, selector: #selector(occlusionChanged),
+                name: NSWindow.didChangeOcclusionStateNotification, object: win)
             view.start()
             wallpaperWindows.append(win); wallpaperViews.append(view)
         }
@@ -107,16 +112,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func applyPowerPolicy() {
-        let onBattery = power?.onBattery ?? false
-        for v in wallpaperViews {
-            if onBattery && !AppSettings.wallpaperOnBattery {
-                v.setPaused(true)                          // freeze on battery (default)
-            } else {
-                v.setPaused(false)
-                v.setFrameCap(onBattery ? 10 : 30)         // 30fps AC, 10fps battery (if animating)
+        guard let power else { return }
+        for (win, v) in zip(wallpaperWindows, wallpaperViews) {
+            var i = RenderPolicyInputs()
+            i.occluded = !win.occlusionState.contains(.visible)
+            i.screenLocked = power.screenLocked
+            i.screensAsleep = power.screensAsleep
+            i.onBattery = power.onBattery
+            i.lowPowerMode = power.lowPowerMode
+            i.thermalSerious = power.thermal == .serious
+            i.thermalCritical = power.thermal == .critical
+            i.animateOnBattery = AppSettings.wallpaperOnBattery
+            switch renderState(i) {
+            case .hidden, .frozen:      v.setPaused(true)
+            case .animating(let fps):   v.setPaused(false); v.setFrameCap(fps)
             }
         }
     }
+
+    @objc private func occlusionChanged(_ note: Notification) { applyPowerPolicy() }
 
     /// "Als Hintergrund" from the config window: host the wallpaper IN-PROCESS (so there
     /// is no separate-process flash) and persist it for the next login WITHOUT launching
@@ -144,6 +158,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.items.forEach { $0.target = self }
         item.menu = menu
         statusItem = item
+    }
+
+    /// Live-apply a changed wallpaper render scale from the config UI (no rebuild).
+    func refreshWallpaperScale() {
+        wallpaperViews.forEach { $0.setRenderScale(CGFloat(AppSettings.wallpaperRenderScale)) }
     }
 
     /// Remove the wallpaper: disable the KeepAlive LaunchAgent first (else launchd would

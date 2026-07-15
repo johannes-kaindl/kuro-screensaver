@@ -108,7 +108,7 @@ every CRT effect, the whole narrative.
 **[↓ KuroScreensaver-native-app-macos.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** → unzip, drag **KuroMetalApp.app** to `/Applications`, open. Turn on **auto-start-on-idle** in its settings to use it as a real screensaver.
 
 > Notarized + stapled with a Developer ID — it opens cleanly, no Gatekeeper
-> warning. Requires macOS 11+ (Apple Silicon or Intel).
+> warning. Requires macOS 14+ (Apple Silicon).
 
 ### Windows (`.scr`)
 
@@ -221,7 +221,7 @@ design history is under [`docs/specs/`](docs/specs/).
 
 ## Compatibility
 
-- **macOS 11+** — the native app (Apple Silicon + Intel; Metal). The 60 fps cap
+- **macOS 14+** — the native app (Apple Silicon; Metal). The 60 fps cap
   and adaptive quality keep it smooth on weaker GPUs.
 - **Modern browsers** — the web app: Chromium ≥ 90, Firefox ≥ 90, Safari ≥ 14,
   WebGL2 required.

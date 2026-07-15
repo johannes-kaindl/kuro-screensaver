@@ -109,7 +109,7 @@ instance — no shim needed there.
 - **macOS** — a standalone fullscreen **Metal app** (`native/macos/KuroMetalApp/`
   + the shared engine in `native/macos/KuroNativeSaver/Core/`). The whole engine
   runs live on the GPU (no WebView, no pre-rendered video). Built with `swiftc`
-  (no Xcode) via `scripts/build-native-app.sh`; notarized + uploaded to the release
+  (no Xcode) via `scripts/build-native-app.sh` (deployment floor **macOS 14** — the render loop uses `NSView.displayLink`/CADisplayLink); notarized + uploaded to the release
   locally via `scripts/package-native-app.sh`. Dev tools live alongside Core:
   `harness/` (headless PNG renders), `tests/`, `tools/`.
 - **Windows** — a real `.scr` (`native/windows/`, .NET WinForms + WebView2 hosting
