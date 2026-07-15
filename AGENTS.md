@@ -112,15 +112,18 @@ instance — no shim needed there.
   (no Xcode) via `scripts/build-native-app.sh` (deployment floor **macOS 14** — the render loop uses `NSView.displayLink`/CADisplayLink); notarized + uploaded to the release
   locally via `scripts/package-native-app.sh`. Dev tools live alongside Core:
   `harness/` (headless PNG renders), `tests/`, `tools/`.
-- **Windows** — a real `.scr` (`native/windows/`, .NET WinForms + WebView2 hosting
-  `screensaver.html`). Cross-builds on macOS/Linux via `dotnet publish -r win-x64`
-  (`scripts/package-windows.sh` → `dist-native/KuroScreensaver-windows.zip`). An
-  optional one-click installer (`native/windows/installer/KuroScreensaver.iss`,
-  built by `scripts/package-windows-installer.sh`) needs the Inno Setup compiler
-  (ISCC), so it only compiles on Windows / wine / CI — not in the plain macOS build.
-  Persistent settings (scene/colour/speed/FX/HUD) are bridged web↔.scr via query
-  params (`src/screensaver/params.ts` ⇄ `Program.cs` config dialog). Install steps:
-  `docs/WINDOWS-INSTALL.md`.
+- **Windows** — a real `.scr` (`native/windows/host/`, C++/Win32 + WebView2
+  hosting `screensaver.html`; the `/c` dialog hosts `settings.html`). MSVC-only:
+  built via CMake in CI (`windows-host.yml` on push for the dev loop,
+  `release.yml` for releases) — there is no local macOS build. Package is
+  `KuroScreensaver.scr` + `web/` (<5 MB; the .NET WinForms host and its
+  self-contained runtime were removed in v0.9.0). Optional Inno Setup installer
+  (`native/windows/installer/KuroScreensaver.iss`) compiles on the Windows CI
+  runner. Persistent settings (scene/colour/speed/FX/HUD) live in
+  `HKCU\Software\KuroScreensaver` and are bridged web↔.scr via query params
+  (`src/screensaver/params.ts`; dialog: `src/settings/`). Requires the WebView2
+  runtime (inbox on Windows 11; the host shows a download link if missing).
+  Install steps: `docs/WINDOWS-INSTALL.md`.
 
 **Deprecated 2026-06-03 (v0.5.0):** all macOS `.saver` paths were removed — the
 WebGL `.saver`/`.app` scaffold (`KuroScreensaverApp`/`KuroScreensaver`), the live

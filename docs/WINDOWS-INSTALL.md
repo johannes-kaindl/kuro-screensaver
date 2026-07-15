@@ -7,7 +7,7 @@ switching, every CRT effect — the same engine the browser runs.
 
 > **Do I need an installer?** No. Windows 11 installs `.scr` files natively
 > (right-click → **Install**). This build ships as a small **folder** (the `.scr`
-> plus its WebView2 DLLs and a `web/` asset folder), so the only rule is: keep
+> plus a `web/` asset folder), so the only rule is: keep
 > that folder together and install from where it lives. See
 > [Do we need an installer?](#do-we-need-an-installer) for the trade-offs.
 
@@ -16,15 +16,16 @@ switching, every CRT effect — the same engine the browser runs.
 ## Requirements
 
 - **Windows 10 (x64) or Windows 11.**
-- **No .NET install needed** — the build is *self-contained* and ships its own
-  .NET runtime (that's most of the download size). Versions **before 0.7.1**
-  were framework-dependent by mistake and silently died without the .NET 8
-  Desktop Runtime — if Preview/Settings "do nothing", update.
+- **No .NET / no runtime bundle** — since v0.9.0 the host is a tiny native exe;
+  the whole download is <5 MB. (v0.7.1–v0.8.0 bundled a ~65 MB .NET runtime; even
+  older builds needed a manual .NET install.)
 - **WebView2 runtime** — Microsoft ships it with Windows 11, so it's present on
   almost every machine (and on Windows 10 with a recent Edge) — but it isn't
   guaranteed on *every* device. If the screen stays black, install the free
   **Evergreen Bootstrapper** from
-  [Microsoft](https://developer.microsoft.com/microsoft-edge/webview2/).
+  [Microsoft](https://developer.microsoft.com/microsoft-edge/webview2/). Since
+  v0.9.0 the host itself shows a message with a download link on start if
+  WebView2 is missing, instead of just staying black.
 - **No admin rights needed** for the steps below — the screensaver is registered
   per-user (`HKCU`), nothing is written to `System32`.
 
@@ -114,8 +115,8 @@ screensaver behaviour).
 
 | Symptom | Fix |
 |---|---|
-| **Preview/Settings/Test do nothing — the process dies instantly** | You're on **v0.7.0 or older**: those builds were framework-dependent and need the .NET 8 Desktop Runtime, which Windows doesn't ship. Update to **v0.7.1+** (self-contained), or install the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0). |
-| **Black screen, nothing renders** | The WebView2 runtime is missing, or the folder was moved/incomplete. Install [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/), and make sure the `.scr` still sits next to its DLLs + `web/` folder. |
+| **Preview/Settings/Test do nothing — the process dies instantly** | You're on **v0.7.0 or older**: those builds were framework-dependent and need the .NET 8 Desktop Runtime, which Windows doesn't ship. Update to **v0.7.1+** (self-contained), or install the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0). From **v0.9.0** on, the host is a native exe and the .NET dependency is gone entirely. |
+| **Black screen, nothing renders** | The WebView2 runtime is missing, or the folder was moved/incomplete. Install [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/), and make sure the `.scr` still sits next to its `web/` folder. From **v0.9.0** on, the host shows a message box with the WebView2 download link instead of just staying black. |
 | **"Windows protected your PC" (SmartScreen)** | The `.scr` is **unsigned** (the project has no Windows code-signing cert). Click **More info → Run anyway**. To avoid it entirely, **Unblock the ZIP before extracting** (see step 2). |
 | **No "Install" in the right-click menu (Win 11)** | Click **Show more options** (or <kbd>Shift</kbd>+<kbd>F10</kbd>) to get the classic menu. |
 | **Not listed in the Screen Saver dropdown** | Expected — multi-file screensavers aren't enumerated there. Use **right-click → Install** instead (it sets the full path). |
@@ -159,14 +160,22 @@ uninstall is worth it.
 
 ## Building the `.scr` yourself
 
-Cross-builds on macOS/Linux (no Windows needed), see
-[`AGENTS.md`](../AGENTS.md):
+The host is C++/Win32 + WebView2, built via CMake/MSVC — it only builds on
+**Windows** (no macOS/Linux cross-build):
 
 ```bash
 bash scripts/package-windows.sh   # → dist-native/KuroScreensaver-windows.zip
 ```
 
-This bundles a fresh web build (`scripts/bundle-web.sh`) next to the `.scr` and
-zips the distributable folder. Requires the .NET 8 SDK on `PATH`. The publish is
-**self-contained** (bundled .NET runtime) — don't switch it back to
-framework-dependent; end-user machines don't have the .NET 8 Desktop Runtime.
+This bundles a fresh web build (`scripts/bundle-web.sh`), builds the host with
+CMake (Release, x64), and zips the distributable folder (`.scr` + `web/`).
+
+On macOS/Linux, dispatch the CI build instead and pull down the result:
+
+```bash
+gh workflow run windows-host --ref <branch>
+# then, once the run finishes:
+gh run download --workflow windows-host -n windows-scr-dry-run
+```
+
+See [`AGENTS.md`](../AGENTS.md) for the native build layout.

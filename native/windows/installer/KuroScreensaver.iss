@@ -1,18 +1,16 @@
 ; Inno Setup script for the Kuro Screensaver Windows .scr.
 ;
-; Builds a single-file, no-admin installer that copies the multi-file screensaver
-; (KuroScreensaver.scr + bundled self-contained .NET runtime + WebView2 DLLs +
-; web/ assets) into a stable per-user location and registers it. The publish MUST
-; be self-contained: Windows does not ship the .NET 8 Desktop Runtime, and a
-; framework-dependent .scr dies instantly on machines without it (v0.7.0 bug). Solves the manual-install footgun: the .scr loads its
-; DLLs and web/ folder from its own directory, so it must live somewhere it won't
-; be moved — which is exactly what this installer guarantees.
+; Builds a single-file, no-admin installer that copies the packaged screensaver
+; (KuroScreensaver.scr + web/ assets — no bundled .NET, no WebView2 DLLs) into a
+; stable per-user location and registers it. Solves the manual-install footgun:
+; the .scr loads its web/ folder from its own directory, so it must live
+; somewhere it won't be moved — which is exactly what this installer guarantees.
 ;
 ; Compile with Inno Setup 6.3+ (the x64compatible architecture identifier needs
-; 6.3 or newer; Windows, or wine + ISCC). The .scr must be published
-; first — see scripts/package-windows-installer.sh, which runs the dotnet publish
-; and then invokes ISCC. Version + source/output dirs can be overridden on the
-; ISCC command line, e.g.:
+; 6.3 or newer; Windows, or wine + ISCC). The .scr must be packaged
+; first — see scripts/package-windows-installer.sh, which runs
+; scripts/package-windows.sh and then invokes ISCC. Version + source/output dirs
+; can be overridden on the ISCC command line, e.g.:
 ;   ISCC /DMyAppVersion=0.6.0 /O"dist-native" native/windows/installer/KuroScreensaver.iss
 ;
 ; NOTE: this installer is unsigned (the project has no Windows code-signing cert),
@@ -23,9 +21,9 @@
   #define MyAppVersion "0.0.0-dev"
 #endif
 
-; Folder holding the published .scr + DLLs + web/ (the dotnet publish output).
+; Folder holding the packaged .scr + web/ (output of scripts/package-windows.sh).
 #ifndef SourceDir
-  #define SourceDir "..\bin\Release\net8.0-windows\win-x64\publish"
+  #define SourceDir "..\..\..\dist-native\windows-scr"
 #endif
 
 #define MyAppName "Kuro Screensaver"
@@ -62,7 +60,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "setactive"; Description: "Set Kuro as my active screen saver now"; GroupDescription: "Screen saver:"
 
 [Files]
-; The whole published folder (.scr, WebView2 DLLs, runtimes\, web\) — kept together.
+; The whole packaged folder (.scr + web\) — kept together.
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Registry]

@@ -22,3 +22,21 @@ jobs:
         run: cmake --build native/windows/host/build --config Release
       - name: Run options tests
         run: native\windows\host\build\Release\options_test.exe
+
+  package:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Package the .scr zip (same script as release CI)
+        shell: bash
+        run: |
+          npm ci
+          bash scripts/package-windows.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-scr-dry-run
+          path: dist-native/

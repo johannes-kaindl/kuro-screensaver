@@ -6,10 +6,10 @@
 # macOS deliverable = the standalone native Metal app (KuroMetalApp). It is notarized
 # + uploaded to the release LOCALLY (CI has no Developer ID cert) via
 # scripts/package-native-app.sh. CI therefore only *compile-checks* the macOS app and
-# ships the Windows .scr + a one-click Inno Setup installer (built on a Windows runner;
-# ISCC is Windows-only — the .scr itself still cross-builds on Linux). The legacy .saver
-# paths (WebView .saver, native live .saver, pre-rendered video .savers) were deprecated
-# 2026-06-03 — the native app replaces them.
+# ships the Windows .scr + a one-click Inno Setup installer — both built on a
+# windows-latest runner (the C++/Win32 host is MSVC-only, no Linux cross-build). The
+# legacy .saver paths (WebView .saver, native live .saver, pre-rendered video .savers)
+# were deprecated 2026-06-03 — the native app replaces them.
 #
 # SETUP (one-time, user side):
 #   1. Codeberg → Settings → Push Mirror to the GitHub repo (incl. tags).
@@ -59,20 +59,20 @@ jobs:
           path: dist-native/KuroMetalApp-ci-unsigned.zip
 
   windows:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.0.x"
-      - name: Typecheck web engine
+      - name: Typecheck + web tests
+        shell: bash
         run: |
           npm ci
           npm run typecheck
-      - name: Build .scr (win-x64 cross-build)
+          npm test
+      - name: Build .scr (C++ micro-host, MSVC)
+        shell: bash
         run: bash scripts/package-windows.sh
       - uses: actions/upload-artifact@v4
         with:
@@ -81,25 +81,22 @@ jobs:
 
   windows-installer:
     runs-on: windows-latest
-    # Optional convenience deliverable: the one-click Inno Setup installer. ISCC is
-    # Windows-only, so this job needs a Windows runner (the .scr itself still
-    # cross-builds on Linux in the `windows` job). continue-on-error keeps a flaky
-    # Inno step from blocking the release — the .scr is the required artifact.
+    # Optional convenience deliverable: the one-click Inno Setup installer. Both
+    # Windows jobs run on windows-latest — the C++/Win32 host is MSVC-only, no Linux
+    # cross-build. continue-on-error keeps a flaky Inno step from blocking the
+    # release — the .scr from the `windows` job is the required artifact.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "8.0.x"
       - name: Build web bundle + publish the .scr folder
         shell: bash
-        # Same script as the `windows` job so the publish flags can never diverge
+        # Same script as the `windows` job so the build flags can never diverge
         # again (v0.7.0 shipped a framework-dependent installer because this step
-        # duplicated the dotnet publish call). Git-Bash on the Windows runner has
-        # no `zip`; the script skips the zip and leaves the publish/ folder.
+        # duplicated the build command). Produces dist-native/windows-scr/, which
+        # the .iss's SourceDir points at.
         run: |
           npm ci
           bash scripts/package-windows.sh
