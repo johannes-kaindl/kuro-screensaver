@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Build the Windows one-click installer (Inno Setup .exe).
 #
-# Runs the normal Windows packaging (fresh web bundle + dotnet publish), then
-# compiles native/windows/installer/KuroScreensaver.iss with the Inno Setup
-# compiler (ISCC) into dist-native/KuroScreensaver-Setup-<version>.exe.
+# Runs the normal Windows packaging (fresh web bundle + cmake build (MSVC,
+# Windows-only)), then compiles native/windows/installer/KuroScreensaver.iss
+# with the Inno Setup compiler (ISCC) into
+# dist-native/KuroScreensaver-Setup-<version>.exe.
 #
 # ISCC is Windows-only; on macOS/Linux it runs under wine (`wine ISCC.exe ...`).
 # If neither is found, this prints instructions and exits 0 after producing the
@@ -15,9 +16,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-export PATH="$HOME/.dotnet:$PATH"
 
-# 1. Fresh web bundle + dotnet publish (produces the publish/ folder the .iss packs).
+# 1. Fresh web bundle + cmake build (produces the publish/ folder the .iss packs).
 bash "$ROOT/scripts/package-windows.sh"
 
 VERSION="$(node -p "require('$ROOT/package.json').version")"

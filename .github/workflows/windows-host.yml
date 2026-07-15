@@ -1,0 +1,42 @@
+# Builds + tests the C++/Win32 micro-host on every push that touches it.
+# The host is MSVC-only, so this workflow IS the dev feedback loop — there is
+# no local build on macOS. Manual run: gh workflow run windows-host.
+name: windows-host
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["**"]
+    paths:
+      - "native/windows/host/**"
+      - ".github/workflows/windows-host.yml"
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure (CMake, MSVC x64)
+        run: cmake -S native/windows/host -B native/windows/host/build -A x64
+      - name: Build (Release)
+        run: cmake --build native/windows/host/build --config Release
+      - name: Run options tests
+        run: native\windows\host\build\Release\options_test.exe
+
+  package:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Package the .scr zip (same script as release CI)
+        shell: bash
+        run: |
+          npm ci
+          bash scripts/package-windows.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-scr-dry-run
+          path: dist-native/
