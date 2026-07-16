@@ -71,7 +71,10 @@ Done. The screensaver now starts after the idle time you chose.
 
 Right-click `KuroScreensaver.scr` → **Configure** (or click **Settings…** in the
 Screen Saver Settings dialog). Since **v0.10.0** the dialog matches the macOS
-app's config window (settings are saved to `HKCU\Software\KuroScreensaver`):
+app's config window (settings are saved to `HKCU\Software\KuroScreensaver`).
+Since **v0.11.0** it opens on a **Screensaver** tab, with a **Wallpaper** tab
+next to it holding the same controls for a separate set of values — see
+[Animated wallpaper](#animated-wallpaper). Everything below describes both:
 
 - **Look** — one-click vibe bundles (*Clean · Heavy CRT · Broken Terminal ·
   Vaporwave · Matrix*) that set every CRT knob at once; touching a slider
@@ -120,34 +123,45 @@ go: reconnected displays keep their configuration, unknown ones default to
 
 ---
 
-## Animated wallpaper (`/w`)
+## Animated wallpaper
 
-Since **v0.10.0** the same host can render the engine as your **desktop
-wallpaper** — behind the icons, on top of nothing. It is the *same* file you
-already installed; there is no separate wallpaper download.
+The engine also runs as your **desktop wallpaper** — behind the icons, on top of
+nothing. Since **v0.11.0** it is its own program, `KuroWallpaper.exe`, shipped in
+the same folder as the screensaver. There is no separate wallpaper download.
 
-If you used the installer, start it from the Start menu: **Kuro Animated
-Wallpaper**. Otherwise run the `.scr` with the `/w` flag (<kbd>Win</kbd>+<kbd>R</kbd>,
-adjust the path to wherever you extracted it):
+Start it from the **Start menu → Kuro Wallpaper** (the installer creates that
+entry by default). It puts the wallpaper on your desktop and opens its settings
+window right away. Click it again while the wallpaper runs and the existing
+window comes forward — you never get a second wallpaper.
 
-```
-"C:\Program Files\Kuro Screensaver\KuroScreensaver.scr" /w
-```
-
-> Double-clicking the `.scr` will *not* start the wallpaper — Windows runs the
-> screensaver instead. The flag has to be passed explicitly, which is what the
-> Start-menu shortcut does for you.
-
-- A **tray icon** appears: pause/resume, **Settings…**, **Start with Windows**
-  (autostart via `HKCU\…\Run`), and quit.
+- A **tray icon** appears: pause/resume, **Settings…**, **Autostart**, and quit.
+- **Its own settings.** The settings window has two tabs, **Screensaver** and
+  **Wallpaper**, each with a complete, independent set: the wallpaper can fly
+  through `void` in green while your screensaver stays on `terrain`. Changing
+  the wallpaper tab applies to the desktop immediately. (The wallpaper's values
+  live under `HKCU\Software\KuroScreensaver\Wallpaper`; the screensaver's stay
+  where they were.)
+- **Autostart** — tick it in the installer, in the wallpaper tab, or in the tray
+  menu. All three write the same `HKCU\…\Run\KuroWallpaper` entry, which starts
+  the wallpaper without a window at login.
 - By default only the **primary monitor** animates (the wallpaper runs all
-  day — this keeps it cheap). Configure per-monitor or span mode in Settings →
-  Monitors (the wallpaper has its own set of per-monitor switches).
+  day — this keeps it cheap). Configure per-monitor or span mode in the
+  wallpaper tab's **Monitors** section (its own set of per-monitor switches,
+  separate from the screensaver's).
 - Audio is always off in wallpaper mode, and the render scale defaults to 66 %.
 - A **power policy** keeps it invisible in daily use: it freezes behind
   fullscreen apps and presentations, suspends completely (RAM drops too) when
   the session is locked or the display sleeps, and freezes on battery. On AC it
   animates at 30 fps.
+
+> **Installed from the ZIP?** `KuroWallpaper.exe` is in it — double-click it, or
+> make your own shortcut to it. Do **not** point a shortcut at the `.scr`: the
+> shell throws a `.scr` shortcut's arguments away and runs the screensaver
+> instead (that was v0.10's Start-menu entry, and the reason the wallpaper is a
+> `.exe` now). `KuroScreensaver.scr /w` still works when the flag really reaches
+> the process — from <kbd>Win</kbd>+<kbd>R</kbd>, a batch file, or a Task
+> Scheduler entry — but the `.exe` is the shorter road, and it is the only one
+> with the settings window and the migrated autostart.
 
 > Wallpaper mode hooks into the desktop's `WorkerW` window — a Windows
 > implementation detail that shifted in 24H2. The host detects both layouts; if
@@ -181,10 +195,17 @@ screensaver behaviour).
 
 ## Uninstall
 
-1. Open **Screen Saver Settings** (search "screen saver" in the Start menu) and
+Installed with the installer? Use **Settings → Apps → Installed apps → Kuro
+Screensaver → Uninstall**; it handles all of the below. From the ZIP:
+
+1. If the wallpaper runs, **quit it from the tray icon** — Windows won't delete a
+   running program.
+2. Open **Screen Saver Settings** (search "screen saver" in the Start menu) and
    set the screensaver back to **(None)**, then **OK**.
-2. Delete the extracted `KuroScreensaver` folder.
-3. *(Optional)* Remove leftover settings:
+3. Delete the extracted `KuroScreensaver` folder.
+4. *(Optional)* Remove the autostart entry, if you ever enabled it:
+   `reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v KuroWallpaper /f`.
+5. *(Optional)* Remove leftover settings (both sets):
    `reg delete "HKCU\Software\KuroScreensaver" /f`.
 
 ---
@@ -209,10 +230,24 @@ you and removes the "don't move the folder" footgun:
 
 - installs the whole folder to a fixed **per-user** location (`%LOCALAPPDATA%\
   Programs\Kuro Screensaver`) — **no admin rights**,
-- optionally sets Kuro as your active screen saver and opens the Settings dialog,
 - checks for the WebView2 runtime and warns if it's missing,
+- speaks **German or English**, following your Windows display language,
 - registers a clean **Add/Remove Programs** uninstall (which only unsets the
-  screen saver if it still points at Kuro).
+  screen saver and the autostart entry if they still point at Kuro, and asks a
+  running wallpaper to quit before removing its files).
+
+The checkboxes it offers:
+
+| | Default | |
+|---|---|---|
+| Set Kuro as my active screen saver now | ☑ on | writes `SCRNSAVE.EXE` |
+| Create a Start menu entry | ☑ on | **Kuro Wallpaper** → `KuroWallpaper.exe` |
+| Create a desktop shortcut | ☐ off | same target |
+| Start the wallpaper with Windows | ☐ off | `Run\KuroWallpaper` = `"…\KuroWallpaper.exe" /silent` |
+
+On the last page it offers to open the Screen Saver settings (so you can set the
+idle time) and to start the wallpaper right away — the latter unchecked, since a
+long-running process shouldn't be a side effect of installing.
 
 Run `KuroScreensaver-Setup-<version>.exe`, click through, done. (It's still
 **unsigned**, so SmartScreen warns once — see the troubleshooting table.)

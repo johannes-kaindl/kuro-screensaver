@@ -33,7 +33,7 @@ the GPU. The web build lives on for in-browser play and cross-platform packaging
 **New in v0.10.0 — Windows grows up.** The `.scr` gets the full settings dialog
 (looks, seven CRT sliders, story & automation — parity with the macOS app),
 multi-monitor support (one panoramic image spanning all displays, or per-monitor
-scene/color/off), an **animated desktop wallpaper mode** (`/w`) with a tray icon
+scene/color/off), an **animated desktop wallpaper mode** with a tray icon
 and a power policy that freezes it behind fullscreen apps, on battery, or when
 locked — plus a render-scale + adaptive-quality package against dropped frames.
 
@@ -123,8 +123,9 @@ every CRT effect, the whole narrative.
 A real `.scr` — since **v0.9.0** a tiny native host (~270 KB zip, no bundled
 runtime; the old ~65 MB .NET package is history). WebView2 does the rendering
 and is built into Windows 11 (on Windows 10 the host shows a download link if
-it's missing). Since **v0.10.0** it also runs as an **animated desktop
-wallpaper** (`KuroScreensaver.scr /w`) and understands multi-monitor setups.
+it's missing). It understands multi-monitor setups, and ships an **animated
+desktop wallpaper** as its own app (`KuroWallpaper.exe`, since **v0.11.0**) with
+its own settings.
 
 | Download | Run |
 |---|---|
@@ -173,9 +174,11 @@ All versions: **[releases page](https://codeberg.org/jkaindl/kuro-screensaver/re
 - **Multi-monitor (Windows)** — span one panoramic image across every display
   (portrait monitors show their tall slice of it), or configure each monitor
   individually: on with its own scene + color, random, or off.
-- **Animated wallpaper (Windows)** — the engine behind your desktop icons, with
-  a tray icon (pause / settings / autostart / quit) and a power policy that
-  suspends it when hidden, frozen behind fullscreen apps, or on battery.
+- **Animated wallpaper (Windows)** — the engine behind your desktop icons, as
+  its own app: a tray icon (pause / settings / autostart / quit), a settings tab
+  with a complete set of values independent of the screensaver's, and a power
+  policy that suspends it when hidden, frozen behind fullscreen apps, or on
+  battery.
 - **Performance controls** — render-scale slider plus adaptive quality that
   first dials back effects, then resolution, when frames drop.
 
@@ -195,10 +198,11 @@ needed). Web / cross-platform builds: TypeScript + three.js (WebGL2).</sub>
   Windows screensaver dialog (**Settings…**): scene/color/tempo, Looks, CRT
   sliders, story & automation, per-monitor setup, and the performance section.
   Every input exits the running saver.
-- **Windows wallpaper** — Start menu → **Kuro Animated Wallpaper**, or run
-  `KuroScreensaver.scr /w` by hand (a double-click runs the saver, not the
-  wallpaper). The tray icon pauses/resumes, opens settings, toggles autostart,
-  and quits.
+- **Windows wallpaper** — Start menu → **Kuro Wallpaper** (from the ZIP:
+  double-click `KuroWallpaper.exe`). It starts the wallpaper and opens its
+  settings, where the **Wallpaper** tab holds a full set of values independent
+  of the screensaver's. The tray icon pauses/resumes, opens settings, toggles
+  autostart, and quits.
 - **Browser** — [launch the web app](https://jkaindl.codeberg.page/kuro-screensaver/):
   `1–9` pick scenes, `←/→` cycle, `M` mutes, `P` pauses, `S` screenshots,
   **Esc** exits; the control bar (mouse) exposes everything else.

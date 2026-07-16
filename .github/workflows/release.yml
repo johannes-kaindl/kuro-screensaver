@@ -91,27 +91,26 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-      - name: Build web bundle + publish the .scr folder
-        shell: bash
-        # Same script as the `windows` job so the build flags can never diverge
-        # again (v0.7.0 shipped a framework-dependent installer because this step
-        # duplicated the build command). Produces dist-native/windows-scr/, which
-        # the .iss's SourceDir points at.
-        run: |
-          npm ci
-          bash scripts/package-windows.sh
-      - name: Compile installer (Inno Setup / ISCC)
+      - name: Ensure Inno Setup is available
         shell: pwsh
         run: |
-          $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup*\ISCC.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $iscc) {
+          if (-not (Get-ChildItem "C:\Program Files (x86)\Inno Setup*\ISCC.exe" -ErrorAction SilentlyContinue)) {
             choco install innosetup -y --no-progress
-            $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup*\ISCC.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           }
-          if (-not $iscc) { throw "ISCC (Inno Setup) not found on the runner" }
-          $ver = (node -p "require('./package.json').version")
-          New-Item -ItemType Directory -Force -Path dist-native | Out-Null
-          & $iscc.FullName "/DMyAppVersion=$ver" "/Odist-native" "native\windows\installer\KuroScreensaver.iss"
+      - name: Compile installer (same script as the installer CI job)
+        shell: bash
+        # The script builds the publish folder AND compiles the .iss, so nothing
+        # here can diverge from what windows-host.yml's `installer` job proves on
+        # every commit. Spelling these steps out again is exactly how v0.7.0
+        # shipped a framework-dependent installer: the duplicated build command
+        # drifted from the script's. KURO_REQUIRE_ISCC makes a missing compiler
+        # fatal — without it the script exits 0 with the publish folder only, and
+        # a release would silently carry no installer.
+        env:
+          KURO_REQUIRE_ISCC: "1"
+        run: |
+          npm ci
+          bash scripts/package-windows-installer.sh
       - uses: actions/upload-artifact@v4
         with:
           name: dist-windows-installer
