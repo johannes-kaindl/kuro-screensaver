@@ -1,10 +1,11 @@
-; Inno Setup script for the Kuro Screensaver Windows .scr.
+; Inno Setup script for the Kuro Screensaver Windows .scr + the wallpaper app.
 ;
 ; Builds a single-file, no-admin installer that copies the packaged screensaver
-; (KuroScreensaver.scr + web/ assets — no bundled .NET, no WebView2 DLLs) into a
-; stable per-user location and registers it. Solves the manual-install footgun:
-; the .scr loads its web/ folder from its own directory, so it must live
-; somewhere it won't be moved — which is exactly what this installer guarantees.
+; (KuroScreensaver.scr + KuroWallpaper.exe + web/ assets — no bundled .NET, no
+; WebView2 DLLs) into a stable per-user location and registers it. Solves the
+; manual-install footgun: both programs load the web/ folder from their own
+; directory, so they must live somewhere they won't be moved — which is exactly
+; what this installer guarantees.
 ;
 ; Compile with Inno Setup 6.3+ (the x64compatible architecture identifier needs
 ; 6.3 or newer; Windows, or wine + ISCC). The .scr must be packaged
@@ -30,6 +31,16 @@
 #define MyAppPublisher "Johannes Kaindl"
 #define MyAppURL "https://codeberg.org/jkaindl/kuro-screensaver"
 #define ScrName "KuroScreensaver.scr"
+; The wallpaper app. Every wallpaper shortcut and the Run key point here and
+; never at the .scr: the shell drops a .scr shortcut's arguments and applies the
+; default verb instead, so "/w" never arrived and the shortcut ran the
+; screensaver (v0.10.1, confirmed on-device).
+#define WallpaperExe "KuroWallpaper.exe"
+; The wallpaper's hidden tray window (src/instance.h) and the registered message
+; it quits on (see StopRunningWallpaper below). Kept next to each other so the
+; two spellings cannot drift from the C++ side unnoticed.
+#define TrayWindowClass "KuroTrayWindow"
+#define QuitMessageName "KuroWallpaper.Quit"
 
 [Setup]
 ; Keep this AppId stable across versions so upgrades replace in place.
@@ -45,7 +56,9 @@ DefaultDirName={autopf}\Kuro Screensaver
 DisableProgramGroupPage=yes
 DisableDirPage=auto
 UninstallDisplayName={#MyAppName}
-UninstallDisplayIcon={app}\{#ScrName}
+; The .exe, not the .scr: this is the icon "Apps & Features" shows, and the
+; wallpaper app is the entry the user actually recognises.
+UninstallDisplayIcon={app}\{#WallpaperExe}
 OutputBaseFilename=KuroScreensaver-Setup-{#MyAppVersion}
 Compression=lzma2
 SolidCompression=yes
@@ -54,36 +67,78 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
 [Languages]
+; Inno picks by the Windows UI language and shows the language dialog only when
+; nothing matches (ShowLanguageDialog=auto, the default). German first because
+; it is the project's own language; English is the fallback for everyone else.
+Name: "german";  MessagesFile: "compiler:Languages\German.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "setactive"; Description: "Set Kuro as my active screen saver now"; GroupDescription: "Screen saver:"
+Name: "setactive"; Description: "{cm:TaskSetActive}"; GroupDescription: "{cm:GroupSaver}"
+Name: "startmenu"; Description: "{cm:TaskStartMenu}"; GroupDescription: "{cm:GroupWallpaper}"
+Name: "desktopicon"; Description: "{cm:TaskDesktopIcon}"; GroupDescription: "{cm:GroupWallpaper}"; Flags: unchecked
+Name: "autostart"; Description: "{cm:TaskAutostart}"; GroupDescription: "{cm:GroupWallpaper}"; Flags: unchecked
+
+[CustomMessages]
+; Every Description: above and every [Code] MsgBox needs BOTH languages — a
+; missing entry still compiles and then shows the bare message name at runtime.
+german.GroupSaver=Bildschirmschoner:
+german.GroupWallpaper=Animiertes Wallpaper:
+german.TaskSetActive=Kuro als aktiven Bildschirmschoner setzen
+german.TaskStartMenu=Startmenü-Eintrag anlegen
+german.TaskDesktopIcon=Desktop-Verknüpfung anlegen
+german.TaskAutostart=Wallpaper mit Windows starten
+german.RunWallpaper=Animiertes Wallpaper jetzt starten
+german.OpenSaverSettings=Bildschirmschoner-Einstellungen öffnen (Wartezeit einstellen)
+german.WebView2Missing=Die Microsoft Edge WebView2 Runtime wurde nicht gefunden. Kuro braucht sie zum Rendern (ohne sie bleibt der Bildschirm schwarz). Sie gehört zu aktuellen Windows-11-Installationen, kann hier also auch nur unerkannt geblieben sein.
+german.WebView2Continue=Trotzdem installieren? (WebView2 lässt sich bei Microsoft nachinstallieren, falls der Bildschirm schwarz bleibt.)
+english.GroupSaver=Screen saver:
+english.GroupWallpaper=Animated wallpaper:
+english.TaskSetActive=Set Kuro as my active screen saver now
+english.TaskStartMenu=Create a Start menu entry
+english.TaskDesktopIcon=Create a desktop shortcut
+english.TaskAutostart=Start the wallpaper with Windows
+english.RunWallpaper=Start the animated wallpaper now
+english.OpenSaverSettings=Open Screen Saver settings (set the idle time)
+english.WebView2Missing=The Microsoft Edge WebView2 Runtime was not detected. Kuro needs it to render (the screen will stay black without it). It ships with current Windows 11, so it may simply be undetected here.
+english.WebView2Continue=Continue installing anyway? (You can install WebView2 from Microsoft if the screen stays black.)
 
 [Files]
-; The whole packaged folder (.scr + web\) — kept together.
+; The whole packaged folder (.scr + KuroWallpaper.exe + web\) — kept together.
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
+[InstallDelete]
+; v0.10's start-menu shortcut pointed at "KuroScreensaver.scr" with a /w
+; parameter — the arguments the shell throws away, so it started the screensaver.
+; It is not in this version's [Icons], and Inno only removes what the current
+; install created, so an upgrade would leave the broken shortcut next to the
+; working one.
+Type: files; Name: "{autoprograms}\Kuro Animated Wallpaper.lnk"
+
 [Icons]
-; Without this the wallpaper mode is unreachable from the shell: double-clicking
-; a .scr runs the saver, and no shell verb passes /w. The shortcut carries
-; arguments, so the shell launches the target directly instead of applying the
-; .scr "install" verb.
-Name: "{autoprograms}\Kuro Animated Wallpaper"; Filename: "{app}\{#ScrName}"; Parameters: "/w"; Comment: "Run the Kuro engine as an animated desktop wallpaper (tray-controlled)"
+; Both point at the .exe, never the .scr (see the WallpaperExe define).
+Name: "{autoprograms}\Kuro Wallpaper"; Filename: "{app}\{#WallpaperExe}"; Comment: "{cm:RunWallpaper}"; Tasks: startmenu
+Name: "{autodesktop}\Kuro Wallpaper"; Filename: "{app}\{#WallpaperExe}"; Comment: "{cm:RunWallpaper}"; Tasks: desktopicon
 
 [Registry]
 ; Register the .scr as the active screen saver (per-user). The conditional cleanup
 ; on uninstall is handled in [Code] so we never clobber a different saver the user
 ; may have chosen afterwards.
 Root: HKCU; Subkey: "Control Panel\Desktop"; ValueType: string; ValueName: "SCRNSAVE.EXE"; ValueData: "{app}\{#ScrName}"; Tasks: setactive
+; /silent = wallpaper without the settings window; the same value the tray's own
+; autostart toggle writes (src/tray.cpp), so the two agree and the checkbox in
+; the wallpaper tab reflects this key.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "KuroWallpaper"; ValueData: """{app}\{#WallpaperExe}"" /silent"; Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
 ; Offer to open the Screen Saver settings so the user can set the idle wait time.
 ; Must go through control.exe — rundll32 treats ",,@screensaver" as a (missing)
 ; DLL export and errors with "Fehler in desk.cpl: Eintrag fehlt: @screensaver".
-Filename: "{sys}\control.exe"; Parameters: "desk.cpl,screensaver,@screensaver"; Description: "Open Screen Saver settings (set the idle time)"; Flags: postinstall skipifsilent nowait
+Filename: "{sys}\control.exe"; Parameters: "desk.cpl,screensaver,@screensaver"; Description: "{cm:OpenSaverSettings}"; Flags: postinstall skipifsilent nowait
 ; Unchecked by default: the wallpaper is a long-running process, so starting it
-; is the user's call, not a side effect of installing.
-Filename: "{app}\{#ScrName}"; Parameters: "/w"; Description: "Start the animated wallpaper now"; Flags: postinstall skipifsilent nowait unchecked
+; is the user's call, not a side effect of installing. No parameter — the .exe
+; defaults to /w and opens its settings window.
+Filename: "{app}\{#WallpaperExe}"; Description: "{cm:RunWallpaper}"; Flags: postinstall skipifsilent nowait unchecked
 
 [Code]
 function WebView2Installed(): Boolean;
@@ -103,13 +158,42 @@ begin
   Result := True;
   if not WebView2Installed() then
   begin
-    if MsgBox('The Microsoft Edge WebView2 Runtime was not detected. Kuro needs it'
-      + ' to render (the screen will stay black without it). It ships with current'
-      + ' Windows 11, so it may simply be undetected here.' + #13#10 + #13#10
-      + 'Continue installing anyway? (You can install WebView2 from Microsoft if'
-      + ' the screen stays black.)', mbConfirmation, MB_YESNO) = IDNO then
+    // Two messages joined here rather than one with %n: the concatenation is
+    // the same in both languages and needs no message-formatting escape.
+    if MsgBox(ExpandConstant('{cm:WebView2Missing}') + #13#10 + #13#10
+      + ExpandConstant('{cm:WebView2Continue}'), mbConfirmation, MB_YESNO) = IDNO then
       Result := False;
   end;
+end;
+
+procedure StopRunningWallpaper();
+var
+  tray: HWND;
+  waited: Integer;
+begin
+  // Windows will not delete a running .exe: without this the uninstall either
+  // errors out or demands a reboot. Ask the app to quit through the same
+  // registered message a second instance uses (src/instance.h) — RegisterWindow-
+  // Message returns the same id in every process of the session, so no shared
+  // handle is needed. The tray window disappears when it is gone (RemoveTray),
+  // which is what we wait for.
+  tray := FindWindowByClassName('{#TrayWindowClass}');
+  if tray = 0 then exit;
+  PostMessage(tray, RegisterWindowMessage('{#QuitMessageName}'), 0, 0);
+  waited := 0;
+  // Bounded: if the app is wedged, uninstall anyway and let Windows report the
+  // file it could not remove — better than hanging the uninstaller forever.
+  while (waited < 5000) and (FindWindowByClassName('{#TrayWindowClass}') <> 0) do
+  begin
+    Sleep(200);
+    waited := waited + 200;
+  end;
+end;
+
+function InitializeUninstall(): Boolean;
+begin
+  StopRunningWallpaper();
+  Result := True;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
@@ -127,14 +211,17 @@ begin
         RegDeleteValue(HKCU, 'Control Panel\Desktop', 'SCRNSAVE.EXE');
     end;
 
-    // The tray's "Start with Windows" writes Run\KuroWallpaper = "<exe>" /w
-    // (src/tray.cpp). Nothing else clears it, so without this an uninstall
-    // leaves an autostart entry pointing at a deleted .scr. Substring match:
-    // the value wraps the path in quotes and appends the flag.
+    // Autostart writes Run\KuroWallpaper — either "<app>\KuroWallpaper.exe"
+    // /silent (this version's installer task and tray toggle) or the v0.10 form
+    // "<app>\KuroScreensaver.scr" /w, which survives on a machine that never ran
+    // the migration. Both names are checked, or an uninstall leaves an autostart
+    // entry pointing at a deleted file. Substring match: the value wraps the
+    // path in quotes and appends the flag.
     if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run',
                            'KuroWallpaper', autostart) then
     begin
-      if Pos(Uppercase(ExpandConstant('{app}\{#ScrName}')), Uppercase(autostart)) > 0 then
+      if (Pos(Uppercase(ExpandConstant('{app}\{#ScrName}')), Uppercase(autostart)) > 0) or
+         (Pos(Uppercase(ExpandConstant('{app}\{#WallpaperExe}')), Uppercase(autostart)) > 0) then
         RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'KuroWallpaper');
     end;
   end;

@@ -73,6 +73,13 @@ LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         OpenSettingsWindow(true);
         return 0;
     }
+    // The uninstaller asks us to go before it deletes our files: Windows will
+    // not remove a running .exe, so without this the uninstall either errors or
+    // demands a reboot. Same exit path as the tray's own Beenden item.
+    if (msg == WallpaperQuitMessage()) {
+        PostQuitMessage(0);
+        return 0;
+    }
     switch (msg) {
         case kTrayMessage:  // NIF_MESSAGE callback: lParam is the mouse message
             if (static_cast<UINT>(lp) == WM_RBUTTONUP || static_cast<UINT>(lp) == WM_LBUTTONUP)
