@@ -120,6 +120,11 @@ std::vector<MonitorInfo> EnumMonitors() {
     return out;
 }
 
+std::wstring EffectiveWallpaperMode(const std::wstring& wmode, bool isPrimary) {
+    if (!wmode.empty()) return wmode;
+    return isPrimary ? L"on" : L"off";
+}
+
 bool MonitorConfigExists(const std::wstring& id, const wchar_t* regPath) {
     HKEY key = nullptr;
     if (RegOpenKeyExW(HKEY_CURRENT_USER, MonitorKey(id, regPath).c_str(), 0, KEY_READ, &key) !=

@@ -18,3 +18,10 @@ bool InitTray(std::function<void(bool paused)> setPaused);
 // Removes the icon and destroys the tray window (call before leaving
 // RunWallpaper's message loop scope).
 void RemoveTray();
+
+// The wallpaper's HKCU Run key. Exported because the settings dialog's
+// autostart checkbox and the tray's menu item are the same switch — two copies
+// of the Run-key path would be two chances to write a subtly different value.
+// Applies immediately (it is an OS setting, not one of the 33 options).
+bool AutostartEnabled();
+void SetAutostartEnabled(bool enabled);

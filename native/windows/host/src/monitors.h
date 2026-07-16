@@ -36,6 +36,14 @@ struct MonitorConfig {
     std::wstring wmode;  // on|off|random|scene, empty = never set (sentinel)
     std::wstring wscene, wpreset;
 };
+// Resolves the wallpaper's per-monitor mode for display. The empty sentinel is
+// not a value but an absence, and absence means "primary on, others off" — the
+// rule the wallpaper host applies. Anything explicit wins unchanged. Lives here
+// so the renderer and the dialog cannot answer this question differently: the
+// UI showing "off" for what the host treats as "on" is how the user saves the
+// v0.10 black-wallpaper bug back in.
+std::wstring EffectiveWallpaperMode(const std::wstring& wmode, bool isPrimary);
+
 bool MonitorConfigExists(const std::wstring& id, const wchar_t* regPath = kRegPath);
 MonitorConfig LoadMonitorConfig(const std::wstring& id, const wchar_t* regPath = kRegPath);
 void SaveMonitorConfig(const std::wstring& id, const MonitorConfig& c,

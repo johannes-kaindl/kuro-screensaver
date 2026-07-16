@@ -40,30 +40,6 @@ bool AddTrayIcon() {
     return Shell_NotifyIconW(NIM_ADD, &nid) != FALSE;
 }
 
-bool AutostartEnabled() {
-    return RegGetValueW(HKEY_CURRENT_USER, kRunKeyPath, kRunValueName, RRF_RT_REG_SZ, nullptr,
-                        nullptr, nullptr) == ERROR_SUCCESS;
-}
-
-void ToggleAutostart() {
-    if (AutostartEnabled()) {
-        RegDeleteKeyValueW(HKEY_CURRENT_USER, kRunKeyPath, kRunValueName);
-        return;
-    }
-    wchar_t exe[MAX_PATH];
-    GetModuleFileNameW(nullptr, exe, MAX_PATH);
-    // GetModuleFileName gives whichever binary is running. When the wallpaper
-    // runs from the .scr (an unmigrated v0.10 autostart), still register the
-    // .exe — that is the file the shell passes arguments through, and /silent on
-    // a .scr would be dropped for the default verb.
-    std::wstring exe_s(exe);
-    size_t slash = exe_s.find_last_of(L'\\');
-    std::wstring dir = slash == std::wstring::npos ? L"" : exe_s.substr(0, slash + 1);
-    std::wstring cmd = L"\"" + dir + L"KuroWallpaper.exe\" /silent";
-    RegSetKeyValueW(HKEY_CURRENT_USER, kRunKeyPath, kRunValueName, REG_SZ, cmd.c_str(),
-                    static_cast<DWORD>((cmd.size() + 1) * sizeof(wchar_t)));
-}
-
 void ShowTrayMenu(HWND hwnd) {
     HMENU menu = CreatePopupMenu();
     if (!menu) return;
@@ -94,7 +70,7 @@ LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     // so they cannot be switch cases. Non-modal: RunWallpaper's loop dispatches
     // for it, exactly like the tray's own Einstellungen… item.
     if (msg == WallpaperShowSettingsMessage()) {
-        OpenSettingsWindow();
+        OpenSettingsWindow(true);
         return 0;
     }
     switch (msg) {
@@ -110,10 +86,10 @@ LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                     break;
                 case IDM_TRAY_SETTINGS:
                     // Non-modal: RunWallpaper's message loop dispatches for it.
-                    OpenSettingsWindow();
+                    OpenSettingsWindow(true);
                     break;
                 case IDM_TRAY_AUTOSTART:
-                    ToggleAutostart();
+                    SetAutostartEnabled(!AutostartEnabled());
                     break;
                 case IDM_TRAY_EXIT:
                     PostQuitMessage(0);
@@ -125,6 +101,30 @@ LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 }
 
 }  // namespace
+
+bool AutostartEnabled() {
+    return RegGetValueW(HKEY_CURRENT_USER, kRunKeyPath, kRunValueName, RRF_RT_REG_SZ, nullptr,
+                        nullptr, nullptr) == ERROR_SUCCESS;
+}
+
+void SetAutostartEnabled(bool enabled) {
+    if (!enabled) {
+        RegDeleteKeyValueW(HKEY_CURRENT_USER, kRunKeyPath, kRunValueName);
+        return;
+    }
+    wchar_t exe[MAX_PATH];
+    GetModuleFileNameW(nullptr, exe, MAX_PATH);
+    // GetModuleFileName gives whichever binary is running. When the wallpaper
+    // runs from the .scr (an unmigrated v0.10 autostart), still register the
+    // .exe — that is the file the shell passes arguments through, and /silent on
+    // a .scr would be dropped for the default verb.
+    std::wstring exe_s(exe);
+    size_t slash = exe_s.find_last_of(L'\\');
+    std::wstring dir = slash == std::wstring::npos ? L"" : exe_s.substr(0, slash + 1);
+    std::wstring cmd = L"\"" + dir + L"KuroWallpaper.exe\" /silent";
+    RegSetKeyValueW(HKEY_CURRENT_USER, kRunKeyPath, kRunValueName, REG_SZ, cmd.c_str(),
+                    static_cast<DWORD>((cmd.size() + 1) * sizeof(wchar_t)));
+}
 
 bool InitTray(std::function<void(bool paused)> setPaused) {
     g_setPaused = std::move(setPaused);

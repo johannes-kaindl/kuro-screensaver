@@ -20,6 +20,10 @@ bool EnsureWebView2Runtime();
 // window owns that reference and must Release() it when it is destroyed —
 // plus the raw ICoreWebView2 (NOT AddRef'd: callers who keep it, e.g. for
 // PostWebMessageAsString replies, must AddRef/Release it themselves).
+// The URL CreateWebView navigates to for a given page+query. Exported so a
+// later re-navigation (ReloadWallpaper) cannot drift from the initial one.
+std::wstring WebPageUrl(const std::wstring& pageAndQuery);
+
 void CreateWebView(HWND hwnd, const std::wstring& pageAndQuery,
                    std::function<void(const std::wstring&)> onWebMessage,
                    std::function<void(ICoreWebView2Controller*, ICoreWebView2*)> onCreated);

@@ -236,89 +236,164 @@ bool IsValidNumber(const std::wstring& v, double lo, double hi) {
     return value >= lo && value <= hi;
 }
 
-bool ParseSaveMessage(const std::wstring& msg, SaverOptions& out,
-                      std::vector<MonitorSave>* monitors, std::wstring* monitorMode) {
-    SaverOptions parsed = out;
-    MonitorSave mons[8];
-    bool monSeen[8][4] = {};  // per index: id, mode, scene, preset
-    std::wstring parsedMode;
+namespace {
 
+enum class Field { Ok, Invalid, Unknown };
+
+// One of the 33 option fields, by its unprefixed name. Both halves of a save
+// message carry the same names — the wallpaper's merely wp-prefixed — so both
+// parsers come through here: a field list maintained twice is a field that
+// silently cannot be saved on one of the two tabs.
+Field ParseOptionField(const std::wstring& key, const std::wstring& val, SaverOptions& parsed) {
+    if (key == L"scene") {
+        if (!IsSlug(val)) return Field::Invalid;
+        parsed.scene = val;
+    } else if (key == L"preset") {
+        if (!IsSlug(val)) return Field::Invalid;
+        parsed.preset = val;
+    } else if (key == L"speed") {
+        if (val != L"slow" && val != L"norm" && val != L"fast") return Field::Invalid;
+        parsed.speed = val;
+    } else if (key == L"look") {
+        if (!val.empty() && !IsSlug(val)) return Field::Invalid;  // empty = custom
+        parsed.look = val;
+    } else if (key == L"altitude") {
+        if (val != L"low" && val != L"mid" && val != L"high") return Field::Invalid;
+        parsed.altitude = val;
+    } else if (key == L"fog") {
+        if (val != L"auto" && val != L"clear" && val != L"dense") return Field::Invalid;
+        parsed.fog = val;
+    } else if (key == L"weather") {
+        if (val != L"light-fog" && val != L"heavy-fog" && val != L"storm" && val != L"dust" &&
+            val != L"clear")
+            return Field::Invalid;
+        parsed.weather = val;
+    } else if (key == L"termlayout") {
+        if (val != L"strip" && val != L"window") return Field::Invalid;
+        parsed.termlayout = val;
+    } else if (key == L"bootspeed") {
+        if (val != L"fast" && val != L"normal" && val != L"cinematic") return Field::Invalid;
+        parsed.bootspeed = val;
+    } else if (key == L"bank") {
+        if (!IsValidNumber(val, 0, 2)) return Field::Invalid;
+        parsed.bank = val;
+    } else if (key == L"cyclemin") {
+        if (!IsValidNumber(val, 0.5, 10)) return Field::Invalid;
+        parsed.cyclemin = val;
+    } else if (key == L"crtintensity") {
+        if (!IsValidNumber(val, 0, 1)) return Field::Invalid;
+        parsed.crtintensity = val;
+    } else if (key == L"curvature") {
+        if (!IsValidNumber(val, 0, 0.25)) return Field::Invalid;
+        parsed.curvature = val;
+    } else if (key == L"aperture") {
+        if (!IsValidNumber(val, 0, 0.5)) return Field::Invalid;
+        parsed.aperture = val;
+    } else if (key == L"bloomstrength") {
+        if (!IsValidNumber(val, 0, 3)) return Field::Invalid;
+        parsed.bloomstrength = val;
+    } else if (key == L"trailsamount") {
+        if (!IsValidNumber(val, 0.5, 0.95)) return Field::Invalid;
+        parsed.trailsamount = val;
+    } else if (key == L"ntsc") {
+        if (!IsValidNumber(val, 0, 1)) return Field::Invalid;
+        parsed.ntsc = val;
+    } else if (key == L"halation") {
+        if (!IsValidNumber(val, 0, 0.6)) return Field::Invalid;
+        parsed.halation = val;
+    } else if (key == L"scale") {
+        if (!IsValidNumber(val, 0.25, 1)) return Field::Invalid;
+        parsed.scale = val;
+    } else {
+        bool* flag = nullptr;
+        if (key == L"audio") flag = &parsed.audio;
+        else if (key == L"bloom") flag = &parsed.bloom;
+        else if (key == L"trails") flag = &parsed.trails;
+        else if (key == L"scan") flag = &parsed.scan;
+        else if (key == L"crt") flag = &parsed.crt;
+        else if (key == L"matrix") flag = &parsed.matrix;
+        else if (key == L"terminal") flag = &parsed.terminal;
+        else if (key == L"radar") flag = &parsed.radar;
+        else if (key == L"crosshair") flag = &parsed.crosshair;
+        else if (key == L"reactive") flag = &parsed.reactive;
+        else if (key == L"autocycle") flag = &parsed.autocycle;
+        else if (key == L"boot") flag = &parsed.boot;
+        else if (key == L"daynight") flag = &parsed.daynight;
+        else if (key == L"perfadapt") flag = &parsed.perfadapt;
+        if (!flag) return Field::Unknown;
+        if (val == L"on") *flag = true;
+        else if (val == L"off") *flag = false;
+        else return Field::Invalid;
+    }
+    return Field::Ok;
+}
+
+// Splits "a=1&b=2" and hands each pair to `fn`; false as soon as a pair has no
+// '=' or `fn` rejects it. The two save-message parsers walk the same message
+// from opposite ends of the wp prefix, so they share the walking.
+template <typename Fn>
+bool ForEachPair(const std::wstring& msg, Fn fn) {
     size_t pos = 0;
     while (pos < msg.size()) {
         size_t amp = msg.find(L'&', pos);
-        std::wstring pair = msg.substr(pos, amp == std::wstring::npos ? std::wstring::npos : amp - pos);
+        std::wstring pair =
+            msg.substr(pos, amp == std::wstring::npos ? std::wstring::npos : amp - pos);
         pos = (amp == std::wstring::npos) ? msg.size() : amp + 1;
 
         size_t eq = pair.find(L'=');
         if (eq == std::wstring::npos) return false;
-        std::wstring key = pair.substr(0, eq);
-        std::wstring val = pair.substr(eq + 1);
+        if (!fn(pair.substr(0, eq), pair.substr(eq + 1))) return false;
+    }
+    return true;
+}
 
-        if (key == L"scene") {
-            if (!IsSlug(val)) return false;
-            parsed.scene = val;
-        } else if (key == L"preset") {
-            if (!IsSlug(val)) return false;
-            parsed.preset = val;
-        } else if (key == L"speed") {
-            if (val != L"slow" && val != L"norm" && val != L"fast") return false;
-            parsed.speed = val;
-        } else if (key == L"look") {
-            if (!val.empty() && !IsSlug(val)) return false;  // empty = custom
-            parsed.look = val;
-        } else if (key == L"altitude") {
-            if (val != L"low" && val != L"mid" && val != L"high") return false;
-            parsed.altitude = val;
-        } else if (key == L"fog") {
-            if (val != L"auto" && val != L"clear" && val != L"dense") return false;
-            parsed.fog = val;
-        } else if (key == L"weather") {
-            if (val != L"light-fog" && val != L"heavy-fog" && val != L"storm" &&
-                val != L"dust" && val != L"clear") return false;
-            parsed.weather = val;
-        } else if (key == L"termlayout") {
-            if (val != L"strip" && val != L"window") return false;
-            parsed.termlayout = val;
-        } else if (key == L"bootspeed") {
-            if (val != L"fast" && val != L"normal" && val != L"cinematic") return false;
-            parsed.bootspeed = val;
-        } else if (key == L"bank") {
-            if (!IsValidNumber(val, 0, 2)) return false;
-            parsed.bank = val;
-        } else if (key == L"cyclemin") {
-            if (!IsValidNumber(val, 0.5, 10)) return false;
-            parsed.cyclemin = val;
-        } else if (key == L"crtintensity") {
-            if (!IsValidNumber(val, 0, 1)) return false;
-            parsed.crtintensity = val;
-        } else if (key == L"curvature") {
-            if (!IsValidNumber(val, 0, 0.25)) return false;
-            parsed.curvature = val;
-        } else if (key == L"aperture") {
-            if (!IsValidNumber(val, 0, 0.5)) return false;
-            parsed.aperture = val;
-        } else if (key == L"bloomstrength") {
-            if (!IsValidNumber(val, 0, 3)) return false;
-            parsed.bloomstrength = val;
-        } else if (key == L"trailsamount") {
-            if (!IsValidNumber(val, 0.5, 0.95)) return false;
-            parsed.trailsamount = val;
-        } else if (key == L"ntsc") {
-            if (!IsValidNumber(val, 0, 1)) return false;
-            parsed.ntsc = val;
-        } else if (key == L"halation") {
-            if (!IsValidNumber(val, 0, 0.6)) return false;
-            parsed.halation = val;
-        } else if (key == L"scale") {
-            if (!IsValidNumber(val, 0.25, 1)) return false;
-            parsed.scale = val;
-        } else if (key == L"monitormode") {
+// The wallpaper half's key prefix. `wp`, not `w`: WMode/WScene/WPreset already
+// mean the per-monitor trio, and a wscene next to a WScene that means something
+// else is a trap for the next reader (spec §5.1).
+constexpr const wchar_t* kWpPrefix = L"wp";
+constexpr size_t kWpPrefixLen = 2;
+
+bool IsWpKey(const std::wstring& key) { return key.rfind(kWpPrefix, 0) == 0; }
+
+}  // namespace
+
+bool ParseSaveMessage(const std::wstring& msg, SaverOptions& out,
+                      std::vector<MonitorSave>* monitors, std::wstring* monitorMode,
+                      std::wstring* wallpaperMonitorMode) {
+    SaverOptions parsed = out;
+    SaverOptions wpScratch;  // the wallpaper half: validated here, kept by its own parser
+    MonitorSave mons[8];
+    bool monSeen[8][4] = {};  // per index: id, mode, scene, preset
+    bool monWSeen[8] = {};    // any of the wallpaper trio seen for that index
+    std::wstring parsedMode, parsedWMode;
+
+    bool ok = ForEachPair(msg, [&](const std::wstring& key, const std::wstring& val) {
+        if (IsWpKey(key)) {
+            // The wallpaper's half of the same message. Skipped, not rejected —
+            // but validated against the real field list, so this stays a parser
+            // and does not become a swallower: a typo must still fail the save.
+            std::wstring sub = key.substr(kWpPrefixLen);
+            if (sub == L"monitormode") {
+                if (val != L"per" && val != L"span") return false;
+                parsedWMode = val;
+                return true;
+            }
+            // wpautostart rides along for tolerance only: the dialog applies
+            // autostart through its own message (it is an OS setting, not one of
+            // the 33), and a save must not fail because it was echoed back.
+            if (sub == L"autostart") return val == L"on" || val == L"off";
+            return ParseOptionField(sub, val, wpScratch) == Field::Ok;
+        }
+        if (key == L"monitormode") {
             if (val != L"per" && val != L"span") return false;
             parsedMode = val;
-        } else if (key.size() > 2 && key[0] == L'm' && key[1] >= L'0' && key[1] <= L'7') {
-            // Per-monitor keys m<N>id / m<N>mode / m<N>scene / m<N>preset.
-            // Indices 0..7 only — the web dialog caps its monitor list at 8
-            // (spec §4), so higher indices never appear in a valid save.
+            return true;
+        }
+        if (key.size() > 2 && key[0] == L'm' && key[1] >= L'0' && key[1] <= L'7') {
+            // Per-monitor keys m<N>id / m<N>mode / m<N>scene / m<N>preset, plus
+            // the wallpaper's m<N>wmode / m<N>wscene / m<N>wpreset. Indices 0..7
+            // only — the web dialog caps its monitor list at 8 (spec §4), so
+            // higher indices never appear in a valid save.
             int idx = key[1] - L'0';
             std::wstring field = key.substr(2);
             if (field == L"id") {
@@ -338,45 +413,65 @@ bool ParseSaveMessage(const std::wstring& msg, SaverOptions& out,
                 if (!val.empty() && !IsSlug(val)) return false;  // empty = global
                 mons[idx].preset = val;
                 monSeen[idx][3] = true;
+            } else if (field == L"wmode") {
+                // Same whitelist as `mode`, and never empty: the empty string is
+                // the "never set" sentinel (monitors.h), which only the ABSENCE
+                // of the key may mean — a save that spells it out would
+                // materialize it.
+                if (val != L"on" && val != L"off" && val != L"random" && val != L"scene")
+                    return false;
+                mons[idx].wmode = val;
+                monWSeen[idx] = true;
+            } else if (field == L"wscene") {
+                if (!val.empty() && !IsSlug(val)) return false;
+                mons[idx].wscene = val;
+                monWSeen[idx] = true;
+            } else if (field == L"wpreset") {
+                if (!val.empty() && !IsSlug(val)) return false;  // empty = global
+                mons[idx].wpreset = val;
+                monWSeen[idx] = true;
             } else {
                 return false;
             }
-        } else {
-            bool* flag = nullptr;
-            if (key == L"audio") flag = &parsed.audio;
-            else if (key == L"bloom") flag = &parsed.bloom;
-            else if (key == L"trails") flag = &parsed.trails;
-            else if (key == L"scan") flag = &parsed.scan;
-            else if (key == L"crt") flag = &parsed.crt;
-            else if (key == L"matrix") flag = &parsed.matrix;
-            else if (key == L"terminal") flag = &parsed.terminal;
-            else if (key == L"radar") flag = &parsed.radar;
-            else if (key == L"crosshair") flag = &parsed.crosshair;
-            else if (key == L"reactive") flag = &parsed.reactive;
-            else if (key == L"autocycle") flag = &parsed.autocycle;
-            else if (key == L"boot") flag = &parsed.boot;
-            else if (key == L"daynight") flag = &parsed.daynight;
-            else if (key == L"perfadapt") flag = &parsed.perfadapt;
-            if (!flag) return false;
-            if (val == L"on") *flag = true;
-            else if (val == L"off") *flag = false;
-            else return false;
+            return true;
         }
-    }
+        return ParseOptionField(key, val, parsed) == Field::Ok;
+    });
+    if (!ok) return false;
 
-    // Monitor entries must form a gapless 0..k prefix with all four keys each.
+    // Monitor entries must form a gapless 0..k prefix with all four saver keys
+    // each. The wallpaper trio is optional (the /c dialog sends none), but may
+    // not appear for an index that carries no entry at all.
     size_t count = 0;
-    while (count < 8 &&
-           (monSeen[count][0] || monSeen[count][1] || monSeen[count][2] || monSeen[count][3])) {
+    while (count < 8 && (monSeen[count][0] || monSeen[count][1] || monSeen[count][2] ||
+                         monSeen[count][3] || monWSeen[count])) {
         if (!monSeen[count][0] || !monSeen[count][1] || !monSeen[count][2] || !monSeen[count][3])
             return false;
         ++count;
     }
     for (size_t i = count; i < 8; ++i)
-        if (monSeen[i][0] || monSeen[i][1] || monSeen[i][2] || monSeen[i][3]) return false;
+        if (monSeen[i][0] || monSeen[i][1] || monSeen[i][2] || monSeen[i][3] || monWSeen[i])
+            return false;
 
     out = parsed;
     if (monitors) monitors->assign(mons, mons + count);
     if (monitorMode) *monitorMode = parsedMode;
+    if (wallpaperMonitorMode) *wallpaperMonitorMode = parsedWMode;
+    return true;
+}
+
+bool ParseWallpaperSaveMessage(const std::wstring& msg, SaverOptions& out) {
+    SaverOptions parsed = out;
+    bool ok = ForEachPair(msg, [&](const std::wstring& key, const std::wstring& val) {
+        // The saver's half (and the monitor keys) belong to ParseSaveMessage —
+        // mirror image of the skip there. Both parsers see the whole message and
+        // each keeps only what is addressed to it.
+        if (!IsWpKey(key)) return true;
+        std::wstring sub = key.substr(kWpPrefixLen);
+        if (sub == L"monitormode" || sub == L"autostart") return true;
+        return ParseOptionField(sub, val, parsed) == Field::Ok;
+    });
+    if (!ok) return false;
+    out = parsed;
     return true;
 }

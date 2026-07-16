@@ -50,9 +50,13 @@ struct SaverOptions {
 };
 
 // One per-monitor override entry from the settings dialog (save-message keys
-// m<N>id/m<N>mode/m<N>scene/m<N>preset, N = 0..7 gapless).
+// m<N>id/m<N>mode/m<N>scene/m<N>preset, N = 0..7 gapless), plus the wallpaper's
+// own trio (m<N>wmode/m<N>wscene/m<N>wpreset). The w-trio is optional: the
+// screensaver's /c dialog sends none, and wmode stays empty then — the "never
+// set" sentinel that MonitorConfig relies on (monitors.h).
 struct MonitorSave {
     std::wstring id, mode, scene, preset;
+    std::wstring wmode, wscene, wpreset;
 };
 
 // Percent-encodes everything outside RFC 3986 unreserved characters, UTF-8
@@ -93,6 +97,18 @@ bool IsValidNumber(const std::wstring& v, double lo, double hi);
 // and `monitormode=per|span` in `monitorMode` when the caller passes them;
 // without out-params those keys are still validated, just not returned.
 // On success the out-params are overwritten (empty when the keys are absent).
+//
+// The dialog serves both tabs, so one message carries both option sets. The
+// wp-prefixed half is validated here but skipped — ParseWallpaperSaveMessage
+// reads it. wallpaperMonitorMode takes `wpmonitormode`; like monitorMode it
+// stays empty rather than defaulting, so a caller can tell "not sent" from
+// "sent as per".
 bool ParseSaveMessage(const std::wstring& msg, SaverOptions& out,
                       std::vector<MonitorSave>* monitors = nullptr,
-                      std::wstring* monitorMode = nullptr);
+                      std::wstring* monitorMode = nullptr,
+                      std::wstring* wallpaperMonitorMode = nullptr);
+
+// Reads the wp-prefixed half of the same message; the saver's keys are skipped.
+// Same all-or-nothing contract as ParseSaveMessage: any invalid value rejects
+// the whole message, `out` stays untouched and the dialog stays open.
+bool ParseWallpaperSaveMessage(const std::wstring& msg, SaverOptions& out);

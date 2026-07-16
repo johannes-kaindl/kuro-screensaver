@@ -50,6 +50,11 @@ constexpr ULONGLONG kStartupReplayMs = 15000;
 struct WallpaperWindow {
     HWND hwnd = nullptr;
     RECT monitorRect{};  // virtual-screen coords, for the occlusion check
+    // Which monitor's overrides this window renders; empty = the span window,
+    // which has none. Kept so ReloadWallpaper can rebuild the SAME page a
+    // restart would build, instead of flattening every screen to the globals.
+    std::wstring monitorId;
+    bool primary = false;
     ICoreWebView2Controller* controller = nullptr;
     ICoreWebView2* webview = nullptr;  // AddRef'd, lives until process exit
     std::wstring lastPowerMsg;
@@ -59,6 +64,9 @@ struct WallpaperWindow {
 
 // Leak intentionally: wallpaper windows live until process exit.
 std::vector<WallpaperWindow*> g_windows;
+// Monitors the wallpaper actually covers — NOT g_windows.size(): one spanning
+// window covers them all, and "1/3" would be a lie in span mode.
+size_t g_coveredMonitors = 0;
 HWND g_host = nullptr;  // WorkerW/Progman host — re-resolved after explorer restarts
 bool g_paused = false;  // tray "anhalten" — overrides the power policy
 bool g_sessionLocked = false;
@@ -106,6 +114,25 @@ LRESULT CALLBACK WallpaperWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 std::wstring BuildWallpaperPage(SaverOptions o) {
     o.audio = false;
     return L"screensaver.html" + BuildQueryString(o) + L"&kiosk=on";
+}
+
+// Folds one monitor's wallpaper overrides into the global set. Shared by the
+// initial creation and the live reload — two copies of this rule would let a
+// saved change render differently than the same values do after a restart.
+// Returns false when this monitor shows no wallpaper at all.
+bool ApplyMonitorOverrides(const std::wstring& id, bool primary, SaverOptions& o) {
+    MonitorConfig c = LoadMonitorConfig(id);
+    // WMode never set (empty sentinel — see monitors.h): the primary monitor
+    // defaults to on, others off. A saver-dialog save may have materialized the
+    // subkey without ever touching WMode.
+    std::wstring wmode = EffectiveWallpaperMode(c.wmode, primary);
+    if (wmode == L"off") return false;  // static wallpaper stays visible there
+    if (wmode == L"random")
+        o.scene = L"random";
+    else if (wmode == L"scene" && !c.wscene.empty())
+        o.scene = c.wscene;
+    if (!c.wpreset.empty()) o.preset = c.wpreset;
+    return true;
 }
 
 // TrySuspend needs a hidden controller; failures are ignored on purpose (the
@@ -229,7 +256,8 @@ void ReattachIfHostLost() {
     }
 }
 
-void CreateWallpaperWindow(HWND host, const RECT& screenRect, const std::wstring& page) {
+void CreateWallpaperWindow(HWND host, const RECT& screenRect, const std::wstring& page,
+                           const std::wstring& monitorId = L"", bool primary = false) {
     // Child coordinates are relative to the host's client area.
     POINT pts[2] = {{screenRect.left, screenRect.top}, {screenRect.right, screenRect.bottom}};
     MapWindowPoints(nullptr, host, pts, 2);
@@ -240,6 +268,8 @@ void CreateWallpaperWindow(HWND host, const RECT& screenRect, const std::wstring
     auto* w = new WallpaperWindow();
     w->hwnd = hwnd;
     w->monitorRect = screenRect;
+    w->monitorId = monitorId;
+    w->primary = primary;
     w->createdTick = GetTickCount64();
     SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(w));
     g_windows.push_back(w);
@@ -284,6 +314,30 @@ LRESULT CALLBACK PowerWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 
 }  // namespace
 
+void ReloadWallpaper() {
+    // g_windows is empty when the dialog came from the saver's /c path — then
+    // this is a no-op and the saved values simply apply at the next start.
+    SaverOptions base = LoadWallpaperOptions();
+    for (WallpaperWindow* w : g_windows) {
+        if (!w->webview) continue;  // WebView still being created — it will pick up the new values
+        SaverOptions o = base;
+        // Per-monitor windows keep their own overrides; the span window (empty
+        // id) has none. A monitor switched to off cannot lose its window here —
+        // creating and destroying windows mid-flight is a restart's job — so it
+        // simply renders the globals until then.
+        if (!w->monitorId.empty()) ApplyMonitorOverrides(w->monitorId, w->primary, o);
+        std::wstring url = WebPageUrl(BuildWallpaperPage(o));
+        w->webview->Navigate(url.c_str());
+    }
+}
+
+std::wstring WallpaperRunStatus() {
+    // Nothing running is not "0/3": the dialog says "Wallpaper läuft nicht" for
+    // the empty string, which is the honest answer on the saver's /c path.
+    if (g_windows.empty()) return L"";
+    return std::to_wstring(g_coveredMonitors) + L"/" + std::to_wstring(EnumMonitors().size());
+}
+
 int RunWallpaper(bool showSettings) {
     HWND host = FindWallpaperHost();
     if (!host) return 1;
@@ -307,22 +361,13 @@ int RunWallpaper(bool showSettings) {
         vs.right = vs.left + GetSystemMetrics(SM_CXVIRTUALSCREEN);
         vs.bottom = vs.top + GetSystemMetrics(SM_CYVIRTUALSCREEN);
         CreateWallpaperWindow(host, vs, BuildWallpaperPage(opts));
+        g_coveredMonitors = mons.size();  // one window, every screen
     } else {
         for (const MonitorInfo& m : mons) {
-            MonitorConfig c = LoadMonitorConfig(m.id);
-            // WMode never set (empty sentinel — see monitors.h): the primary
-            // monitor defaults to on, others off. A saver-dialog save may have
-            // materialized the subkey without touching WMode.
-            std::wstring wmode =
-                c.wmode.empty() ? std::wstring(m.primary ? L"on" : L"off") : c.wmode;
-            if (wmode == L"off") continue;  // static wallpaper stays visible there
             SaverOptions per = opts;
-            if (wmode == L"random")
-                per.scene = L"random";
-            else if (wmode == L"scene" && !c.wscene.empty())
-                per.scene = c.wscene;
-            if (!c.wpreset.empty()) per.preset = c.wpreset;
-            CreateWallpaperWindow(host, m.rect, BuildWallpaperPage(per));
+            if (!ApplyMonitorOverrides(m.id, m.primary, per)) continue;
+            CreateWallpaperWindow(host, m.rect, BuildWallpaperPage(per), m.id, m.primary);
+            ++g_coveredMonitors;
         }
     }
 

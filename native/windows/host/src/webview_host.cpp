@@ -51,10 +51,14 @@ bool EnsureWebView2Runtime() {
     return false;
 }
 
+std::wstring WebPageUrl(const std::wstring& pageAndQuery) {
+    return L"https://kuro.local/" + pageAndQuery;
+}
+
 void CreateWebView(HWND hwnd, const std::wstring& pageAndQuery,
                    std::function<void(const std::wstring&)> onWebMessage,
                    std::function<void(ICoreWebView2Controller*, ICoreWebView2*)> onCreated) {
-    std::wstring url = L"https://kuro.local/" + pageAndQuery;
+    std::wstring url = WebPageUrl(pageAndQuery);
 
     CreateCoreWebView2EnvironmentWithOptions(
         nullptr, UserDataDir().c_str(), nullptr,

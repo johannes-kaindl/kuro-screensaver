@@ -206,6 +206,19 @@ int main() {
     ExpectTrue(MonitorConfigExists(L"FRESHMON", testKey) && fresh.mode == L"random" &&
                    fresh.wmode.empty(),
                "empty-wmode save materializes no WMode");
+    // 10b. The dialog must receive the EFFECTIVE wallpaper mode, not the raw
+    // sentinel: an unset monitor means "primary on, others off" (monitors.h),
+    // and a UI that rendered the empty string as "off" would let the user save
+    // the v0.10 black-wallpaper bug straight back in.
+    ExpectEq(EffectiveWallpaperMode(L"", true), std::wstring(L"on"), "unset primary is on");
+    ExpectEq(EffectiveWallpaperMode(L"", false), std::wstring(L"off"), "unset secondary is off");
+    ExpectEq(EffectiveWallpaperMode(L"scene", true), std::wstring(L"scene"),
+             "explicit value wins over the rule");
+    ExpectEq(EffectiveWallpaperMode(L"off", true), std::wstring(L"off"),
+             "explicitly off primary stays off");
+    ExpectEq(EffectiveWallpaperMode(L"on", false), std::wstring(L"on"),
+             "explicitly on secondary stays on");
+
     ExpectEq(LoadMonitorMode(false, testKey), L"per", "saver monitor mode defaults to per");
     SaveMonitorMode(false, L"span", testKey);
     ExpectEq(LoadMonitorMode(false, testKey), L"span", "saver monitor mode round-trip");
