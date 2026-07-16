@@ -20,9 +20,12 @@ cd "$ROOT"
 # 1. Fresh web bundle + cmake build (produces the publish/ folder the .iss packs).
 bash "$ROOT/scripts/package-windows.sh"
 
-VERSION="$(node -p "require('$ROOT/package.json').version")"
-ISS="$ROOT/native/windows/installer/KuroScreensaver.iss"
-OUT="$ROOT/dist-native"
+# All three are relative on purpose: we cd'd to $ROOT above, and on Windows $ROOT
+# is a Git-Bash path (/d/a/...) that native binaries — node.exe, ISCC.exe — cannot
+# resolve. Handing them the absolute form is why this script never ran on Windows.
+VERSION="$(node -p "require('./package.json').version")"
+ISS="native/windows/installer/KuroScreensaver.iss"
+OUT="dist-native"
 mkdir -p "$OUT"
 
 # 2. Find an Inno Setup compiler: native ISCC, its default install location
