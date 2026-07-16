@@ -447,6 +447,35 @@ int main() {
                  "wallpaper query/save round-trip");
     }
 
+    // 17. The whole message, in the exact shape buildSaveMessage (form-state.ts)
+    // emits it: both 33-key halves, both monitor modes, a monitor entry with
+    // both trios. Pinned here because the halves were merged in two separate
+    // commits and the branch spent a while where the page sent wp keys the host
+    // still rejected — every save failed. This is the end-to-end guard against
+    // that ever being true again.
+    {
+        std::wstring msg = std::wstring(kDefaultQuery + 1) + L"&monitormode=per" +
+                           L"&m0id=DELL_ABC1&m0mode=scene&m0scene=matrix&m0preset=phosphor" +
+                           L"&m0wmode=random&m0wscene=&m0wpreset=kuro" +
+                           WpPrefixed(std::wstring(L"?") + kFlipQuery) + L"&wpmonitormode=span";
+
+        SaverOptions saver;
+        std::vector<MonitorSave> mons;
+        std::wstring mode, wmode;
+        ExpectTrue(ParseSaveMessage(msg, saver, &mons, &mode, &wmode), "full dialog save accepted");
+        ExpectEq(BuildQueryString(saver), kDefaultQuery, "full dialog save: saver half intact");
+        ExpectEq(mode, std::wstring(L"per"), "full dialog save: saver monitor mode");
+        ExpectEq(wmode, std::wstring(L"span"), "full dialog save: wallpaper monitor mode");
+        ExpectTrue(mons.size() == 1 && mons[0].mode == L"scene" && mons[0].wmode == L"random" &&
+                       mons[0].wpreset == L"kuro",
+                   "full dialog save: both monitor trios");
+
+        SaverOptions wp;
+        ExpectTrue(ParseWallpaperSaveMessage(msg, wp), "full dialog save: wallpaper half accepted");
+        ExpectEq(BuildQueryString(wp), std::wstring(L"?") + kFlipQuery,
+                 "full dialog save: wallpaper half intact");
+    }
+
     if (failures) {
         fprintf(stderr, "%d failure(s)\n", failures);
         return 1;
