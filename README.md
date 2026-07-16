@@ -195,8 +195,10 @@ needed). Web / cross-platform builds: TypeScript + three.js (WebGL2).</sub>
   Windows screensaver dialog (**Settings…**): scene/color/tempo, Looks, CRT
   sliders, story & automation, per-monitor setup, and the performance section.
   Every input exits the running saver.
-- **Windows wallpaper** — run `KuroScreensaver.scr /w` (or enable autostart in
-  the tray menu). The tray icon pauses/resumes, opens settings, and quits.
+- **Windows wallpaper** — Start menu → **Kuro Animated Wallpaper**, or run
+  `KuroScreensaver.scr /w` by hand (a double-click runs the saver, not the
+  wallpaper). The tray icon pauses/resumes, opens settings, toggles autostart,
+  and quits.
 - **Browser** — [launch the web app](https://jkaindl.codeberg.page/kuro-screensaver/):
   `1–9` pick scenes, `←/→` cycle, `M` mutes, `P` pauses, `S` screenshots,
   **Esc** exits; the control bar (mouse) exposes everything else.

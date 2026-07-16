@@ -9,6 +9,8 @@ on:
     branches: ["**"]
     paths:
       - "native/windows/host/**"
+      - "native/windows/installer/**"
+      - "scripts/package-windows-installer.sh"
       - ".github/workflows/windows-host.yml"
 
 jobs:
@@ -22,6 +24,35 @@ jobs:
         run: cmake --build native/windows/host/build --config Release
       - name: Run options tests
         run: native\windows\host\build\Release\options_test.exe
+
+  installer:
+    # Nothing else compiles the .iss until a release tag is pushed, so a syntax
+    # or logic error in it stays invisible right up to the release — which is
+    # exactly how v0.7.0 shipped a broken installer. Compiling it here surfaces
+    # the break on the commit that caused it.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Ensure Inno Setup is available
+        shell: pwsh
+        run: |
+          if (-not (Get-ChildItem "C:\Program Files (x86)\Inno Setup*\ISCC.exe" -ErrorAction SilentlyContinue)) {
+            choco install innosetup -y --no-progress
+          }
+      - name: Compile the installer (same script as release CI)
+        shell: bash
+        env:
+          KURO_REQUIRE_ISCC: "1"
+        run: |
+          npm ci
+          bash scripts/package-windows-installer.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-dry-run
+          path: dist-native/KuroScreensaver-Setup-*.exe
 
   package:
     if: github.event_name == 'workflow_dispatch'

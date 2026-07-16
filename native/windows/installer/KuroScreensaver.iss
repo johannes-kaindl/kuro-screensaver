@@ -63,6 +63,13 @@ Name: "setactive"; Description: "Set Kuro as my active screen saver now"; GroupD
 ; The whole packaged folder (.scr + web\) — kept together.
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
+[Icons]
+; Without this the wallpaper mode is unreachable from the shell: double-clicking
+; a .scr runs the saver, and no shell verb passes /w. The shortcut carries
+; arguments, so the shell launches the target directly instead of applying the
+; .scr "install" verb.
+Name: "{autoprograms}\Kuro Animated Wallpaper"; Filename: "{app}\{#ScrName}"; Parameters: "/w"; Comment: "Run the Kuro engine as an animated desktop wallpaper (tray-controlled)"
+
 [Registry]
 ; Register the .scr as the active screen saver (per-user). The conditional cleanup
 ; on uninstall is handled in [Code] so we never clobber a different saver the user
@@ -74,6 +81,9 @@ Root: HKCU; Subkey: "Control Panel\Desktop"; ValueType: string; ValueName: "SCRN
 ; Must go through control.exe — rundll32 treats ",,@screensaver" as a (missing)
 ; DLL export and errors with "Fehler in desk.cpl: Eintrag fehlt: @screensaver".
 Filename: "{sys}\control.exe"; Parameters: "desk.cpl,screensaver,@screensaver"; Description: "Open Screen Saver settings (set the idle time)"; Flags: postinstall skipifsilent nowait
+; Unchecked by default: the wallpaper is a long-running process, so starting it
+; is the user's call, not a side effect of installing.
+Filename: "{app}\{#ScrName}"; Parameters: "/w"; Description: "Start the animated wallpaper now"; Flags: postinstall skipifsilent nowait unchecked
 
 [Code]
 function WebView2Installed(): Boolean;
@@ -105,6 +115,7 @@ end;
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   active: String;
+  autostart: String;
 begin
   // On uninstall, only clear the active-saver registry value if it still points
   // at our .scr (leave any other screen saver the user later picked untouched).
@@ -114,6 +125,17 @@ begin
     begin
       if CompareText(active, ExpandConstant('{app}\{#ScrName}')) = 0 then
         RegDeleteValue(HKCU, 'Control Panel\Desktop', 'SCRNSAVE.EXE');
+    end;
+
+    // The tray's "Start with Windows" writes Run\KuroWallpaper = "<exe>" /w
+    // (src/tray.cpp). Nothing else clears it, so without this an uninstall
+    // leaves an autostart entry pointing at a deleted .scr. Substring match:
+    // the value wraps the path in quotes and appends the flag.
+    if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run',
+                           'KuroWallpaper', autostart) then
+    begin
+      if Pos(Uppercase(ExpandConstant('{app}\{#ScrName}')), Uppercase(autostart)) > 0 then
+        RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'KuroWallpaper');
     end;
   end;
 end;

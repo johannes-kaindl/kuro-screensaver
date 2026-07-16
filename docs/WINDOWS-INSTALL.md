@@ -123,11 +123,20 @@ go: reconnected displays keep their configuration, unknown ones default to
 ## Animated wallpaper (`/w`)
 
 Since **v0.10.0** the same host can render the engine as your **desktop
-wallpaper** — behind the icons, on top of nothing:
+wallpaper** — behind the icons, on top of nothing. It is the *same* file you
+already installed; there is no separate wallpaper download.
+
+If you used the installer, start it from the Start menu: **Kuro Animated
+Wallpaper**. Otherwise run the `.scr` with the `/w` flag (<kbd>Win</kbd>+<kbd>R</kbd>,
+adjust the path to wherever you extracted it):
 
 ```
-KuroScreensaver.scr /w
+"C:\Program Files\Kuro Screensaver\KuroScreensaver.scr" /w
 ```
+
+> Double-clicking the `.scr` will *not* start the wallpaper — Windows runs the
+> screensaver instead. The flag has to be passed explicitly, which is what the
+> Start-menu shortcut does for you.
 
 - A **tray icon** appears: pause/resume, **Settings…**, **Start with Windows**
   (autostart via `HKCU\…\Run`), and quit.
