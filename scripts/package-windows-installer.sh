@@ -30,8 +30,15 @@ mkdir -p "$OUT"
 
 # 2. Find an Inno Setup compiler: native ISCC, its default install location
 #    (Windows runners ship it there but do NOT put it on PATH), or via wine.
+#
+# MSYS2_ARG_CONV_EXCL: under Git-Bash, MSYS rewrites any argument starting with
+# "/" into a Windows path, so ISCC saw /DMyAppVersion=... and /Odist-native as
+# two extra script filenames and bailed with "You may not specify more than one
+# script filename". Excluding those two prefixes passes them through verbatim.
+# The variable is inert outside MSYS, so the wine path is unaffected.
 run_iscc() {
   local installed
+  export MSYS2_ARG_CONV_EXCL="/D;/O"
   if command -v iscc >/dev/null 2>&1; then
     iscc "/DMyAppVersion=$VERSION" "/O$OUT" "$ISS"
   elif command -v ISCC >/dev/null 2>&1; then
@@ -42,13 +49,23 @@ run_iscc() {
   elif command -v wine >/dev/null 2>&1 && [ -n "${ISCC_EXE:-}" ] && [ -f "$ISCC_EXE" ]; then
     wine "$ISCC_EXE" "/DMyAppVersion=$VERSION" "/O$OUT" "$ISS"
   else
-    return 1
+    # 127 = no compiler at all, distinct from any exit code ISCC itself returns.
+    return 127
   fi
 }
 
 echo "=== Inno Setup compile (v$VERSION) ==="
-if run_iscc; then
+rc=0
+run_iscc || rc=$?
+
+if [ "$rc" -eq 0 ]; then
   echo "✓ $OUT/KuroScreensaver-Setup-$VERSION.exe"
+elif [ "$rc" -ne 127 ]; then
+  # A compiler ran and rejected the script. Always fatal, strict mode or not —
+  # reporting "compiler not found" here would send the reader hunting for an
+  # install that is already present, and passing would hide a broken .iss.
+  echo "✗ ISCC ran but failed to compile $ISS (exit $rc, see its output above)." >&2
+  exit 1
 else
   cat <<EOF
 
