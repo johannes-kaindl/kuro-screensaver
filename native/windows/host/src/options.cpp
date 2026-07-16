@@ -80,42 +80,60 @@ std::wstring EscapeDataString(const std::wstring& value) {
     return out;
 }
 
-std::wstring BuildQueryString(const SaverOptions& o) {
-    return L"?scene=" + EscapeDataString(o.scene) +
-           L"&preset=" + EscapeDataString(o.preset) +
-           L"&speed=" + EscapeDataString(o.speed) +
-           L"&audio=" + OnOff(o.audio) +
-           L"&bloom=" + OnOff(o.bloom) +
-           L"&trails=" + OnOff(o.trails) +
-           L"&scan=" + OnOff(o.scan) +
-           L"&crt=" + OnOff(o.crt) +
-           L"&matrix=" + OnOff(o.matrix) +
-           L"&terminal=" + OnOff(o.terminal) +
-           L"&radar=" + OnOff(o.radar) +
-           L"&crosshair=" + OnOff(o.crosshair) +
+namespace {
+
+// The 33 fields in the pinned contract order, every pair led by '&' and every
+// key prefixed by `p`. Both query halves come from here: the wallpaper's is the
+// saver's with a wp prefix (spec §5.1), and two hand-written 33-key lists would
+// drift apart the moment one side gains a field.
+std::wstring BuildFields(const SaverOptions& o, const std::wstring& p) {
+    return L"&" + p + L"scene=" + EscapeDataString(o.scene) +
+           L"&" + p + L"preset=" + EscapeDataString(o.preset) +
+           L"&" + p + L"speed=" + EscapeDataString(o.speed) +
+           L"&" + p + L"audio=" + OnOff(o.audio) +
+           L"&" + p + L"bloom=" + OnOff(o.bloom) +
+           L"&" + p + L"trails=" + OnOff(o.trails) +
+           L"&" + p + L"scan=" + OnOff(o.scan) +
+           L"&" + p + L"crt=" + OnOff(o.crt) +
+           L"&" + p + L"matrix=" + OnOff(o.matrix) +
+           L"&" + p + L"terminal=" + OnOff(o.terminal) +
+           L"&" + p + L"radar=" + OnOff(o.radar) +
+           L"&" + p + L"crosshair=" + OnOff(o.crosshair) +
            // v0.10 additive keys — pinned contract order. Numerics pass
            // through raw (validated strings, never reformatted).
-           L"&look=" + EscapeDataString(o.look) +
-           L"&altitude=" + EscapeDataString(o.altitude) +
-           L"&fog=" + EscapeDataString(o.fog) +
-           L"&weather=" + EscapeDataString(o.weather) +
-           L"&bank=" + o.bank +
-           L"&reactive=" + OnOff(o.reactive) +
-           L"&autocycle=" + OnOff(o.autocycle) +
-           L"&cyclemin=" + o.cyclemin +
-           L"&termlayout=" + EscapeDataString(o.termlayout) +
-           L"&boot=" + OnOff(o.boot) +
-           L"&bootspeed=" + EscapeDataString(o.bootspeed) +
-           L"&daynight=" + OnOff(o.daynight) +
-           L"&crtintensity=" + o.crtintensity +
-           L"&curvature=" + o.curvature +
-           L"&aperture=" + o.aperture +
-           L"&bloomstrength=" + o.bloomstrength +
-           L"&trailsamount=" + o.trailsamount +
-           L"&ntsc=" + o.ntsc +
-           L"&halation=" + o.halation +
-           L"&scale=" + o.scale +
-           L"&perfadapt=" + OnOff(o.perfadapt);
+           L"&" + p + L"look=" + EscapeDataString(o.look) +
+           L"&" + p + L"altitude=" + EscapeDataString(o.altitude) +
+           L"&" + p + L"fog=" + EscapeDataString(o.fog) +
+           L"&" + p + L"weather=" + EscapeDataString(o.weather) +
+           L"&" + p + L"bank=" + o.bank +
+           L"&" + p + L"reactive=" + OnOff(o.reactive) +
+           L"&" + p + L"autocycle=" + OnOff(o.autocycle) +
+           L"&" + p + L"cyclemin=" + o.cyclemin +
+           L"&" + p + L"termlayout=" + EscapeDataString(o.termlayout) +
+           L"&" + p + L"boot=" + OnOff(o.boot) +
+           L"&" + p + L"bootspeed=" + EscapeDataString(o.bootspeed) +
+           L"&" + p + L"daynight=" + OnOff(o.daynight) +
+           L"&" + p + L"crtintensity=" + o.crtintensity +
+           L"&" + p + L"curvature=" + o.curvature +
+           L"&" + p + L"aperture=" + o.aperture +
+           L"&" + p + L"bloomstrength=" + o.bloomstrength +
+           L"&" + p + L"trailsamount=" + o.trailsamount +
+           L"&" + p + L"ntsc=" + o.ntsc +
+           L"&" + p + L"halation=" + o.halation +
+           L"&" + p + L"scale=" + o.scale +
+           L"&" + p + L"perfadapt=" + OnOff(o.perfadapt);
+}
+
+}  // namespace
+
+std::wstring BuildQueryString(const SaverOptions& o) {
+    return L"?" + BuildFields(o, L"").substr(1);  // the leading '&' becomes the '?'
+}
+
+std::wstring BuildWallpaperQuerySuffix(const SaverOptions& o, const std::wstring& runningStatus) {
+    // runningStatus is host-built from two integers ("2/3"), so it goes in raw
+    // like the numerics — nothing in it needs escaping.
+    return BuildFields(o, L"wp") + L"&wprunning=" + runningStatus;
 }
 
 SaverOptions LoadOptions(const wchar_t* regPath) {

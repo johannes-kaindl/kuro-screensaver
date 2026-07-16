@@ -64,6 +64,12 @@ std::wstring EscapeDataString(const std::wstring& value);
 // keys 13–33 append in the pinned v0.10 contract order (numerics raw).
 std::wstring BuildQueryString(const SaverOptions& o);
 
+// The wallpaper's additive query half — the same 33 keys in the same order,
+// every one wp-prefixed, leading '&', to be appended after BuildQueryString's
+// output so the saver prefix stays byte-identical (spec §5.1). runningStatus is
+// free-form for the dialog's status block ("2/3", or empty when nothing runs).
+std::wstring BuildWallpaperQuerySuffix(const SaverOptions& wp, const std::wstring& runningStatus);
+
 // Registry I/O (HKCU). regPath is overridable for tests only.
 SaverOptions LoadOptions(const wchar_t* regPath = kRegPath);
 void SaveOptions(const SaverOptions& o, const wchar_t* regPath = kRegPath);
