@@ -1,6 +1,6 @@
 {
   "name": "kuro-screensaver",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "private": true,
   "type": "module",
   "description": "Standalone retro-CRT 3D screensaver engine — extracted from kuro-companion plugin.",
