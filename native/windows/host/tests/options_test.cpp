@@ -3,6 +3,7 @@
 // pure host helpers: numeric validation, monitor-id sanitizing, per-monitor
 // registry config and the wallpaper render-policy table. Plain main(), no
 // framework — the CI job just checks the exit code.
+#include "instance.h"
 #include "monitors.h"
 #include "options.h"
 #include "render_policy.h"
@@ -238,6 +239,40 @@ int main() {
         PolicyInputs i;
         i.powerSaver = true;
         ExpectTrue(DecideRenderPolicy(i).state == RenderState::Frozen, "power saver freezes");
+    }
+
+    // 12. Autostart migration. v0.10 wrote Run\KuroWallpaper =
+    // "<dir>\KuroScreensaver.scr" /w. The app is now a .exe, so the key must be
+    // rewritten — but only when it points at OUR .scr: a user who aimed it
+    // somewhere else keeps their value, and an absent key stays absent.
+    {
+        const wchar_t* testRun = L"Software\\KuroScreensaverTest\\Run";
+        RegDeleteTreeW(HKEY_CURRENT_USER, L"Software\\KuroScreensaverTest");
+
+        std::wstring old = L"\"C:\\Program Files\\Kuro\\KuroScreensaver.scr\" /w";
+        WriteReg(testRun, L"KuroWallpaper", old);
+        MigrateAutostartKey(testRun);
+        std::wstring got = ReadReg(testRun, L"KuroWallpaper", L"");
+        ExpectTrue(got.find(L"KuroWallpaper.exe") != std::wstring::npos,
+                   "autostart migration: points at the exe");
+        ExpectTrue(got.find(L"/silent") != std::wstring::npos,
+                   "autostart migration: silent flag");
+        ExpectTrue(got.find(L"C:\\Program Files\\Kuro\\") != std::wstring::npos,
+                   "autostart migration: keeps the install directory");
+
+        std::wstring foreign = L"\"C:\\Other\\thing.exe\" --go";
+        WriteReg(testRun, L"KuroWallpaper", foreign);
+        MigrateAutostartKey(testRun);
+        ExpectEq(ReadReg(testRun, L"KuroWallpaper", L""), foreign,
+                 "autostart migration: foreign value untouched");
+
+        // Migration must never CREATE an autostart the user did not ask for.
+        RegDeleteKeyValueW(HKEY_CURRENT_USER, testRun, L"KuroWallpaper");
+        MigrateAutostartKey(testRun);
+        ExpectEq(ReadReg(testRun, L"KuroWallpaper", L"<none>"), std::wstring(L"<none>"),
+                 "autostart migration: absent stays absent");
+
+        RegDeleteTreeW(HKEY_CURRENT_USER, L"Software\\KuroScreensaverTest");
     }
 
     if (failures) {

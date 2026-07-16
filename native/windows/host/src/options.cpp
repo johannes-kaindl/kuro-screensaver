@@ -5,8 +5,6 @@
 #include <cstdio>
 #include <vector>
 
-namespace {
-
 std::wstring ReadReg(const wchar_t* path, const wchar_t* name, const std::wstring& def) {
     wchar_t buf[256];
     DWORD size = sizeof(buf);
@@ -18,6 +16,8 @@ void WriteReg(const wchar_t* path, const wchar_t* name, const std::wstring& valu
     RegSetKeyValueW(HKEY_CURRENT_USER, path, name, REG_SZ, value.c_str(),
                     static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t)));
 }
+
+namespace {
 
 bool ReadFlag(const wchar_t* path, const wchar_t* name, bool def) {
     return ReadReg(path, name, def ? L"on" : L"off") == L"on";

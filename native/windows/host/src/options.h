@@ -68,6 +68,13 @@ std::wstring BuildQueryString(const SaverOptions& o);
 SaverOptions LoadOptions(const wchar_t* regPath = kRegPath);
 void SaveOptions(const SaverOptions& o, const wchar_t* regPath = kRegPath);
 
+// Single-value HKCU string I/O, the primitives the two functions above are
+// built from. Exported because the autostart migration (instance.h) and its
+// test need the same reader and writer — a second, subtly different pair is how
+// key names drift apart.
+std::wstring ReadReg(const wchar_t* path, const wchar_t* name, const std::wstring& def);
+void WriteReg(const wchar_t* path, const wchar_t* name, const std::wstring& value);
+
 // Validates a raw decimal string (^[0-9]+(\.[0-9]+)?$ — no sign, no exponent,
 // no locale comma) and checks lo <= value <= hi. Manual scan on purpose:
 // swscanf/wcstod honor the user locale and would mis-parse the dot.
