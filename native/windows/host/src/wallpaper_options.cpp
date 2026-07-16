@@ -18,8 +18,8 @@ SaverOptions LoadWallpaperOptions(const wchar_t* regPath) {
 
     if (ReadReg(regPath, L"Scale", L"").empty()) {
         // v0.10 kept the wallpaper's render scale in a single flat key next to
-        // the saver's values (WallpaperScale, read by wallpaper_window.cpp).
-        // The subkey supersedes it — but a value someone set by hand must not
+        // the saver's values (WallpaperScale, read by BuildWallpaperPage back
+        // then). The subkey supersedes it — but a value someone set by hand must not
         // silently revert, so inherit it once. No UI ever wrote that key, hence
         // no round-trip migration: honour it on read, let the next save move it.
         // Parent derived from regPath, NOT kRegPath — otherwise the tests, which

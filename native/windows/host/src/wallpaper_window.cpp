@@ -31,6 +31,7 @@
 #include "render_policy.h"
 #include "settings_window.h"
 #include "tray.h"
+#include "wallpaper_options.h"
 #include "webview_host.h"
 
 namespace {
@@ -96,24 +97,14 @@ LRESULT CALLBACK WallpaperWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
-// WallpaperScale registry value (raw string, validated), default 0.66 —
-// replaces the saver's Scale in the wallpaper URL.
-std::wstring WallpaperScale() {
-    wchar_t buf[64];
-    DWORD size = sizeof(buf);
-    if (RegGetValueW(HKEY_CURRENT_USER, kRegPath, L"WallpaperScale", RRF_RT_REG_SZ, nullptr, buf,
-                     &size) == ERROR_SUCCESS) {
-        std::wstring v(buf);
-        if (IsValidNumber(v, 0.25, 1)) return v;
-    }
-    return L"0.66";
-}
-
-// Wallpaper URL: audio forced off (no UI opt-in in v0.10), scale replaced by
-// WallpaperScale, kiosk flag constant. Takes a copy on purpose.
+// Wallpaper URL: audio forced off (spec §4.1 — the dialog greys the switch out
+// with that reason, this is what makes the reason true), kiosk flag constant.
+// Scale is NOT overridden here any more: it is a normal field of the wallpaper's
+// own option set, and the legacy WallpaperScale key is inherited once on load
+// (LoadWallpaperOptions). Overriding it here would beat the tab's own slider.
+// Takes a copy on purpose.
 std::wstring BuildWallpaperPage(SaverOptions o) {
     o.audio = false;
-    o.scale = WallpaperScale();
     return L"screensaver.html" + BuildQueryString(o) + L"&kiosk=on";
 }
 
@@ -305,7 +296,9 @@ int RunWallpaper(bool showSettings) {
     wc.hbrBackground = static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
     RegisterClassW(&wc);
 
-    SaverOptions opts = LoadOptions();
+    // The wallpaper's own set, not the saver's — the wallpaper tab of the
+    // dialog would otherwise have no effect at all (spec §4).
+    SaverOptions opts = LoadWallpaperOptions();
     std::vector<MonitorInfo> mons = EnumMonitors();
     if (mons.empty()) return 0;
 

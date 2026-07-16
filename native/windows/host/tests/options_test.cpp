@@ -50,6 +50,21 @@ static const wchar_t* kFlipQuery =  // without the leading '?'
     L"&daynight=off&crtintensity=0.85&curvature=0.022&aperture=0.45"
     L"&bloomstrength=1.6&trailsamount=0.9&ntsc=0.6&halation=0.4&scale=0.66&perfadapt=off";
 
+// Turns the pinned saver fixture "?scene=random&preset=…" into the wallpaper
+// half it must mirror: "&wpscene=random&wppreset=…". Derived rather than typed
+// out a second time — a hand-copied 33-key twin drifts the moment one side
+// gains a field.
+static std::wstring WpPrefixed(const std::wstring& saverQuery) {
+    std::wstring out;
+    for (size_t pos = 1; pos < saverQuery.size();) {  // 1: skip the leading '?'
+        size_t amp = saverQuery.find(L'&', pos);
+        size_t end = amp == std::wstring::npos ? saverQuery.size() : amp;
+        out += L"&wp" + saverQuery.substr(pos, end - pos);
+        pos = end + 1;
+    }
+    return out;
+}
+
 int main() {
     // 0. Source encoding. The sources are UTF-8 without BOM, so without /utf-8
     // MSVC decodes them as the system codepage and every non-ASCII literal turns
@@ -318,6 +333,37 @@ int main() {
                  "wallpaper set untouched by saver save");
 
         RegDeleteTreeW(HKEY_CURRENT_USER, saverKey);
+    }
+
+    // 14. The dialog needs both sets. The saver prefix must stay byte-identical
+    // (the v0.9 format contract), so the wallpaper set is strictly additive with
+    // a wp prefix — wp, not w, because WMode/WScene/WPreset already mean the
+    // per-monitor trio and a wscene next to a WScene is a trap for the next
+    // reader.
+    {
+        SaverOptions wp = WallpaperDefaults();
+        wp.scene = L"void";
+        wp.preset = L"phosphor";
+        wp.scale = L"0.66";
+
+        std::wstring suffix = BuildWallpaperQuerySuffix(wp, L"2/3");
+        ExpectTrue(suffix.rfind(L"&", 0) == 0, "wallpaper query: starts with &");
+        ExpectTrue(suffix.find(L"&wpscene=void") != std::wstring::npos, "wallpaper query: scene");
+        ExpectTrue(suffix.find(L"&wppreset=phosphor") != std::wstring::npos,
+                   "wallpaper query: preset");
+        ExpectTrue(suffix.find(L"&wpscale=0.66") != std::wstring::npos,
+                   "wallpaper query: numeric stays raw");
+        ExpectTrue(suffix.find(L"&wprunning=2/3") != std::wstring::npos,
+                   "wallpaper query: run status");
+        // Exact mirror of the saver half: same 33 keys, same order, same values,
+        // every one wp-prefixed, then wprunning. A field only one half carries
+        // would be an option the dialog can show but never save.
+        ExpectEq(BuildWallpaperQuerySuffix(SaverOptions{}, L""),
+                 WpPrefixed(kDefaultQuery) + L"&wprunning=",
+                 "wallpaper query mirrors the saver half key for key");
+        // The saver's own query must not have gained anything.
+        ExpectTrue(BuildQueryString(SaverOptions{}).find(L"wp") == std::wstring::npos,
+                   "saver query free of wp keys");
     }
 
     if (failures) {
