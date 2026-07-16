@@ -7,6 +7,7 @@
 #include "monitors.h"
 #include "options.h"
 #include "render_policy.h"
+#include "wallpaper_options.h"
 
 #include <windows.h>
 
@@ -273,6 +274,50 @@ int main() {
                  "autostart migration: absent stays absent");
 
         RegDeleteTreeW(HKEY_CURRENT_USER, L"Software\\KuroScreensaverTest");
+    }
+
+    // 13. The wallpaper keeps a full, independent option set in a subkey with
+    // identical key names (spec §4). Two invariants matter: a wallpaper save must
+    // not touch the saver's values, and an empty subkey must yield the WALLPAPER
+    // defaults (audio off, scale 0.66) — not the saver's.
+    {
+        const wchar_t* saverKey = L"Software\\KuroScreensaverTest";
+        const wchar_t* wpKey = L"Software\\KuroScreensaverTest\\Wallpaper";
+        RegDeleteTreeW(HKEY_CURRENT_USER, saverKey);
+
+        SaverOptions wp = LoadWallpaperOptions(wpKey);
+        ExpectTrue(!wp.audio, "wallpaper default: audio off");
+        ExpectEq(wp.scale, std::wstring(L"0.66"), "wallpaper default: render scale 0.66");
+        ExpectEq(wp.preset, SaverOptions{}.preset, "wallpaper default: rest is the saver default");
+
+        // A hand-set v0.10 WallpaperScale is inherited once, not silently lost.
+        WriteReg(saverKey, L"WallpaperScale", L"0.5");
+        ExpectEq(LoadWallpaperOptions(wpKey).scale, std::wstring(L"0.5"),
+                 "wallpaper default: inherits legacy WallpaperScale");
+        WriteReg(saverKey, L"WallpaperScale", L"9");
+        ExpectEq(LoadWallpaperOptions(wpKey).scale, std::wstring(L"0.66"),
+                 "wallpaper default: rejects out-of-range legacy WallpaperScale");
+        RegDeleteKeyValueW(HKEY_CURRENT_USER, saverKey, L"WallpaperScale");
+
+        wp.scene = L"void";
+        wp.preset = L"phosphor";
+        wp.scale = L"0.5";
+        SaveWallpaperOptions(wp, wpKey);
+        SaverOptions back = LoadWallpaperOptions(wpKey);
+        ExpectEq(back.scene, std::wstring(L"void"), "wallpaper round-trip: scene");
+        ExpectEq(back.preset, std::wstring(L"phosphor"), "wallpaper round-trip: preset");
+        ExpectEq(back.scale, std::wstring(L"0.5"), "wallpaper round-trip: raw numeric");
+
+        // The saver set is untouched by all of the above …
+        SaverOptions saver = LoadOptions(saverKey);
+        ExpectEq(saver.scene, std::wstring(L"random"), "saver set untouched by wallpaper save");
+        // … and the reverse: a saver save leaves the wallpaper subkey alone.
+        saver.scene = L"terrain";
+        SaveOptions(saver, saverKey);
+        ExpectEq(LoadWallpaperOptions(wpKey).scene, std::wstring(L"void"),
+                 "wallpaper set untouched by saver save");
+
+        RegDeleteTreeW(HKEY_CURRENT_USER, saverKey);
     }
 
     if (failures) {
