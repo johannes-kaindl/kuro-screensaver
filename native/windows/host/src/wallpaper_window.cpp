@@ -222,8 +222,12 @@ void ApplyPowerStates(bool force) {
     }
 }
 
-// Tray hook: pause = hide + suspend, resume = back + re-applied power state.
-void SetWallpaperPaused(bool paused) {
+// What pausing DOES (hide + suspend, resume = back + re-applied power state).
+// Deliberately not called SetWallpaperPaused: that name belongs to the switch in
+// tray.h which owns the state and calls this as its effect. One name for both
+// would compile until someone exported the other — which is exactly what
+// happened when the dialog's [Anhalten] button needed the switch.
+static void ApplyPauseToWindows(bool paused) {
     g_paused = paused;
     for (WallpaperWindow* w : g_windows) {
         if (paused) {
@@ -398,7 +402,7 @@ int RunWallpaper(bool showSettings) {
     }
 
     // Tray runs even when every monitor is off — settings/exit stay reachable.
-    InitTray(SetWallpaperPaused);
+    InitTray(ApplyPauseToWindows);
 
     // Start-menu click: show the window immediately. Autostart (/silent) skips
     // this — a window popping up at every login is exactly what nobody wants.
