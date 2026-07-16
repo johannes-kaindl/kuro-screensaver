@@ -39,12 +39,15 @@ function hostQuery(o: {
   wallpaper?: Partial<SettingsFormState>;
   monitors?: MonitorEntry[];
   tab?: 'saver' | 'wallpaper';
+  running?: string;
+  paused?: boolean;
 } = {}): string {
   const query = buildSaveMessage(
     { ...FORM_DEFAULTS, ...o.saver }, [], 'per',
     { ...WALLPAPER_FORM_DEFAULTS, ...o.wallpaper }, 'per',
   ).slice('save:'.length);
   return `?${query}&monitors=${encodeURIComponent(JSON.stringify(o.monitors ?? []))}` +
+    `&wprunning=${o.running ?? ''}&wppaused=${o.paused ? 'on' : 'off'}` +
     `&tab=${o.tab ?? 'saver'}`;
 }
 
@@ -182,5 +185,40 @@ describe('settings dialog — the inactive tab is normalised too', () => {
     expect(msg).toContain(`&bootspeed=${FORM_DEFAULTS.bootspeed}`);
     expect(msg).toContain(`&wpspeed=${WALLPAPER_FORM_DEFAULTS.speed}`);
     expect(msg).toContain(`&wptermlayout=${WALLPAPER_FORM_DEFAULTS.termlayout}`);
+  });
+});
+
+describe('pause button', () => {
+  /** The [Anhalten] control from the approved layout — the tray's toggle, in the dialog. */
+  function pauseButton(): HTMLButtonElement | undefined {
+    return [...document.querySelectorAll<HTMLButtonElement>('button.pause')][0];
+  }
+
+  it('posts pause:on immediately, not on save', async () => {
+    await openDialog(hostQuery({ tab: 'wallpaper', running: '2/3' }));
+    pauseButton()!.click();
+    // Immediate-apply like the tray item and the autostart box: pausing is an
+    // action, not a setting you stage and confirm.
+    expect(posted.at(-1)).toBe('pause:on');
+  });
+
+  it('posts pause:off and relabels when resuming', async () => {
+    await openDialog(hostQuery({ tab: 'wallpaper', running: '2/3', paused: true }));
+    expect(pauseButton()!.textContent).toBe('Fortsetzen');
+    pauseButton()!.click();
+    expect(posted.at(-1)).toBe('pause:off');
+    expect(pauseButton()!.textContent).toBe('Anhalten');
+  });
+
+  it('is absent when no wallpaper runs — nothing to pause', async () => {
+    // The /c path: the saver's dialog has no tray and no wallpaper behind it.
+    await openDialog(hostQuery({ tab: 'wallpaper', running: '' }));
+    expect(pauseButton()).toBeUndefined();
+  });
+
+  it('never leaks into the save message', async () => {
+    await openDialog(hostQuery({ tab: 'wallpaper', running: '2/3' }));
+    pauseButton()!.click();
+    expect(save()).not.toContain('pause');
   });
 });

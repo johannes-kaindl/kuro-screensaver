@@ -25,6 +25,7 @@ import {
   readMonitors,
   readTab,
   readWallpaperInitial,
+  readWallpaperPaused,
   readWallpaperRunning,
   type BoolKey,
   type MonitorEntry,
@@ -424,6 +425,22 @@ const running = readWallpaperRunning(params);
 status.textContent = running ? `● Läuft auf ${running} Monitoren` : '○ Wallpaper läuft nicht';
 status.classList.toggle('on', running !== '');
 
+// Only when something is actually running: the saver's /c dialog has no tray and
+// no wallpaper behind it, so a button there would post into the void.
+let paused = readWallpaperPaused(params);
+const pauseBtn = document.createElement('button');
+pauseBtn.className = 'pause';
+pauseBtn.type = 'button';
+const labelPause = (): void => { pauseBtn.textContent = paused ? 'Fortsetzen' : 'Anhalten'; };
+labelPause();
+// Immediate-apply, like the autostart box and the tray item it mirrors: pausing
+// is an action, not a setting you stage and confirm with Save.
+pauseBtn.addEventListener('click', () => {
+  paused = !paused;
+  labelPause();
+  post(`pause:${paused ? 'on' : 'off'}`);
+});
+
 const autostartRow = document.createElement('label');
 autostartRow.className = 'toggle autostart';
 const autostartBox = document.createElement('input');
@@ -437,9 +454,14 @@ autostartBox.addEventListener('change', () => {
 });
 autostartRow.append(autostartBox, document.createTextNode('Mit Windows starten'));
 
+const statusRow = document.createElement('div');
+statusRow.className = 'status-row';
+statusRow.append(status);
+if (running) statusRow.append(pauseBtn);
+
 const wallpaperHead = document.createElement('div');
 wallpaperHead.className = 'wp-head';
-wallpaperHead.append(status, autostartRow);
+wallpaperHead.append(statusRow, autostartRow);
 refreshers.push(() => { wallpaperHead.hidden = !isWallpaperTab(); });
 
 // ---------------------------------------------------------------- Buttons

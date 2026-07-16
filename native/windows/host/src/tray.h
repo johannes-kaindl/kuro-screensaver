@@ -25,3 +25,11 @@ void RemoveTray();
 // Applies immediately (it is an OS setting, not one of the 33 options).
 bool AutostartEnabled();
 void SetAutostartEnabled(bool enabled);
+
+// The pause toggle, for the same reason: the dialog's [Anhalten] button and the
+// tray's menu item are one switch. The tray owns the state (it drives the menu
+// label), so both readers must come here rather than keep their own copy — two
+// copies drift the moment one path is used and the other is not.
+// No-op when the tray is not up (the saver's /c dialog runs without one).
+bool WallpaperPaused();
+void SetWallpaperPaused(bool paused);

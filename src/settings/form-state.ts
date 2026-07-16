@@ -306,6 +306,11 @@ export function readAutostart(params: URLSearchParams): boolean {
   return params.get(WALLPAPER_PREFIX + 'autostart') === 'on';
 }
 
+/** Whether the tray currently holds the wallpaper paused (host-owned, like autostart). */
+export function readWallpaperPaused(params: URLSearchParams): boolean {
+  return params.get(WALLPAPER_PREFIX + 'paused') === 'on';
+}
+
 /** Parses the host's monitor list (`monitors=`-JSON param); [] when absent/broken. */
 export function readMonitors(params: URLSearchParams): MonitorEntry[] {
   const raw = params.get('monitors');

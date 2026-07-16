@@ -88,8 +88,7 @@ LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_COMMAND:
             switch (LOWORD(wp)) {
                 case IDM_TRAY_TOGGLE:
-                    g_paused = !g_paused;
-                    if (g_setPaused) g_setPaused(g_paused);
+                    SetWallpaperPaused(!g_paused);
                     break;
                 case IDM_TRAY_SETTINGS:
                     // Non-modal: RunWallpaper's message loop dispatches for it.
@@ -160,6 +159,17 @@ bool InitTray(std::function<void(bool paused)> setPaused) {
         return false;
     }
     return true;
+}
+
+bool WallpaperPaused() { return g_paused; }
+
+void SetWallpaperPaused(bool paused) {
+    // Single owner of the toggle: the tray menu, the dialog's [Anhalten] button
+    // and any future caller all land here, so the menu label can never disagree
+    // with what the wallpaper is actually doing. g_setPaused is null on the
+    // saver's /c path (no tray, no wallpaper) — then this is a no-op.
+    g_paused = paused;
+    if (g_setPaused) g_setPaused(g_paused);
 }
 
 void RemoveTray() {

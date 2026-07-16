@@ -28,8 +28,15 @@
         border: 1px solid #1e3a28; background: rgba(10, 18, 13, 0.45);
         padding: 8px 12px; margin-bottom: 10px;
       }
+      .status-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
       .status { opacity: 0.7; }
       .status.on { color: #d4ffdd; opacity: 1; }
+      /* Quieter than Save: pausing is reversible and not what you came here for. */
+      button.pause {
+        background: transparent; border: 1px solid #2a5a3c; color: #a8d8b8;
+        padding: 3px 10px; font: inherit; font-size: 11px; cursor: pointer;
+      }
+      button.pause:hover { border-color: #39ff7a; color: #d4ffdd; }
       .reason { font-size: 11px; opacity: 0.7; }
       .toggle.disabled { cursor: default; opacity: 0.5; }
       .look-row { margin-bottom: 12px; }

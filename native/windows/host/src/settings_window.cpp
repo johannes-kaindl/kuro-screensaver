@@ -118,6 +118,12 @@ void HandleWebMessage(HWND hwnd, const std::wstring& message) {
         SetAutostartEnabled(message.substr(10) == L"on");
         return;
     }
+    // Same shape, same reason. No-op without a tray (the /c path), where the
+    // page hides the button anyway because nothing is running to pause.
+    if (message.rfind(L"pause:", 0) == 0) {
+        SetWallpaperPaused(message.substr(6) == L"on");
+        return;
+    }
     if (message.rfind(L"save:", 0) != 0) return;
 
     const std::wstring body = message.substr(5);
@@ -225,6 +231,7 @@ HWND OpenSettingsWindow(bool openOnWallpaperTab) {
                         BuildWallpaperQuerySuffix(LoadWallpaperOptions(), WallpaperRunStatus()) +
                         L"&wpmonitormode=" + LoadMonitorMode(true) +
                         L"&wpautostart=" + (AutostartEnabled() ? L"on" : L"off") +
+                        L"&wppaused=" + (WallpaperPaused() ? L"on" : L"off") +
                         L"&tab=" + (openOnWallpaperTab ? L"wallpaper" : L"saver");
 
     CreateWebView(
