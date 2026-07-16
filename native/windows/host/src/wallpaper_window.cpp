@@ -328,6 +328,15 @@ void ReloadWallpaper() {
         if (!w->monitorId.empty()) ApplyMonitorOverrides(w->monitorId, w->primary, o);
         std::wstring url = WebPageUrl(BuildWallpaperPage(o));
         w->webview->Navigate(url.c_str());
+        // A reload IS the startup race again: the new page builds its message
+        // listener asynchronously and starts out animating at the engine default.
+        // Without re-arming the replay window, the next poll would find the old
+        // createdTick (settled) and the stale lastPowerMsg equal to the current
+        // policy, dedupe it away, and the fresh page would never hear e.g.
+        // power:frozen — animating on battery until the power state happens to
+        // change. Every save would silently undo the v0.8 efficiency work.
+        w->createdTick = GetTickCount64();
+        w->lastPowerMsg.clear();
     }
 }
 

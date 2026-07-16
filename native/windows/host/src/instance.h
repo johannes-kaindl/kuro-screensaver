@@ -11,8 +11,12 @@
 // the wallpaper; the caller should signal it and exit.
 bool AcquireWallpaperInstance();
 
-// Asks the running instance to show its settings window. Safe to call after
-// AcquireWallpaperInstance() returned false.
+// Asks the running instance to show its settings window. Call after
+// AcquireWallpaperInstance() returned false. BLOCKS for up to 5 s: the winner
+// creates its tray window late in startup, and giving up early would silently
+// drop the request. Returns as soon as the message is posted, or when the wait
+// runs out. Never call this for /silent — the autostart losing the race must not
+// force a window open (main.cpp).
 void SignalExistingInstance();
 
 // Registered window messages, shared by sender and receiver. Both return the

@@ -84,16 +84,20 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         HWND parent = ParsePreviewHandle(arg, argc, argv);
         rc = parent ? RunPreview(parent) : 0;
     } else if (flag == L"/w") {
+        // /silent = autostart: tray only. Everything else (start-menu click,
+        // the bare KuroWallpaper.exe) wants its window.
+        const bool silent = argc > 1 && _wcsicmp(argv[1], L"/silent") == 0;
         // Second instance? Hand the request over and get out of the way — never
         // render a second wallpaper (instance.h).
         if (!AcquireWallpaperInstance()) {
-            SignalExistingInstance();
+            // Only a user-initiated start asks the winner to show its window.
+            // The autostart losing the race against a manual start must stay
+            // silent — forcing the settings window open at login is exactly what
+            // /silent exists to prevent.
+            if (!silent) SignalExistingInstance();
             rc = 0;
         } else {
             MigrateAutostartKey();  // a v0.10 key still points at the .scr
-            // /silent = autostart: tray only. Everything else (start-menu click,
-            // the bare KuroWallpaper.exe) wants its window.
-            const bool silent = argc > 1 && _wcsicmp(argv[1], L"/silent") == 0;
             rc = RunWallpaper(!silent);
         }
     } else {
