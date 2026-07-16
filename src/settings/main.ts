@@ -1,9 +1,12 @@
-// Native settings dialog (Windows .scr `/c`) — renders the full v0.10 option
-// set (looks, CRT sliders, motion/story, monitors, performance) and posts it
-// back to the Win32 host via window.chrome.webview.postMessage
-// ("save:<query>" or "cancel"; host answers "saveerror" when it rejects).
-// Loads standalone in a browser too (styling / dev loop); without the host
-// bridge the messages go to the console instead.
+// Native settings dialog (Windows) — renders the full v0.10 option set (looks,
+// CRT sliders, motion/story, monitors, performance) and posts it back to the
+// Win32 host via window.chrome.webview.postMessage ("save:<query>" or "cancel";
+// host answers "saveerror" when it rejects). Loads standalone in a browser too
+// (styling / dev loop); without the host bridge the messages go to the console.
+//
+// v0.11: two tabs, two fully independent option sets. One DOM drives both — the
+// tab switch repoints `state` and re-runs the refreshers, so every control keeps
+// exactly one definition and the two tabs cannot drift apart.
 //
 // Scene / preset / look lists come straight from the engine data — the retired
 // C# ConfigForm duplicated them by hand.
@@ -16,24 +19,49 @@ import {
   NUMERIC_RANGES,
   buildSaveMessage,
   initialMonitorStates,
+  readAutostart,
   readInitial,
   readMonitors,
+  readTab,
+  readWallpaperInitial,
+  readWallpaperRunning,
   type BoolKey,
   type MonitorEntry,
   type MonitorFormState,
   type NumericKey,
+  type SettingsFormState,
+  type Tab,
 } from './form-state';
 
 const SPEEDS = ['slow', 'norm', 'fast'] as const;
 
 const params = new URLSearchParams(location.search);
-const state = readInitial(params);
+const saverState = readInitial(params);
+const wallpaperState = readWallpaperInitial(params);
 const monitors = readMonitors(params);
 
+let tab: Tab = readTab(params);
+const isWallpaperTab = (): boolean => tab === 'wallpaper';
+
+// Every control below closes over this binding rather than a fixed object, so
+// repointing it IS the tab switch.
+let state: SettingsFormState = isWallpaperTab() ? wallpaperState : saverState;
+
 // MonitorMode travels as its own query param (not part of the 33-key format);
-// echoed back verbatim in the save message when non-empty.
-let monitorMode = params.get('monitormode') ?? '';
-if (monitors.length >= 2 && monitorMode !== 'per' && monitorMode !== 'span') monitorMode = 'per';
+// echoed back verbatim in the save message when non-empty. One per tab: the
+// wallpaper's span/per choice lives in WallpaperMonitorMode and has always been
+// independent of the saver's — v0.10 just had no UI for it.
+const monitorModes: Record<Tab, string> = {
+  saver: params.get('monitormode') ?? '',
+  wallpaper: params.get('wmonitormode') ?? '',
+};
+if (monitors.length >= 2) {
+  for (const t of ['saver', 'wallpaper'] as const) {
+    if (monitorModes[t] !== 'per' && monitorModes[t] !== 'span') monitorModes[t] = 'per';
+  }
+}
+
+let autostart = readAutostart(params);
 
 // Per-monitor overrides start from the existing config the host embeds in
 // the monitors=-JSON — an untouched save keeps them (unknown registry values
@@ -75,11 +103,16 @@ function select(options: readonly Option[], get: () => string, set: (v: string) 
     opt.textContent = o.label ?? o.value;
     sel.append(opt);
   }
-  const current = get();
-  sel.value = options.some((o) => o.value === current) ? current : options[0].value;
-  set(sel.value); // normalise unknown registry values to a real option
+  // Normalise unknown registry values to a real option — on load AND on every
+  // refresh, because a tab switch shows a set this select has never seen.
+  const normalise = (): void => {
+    const current = get();
+    sel.value = options.some((o) => o.value === current) ? current : options[0].value;
+    if (sel.value !== current) set(sel.value);
+  };
+  normalise();
   sel.addEventListener('change', () => set(sel.value));
-  refreshers.push(() => { sel.value = get(); });
+  refreshers.push(normalise);
   return sel;
 }
 
@@ -238,8 +271,23 @@ display.grid.append(
   toggle('boot', 'Boot sequence'),
   row('Boot speed', select(opts(['fast', 'normal', 'cinematic']), () => state.bootspeed, (v) => (state.bootspeed = v))),
   toggle('daynight', 'Day/night'),
-  toggle('audio', 'Audio'),
 );
+
+// Audio is forced off in the wallpaper (BuildWallpaperPage) — greyed out WITH
+// the reason, not hidden: a missing switch reads as a bug, a greyed one with an
+// explanation reads as a decision (spec §5).
+const audioToggle = toggle('audio', 'Audio');
+const audioBox = audioToggle.querySelector('input')!;
+const audioReason = document.createElement('span');
+audioReason.className = 'reason';
+audioReason.textContent = 'aus — im Wallpaper immer';
+audioToggle.append(audioReason);
+refreshers.push(() => {
+  audioBox.disabled = isWallpaperTab();
+  audioToggle.classList.toggle('disabled', isWallpaperTab());
+  audioReason.hidden = !isWallpaperTab();
+});
+display.grid.append(audioToggle);
 
 // ---------------------------------------------------------------- Monitore
 function badge(text: string): HTMLElement {
@@ -294,12 +342,12 @@ if (monitors.length > 0) {
       radio.type = 'radio';
       radio.name = 'monitormode';
       radio.value = value;
-      radio.checked = monitorMode === value;
+      radio.checked = monitorModes[tab] === value;
       radio.addEventListener('change', () => {
-        if (radio.checked) monitorMode = value;
+        if (radio.checked) monitorModes[tab] = value;
         refreshAll();
       });
-      refreshers.push(() => { radio.checked = monitorMode === value; });
+      refreshers.push(() => { radio.checked = monitorModes[tab] === value; });
       wrap.append(radio, document.createTextNode(text));
       radios.append(wrap);
     }
@@ -308,20 +356,32 @@ if (monitors.length > 0) {
   }
   // Save-format cap: ParseSaveMessage accepts m0..m7 only, buildSaveMessage
   // slices accordingly — so no card for what would silently not be saved.
-  monitors.slice(0, MONITOR_CAP).forEach((entry, i) => mon.grid.append(monitorCard(entry, monitorStates[i])));
+  monitors.slice(0, MONITOR_CAP).forEach((entry, i) => {
+    const card = monitorCard(entry, monitorStates[i]);
+    // The cards edit the saver's per-monitor trio. The wallpaper's own trio
+    // (WMode/WScene/WPreset) is a separate registry vocabulary that no query
+    // key carries yet, so showing these cards under the wallpaper tab would
+    // silently edit the wrong set.
+    refreshers.push(() => { card.hidden = isWallpaperTab(); });
+    mon.grid.append(card);
+  });
   if (monitors.length > MONITOR_CAP) {
     const capHint = document.createElement('div');
     capHint.className = 'hint';
     capHint.textContent = `Maximal ${MONITOR_CAP} Monitore konfigurierbar`;
     capHint.style.gridColumn = '1 / -1';
+    refreshers.push(() => { capHint.hidden = isWallpaperTab(); });
     mon.grid.append(capHint);
   }
+  const perMonHint = document.createElement('div');
+  perMonHint.className = 'hint';
+  perMonHint.textContent = 'Je-Monitor-Zuordnung: derzeit nur für den Screensaver einstellbar';
+  refreshers.push(() => { perMonHint.hidden = !isWallpaperTab(); });
   const hint = document.createElement('div');
   hint.className = 'hint';
   hint.textContent = 'Empfehlung: Render-Scale ≤ 66 % bei 3 Monitoren';
-  hint.hidden = monitorMode !== 'span';
-  refreshers.push(() => { hint.hidden = monitorMode !== 'span'; });
-  mon.root.append(hint);
+  refreshers.push(() => { hint.hidden = monitorModes[tab] !== 'span'; });
+  mon.root.append(perMonHint, hint);
 }
 
 const perf = section('Leistung');
@@ -331,6 +391,48 @@ perf.grid.append(
   }),
   toggle('perfadapt', 'Adaptive quality'),
 );
+
+// ------------------------------------------------- Tabs, Status, Autostart
+const tabBar = document.createElement('div');
+tabBar.className = 'tabs';
+for (const [value, text] of [['saver', 'Screensaver'], ['wallpaper', 'Wallpaper']] as const) {
+  const btn = document.createElement('button');
+  btn.className = 'tab';
+  btn.textContent = text;
+  btn.addEventListener('click', () => {
+    tab = value;
+    state = value === 'wallpaper' ? wallpaperState : saverState;
+    refreshAll();
+  });
+  refreshers.push(() => { btn.classList.toggle('active', tab === value); });
+  tabBar.append(btn);
+}
+
+// Status and autostart live in the wallpaper tab only: they concern the
+// wallpaper alone — the screensaver is started by Windows itself (spec E4).
+const status = document.createElement('div');
+status.className = 'status';
+const running = readWallpaperRunning(params);
+status.textContent = running ? `● Läuft auf ${running} Monitoren` : '○ Wallpaper läuft nicht';
+status.classList.toggle('on', running !== '');
+
+const autostartRow = document.createElement('label');
+autostartRow.className = 'toggle autostart';
+const autostartBox = document.createElement('input');
+autostartBox.type = 'checkbox';
+autostartBox.checked = autostart;
+// Applies immediately instead of on Save: the Run key is an OS setting, not one
+// of the 33 options — same as the tray's toggle, which it mirrors.
+autostartBox.addEventListener('change', () => {
+  autostart = autostartBox.checked;
+  post(`autostart:${autostart ? 'on' : 'off'}`);
+});
+autostartRow.append(autostartBox, document.createTextNode('Mit Windows starten'));
+
+const wallpaperHead = document.createElement('div');
+wallpaperHead.className = 'wp-head';
+wallpaperHead.append(status, autostartRow);
+refreshers.push(() => { wallpaperHead.hidden = !isWallpaperTab(); });
 
 // ---------------------------------------------------------------- Buttons
 const errorLine = document.createElement('div');
@@ -351,7 +453,12 @@ const save = document.createElement('button');
 save.textContent = 'Save';
 save.addEventListener('click', () => {
   errorLine.hidden = true;
-  post(buildSaveMessage(state, monitorStates, monitorMode));
+  // Both tabs always go out, whichever one is visible — the host splits them by
+  // prefix into two registry keys and never read-modify-writes the other's
+  // (spec §5.2). The saver's set is always `saverState`, never the active tab.
+  post(buildSaveMessage(
+    saverState, monitorStates, monitorModes.saver, wallpaperState, monitorModes.wallpaper,
+  ));
 });
 const cancel = document.createElement('button');
 cancel.textContent = 'Cancel';
@@ -359,9 +466,13 @@ cancel.addEventListener('click', () => post('cancel'));
 buttons.append(save, cancel);
 
 const title = document.createElement('h1');
-title.textContent = 'KURO // SCREENSAVER SETTINGS';
+title.textContent = 'KURO // SETTINGS'; // serves both tabs now
 
 const app = document.getElementById('app')!;
-app.append(title, lookRow, bild.root, crtFx.root, motion.root, term.root, display.root);
+app.append(title, tabBar, wallpaperHead, lookRow, bild.root, crtFx.root, motion.root, term.root, display.root);
 if (monitorSection) app.append(monitorSection);
 app.append(perf.root, errorLine, buttons);
+
+// Nothing above rendered tab-dependent state yet — the refreshers own that, so
+// the first paint is the same code path as every later tab switch.
+refreshAll();
