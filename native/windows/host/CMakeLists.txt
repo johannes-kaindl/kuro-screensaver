@@ -29,6 +29,7 @@ endif()
 
 add_library(host_lib STATIC
   src/options.cpp
+  src/wallpaper_options.cpp
   src/instance.cpp
   src/monitors.cpp
   src/render_policy.cpp
