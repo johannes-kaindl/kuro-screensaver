@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 
+#include "instance.h"
 #include "resource.h"
 #include "settings_window.h"
 
@@ -81,6 +82,14 @@ LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         AddTrayIcon();
         return 0;
     }
+    // A second instance asked us to surface the settings window (start-menu click
+    // while the wallpaper already runs). Registered messages carry a runtime id,
+    // so they cannot be switch cases. Non-modal: RunWallpaper's loop dispatches
+    // for it, exactly like the tray's own Einstellungen… item.
+    if (msg == WallpaperShowSettingsMessage()) {
+        OpenSettingsWindow();
+        return 0;
+    }
     switch (msg) {
         case kTrayMessage:  // NIF_MESSAGE callback: lParam is the mouse message
             if (static_cast<UINT>(lp) == WM_RBUTTONUP || static_cast<UINT>(lp) == WM_LBUTTONUP)
@@ -118,13 +127,16 @@ bool InitTray(std::function<void(bool paused)> setPaused) {
     WNDCLASSW wc{};
     wc.lpfnWndProc = TrayWndProc;
     wc.hInstance = GetModuleHandleW(nullptr);
-    wc.lpszClassName = L"KuroTrayWindow";
+    // Shared constant, not a literal: a second instance and the uninstaller find
+    // this window by class name (instance.h), so the two spellings must not be
+    // able to drift apart.
+    wc.lpszClassName = kTrayWindowClass;
     RegisterClassW(&wc);
 
     // Hidden top-level window (NOT message-only): TrackPopupMenu needs a
     // window that can take the foreground, and the "TaskbarCreated"
     // broadcast only reaches top-level windows.
-    g_trayWindow = CreateWindowExW(0, L"KuroTrayWindow", L"", 0, 0, 0, 0, 0, nullptr, nullptr,
+    g_trayWindow = CreateWindowExW(0, kTrayWindowClass, L"", 0, 0, 0, 0, 0, nullptr, nullptr,
                                    wc.hInstance, nullptr);
     if (!g_trayWindow) return false;
 
