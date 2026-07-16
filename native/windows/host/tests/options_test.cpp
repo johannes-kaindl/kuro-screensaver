@@ -327,6 +327,24 @@ int main() {
                  "wallpaper default: rejects out-of-range legacy WallpaperScale");
         RegDeleteKeyValueW(HKEY_CURRENT_USER, saverKey, L"WallpaperScale");
 
+        // A present-but-invalid own Scale must fall back to the WALLPAPER default,
+        // not to the saver's "1": LoadOptions has already substituted its own
+        // default by the time we look, so only a validity check can tell the two
+        // apart. "1" through the bloom+CRT chain at device resolution is the v0.8
+        // stutter.
+        WriteReg(wpKey, L"Scale", L"1.5");
+        ExpectEq(LoadWallpaperOptions(wpKey).scale, std::wstring(L"0.66"),
+                 "wallpaper default: invalid own Scale falls back to 0.66, not the saver's 1");
+        WriteReg(wpKey, L"Scale", L"nonsense");
+        ExpectEq(LoadWallpaperOptions(wpKey).scale, std::wstring(L"0.66"),
+                 "wallpaper default: unparseable own Scale falls back to 0.66");
+        // …while a valid one is still honoured, or the guard would be a blanket
+        // override of the tab's own slider.
+        WriteReg(wpKey, L"Scale", L"0.75");
+        ExpectEq(LoadWallpaperOptions(wpKey).scale, std::wstring(L"0.75"),
+                 "wallpaper default: valid own Scale wins");
+        RegDeleteTreeW(HKEY_CURRENT_USER, wpKey);
+
         wp.scene = L"void";
         wp.preset = L"phosphor";
         wp.scale = L"0.5";

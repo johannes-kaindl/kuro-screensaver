@@ -16,7 +16,11 @@ SaverOptions LoadWallpaperOptions(const wchar_t* regPath) {
     SaverOptions o = LoadOptions(regPath);
     if (ReadReg(regPath, L"Audio", L"").empty()) o.audio = defaults.audio;
 
-    if (ReadReg(regPath, L"Scale", L"").empty()) {
+    // Validity, not mere presence: LoadOptions has already fallen back to the
+    // SAVER default ("1") for a present-but-invalid value (Scale=1.5 by hand),
+    // so an .empty() check would let full device resolution through the bloom+CRT
+    // chain — the v0.8 stutter this whole default exists to prevent.
+    if (!IsValidNumber(ReadReg(regPath, L"Scale", L""), 0.25, 1)) {
         // v0.10 kept the wallpaper's render scale in a single flat key next to
         // the saver's values (WallpaperScale, read by BuildWallpaperPage back
         // then). The subkey supersedes it — but a value someone set by hand must not
