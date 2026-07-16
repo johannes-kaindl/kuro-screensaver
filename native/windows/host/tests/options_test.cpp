@@ -366,6 +366,74 @@ int main() {
                    "saver query free of wp keys");
     }
 
+    // 15. One dialog, one save message, both sets. The saver parser must skip
+    // the wallpaper's keys — but must NOT turn into a parser that swallows
+    // anything: a typo has to stay a rejected message, or the all-or-nothing
+    // guarantee (section 4) is worth nothing.
+    {
+        SaverOptions both;
+        ExpectTrue(ParseSaveMessage(L"scene=void&wpscene=terrain&wpmonitormode=span&wpautostart=on",
+                                    both),
+                   "saver parser skips wp keys");
+        ExpectEq(both.scene, std::wstring(L"void"), "saver parser ignores wp values");
+        ExpectTrue(!ParseSaveMessage(L"wpevil=1", both), "unknown wp key still rejected");
+        ExpectTrue(!ParseSaveMessage(L"evil=1", both), "unknown key still rejected");
+        ExpectTrue(!ParseSaveMessage(L"wpscale=9", both), "invalid wp value still rejected");
+
+        // The wallpaper's global span/per choice rides the same message as the
+        // saver's, and stays empty rather than defaulting — so the host can tell
+        // "the dialog offered no choice" from "the user picked per".
+        SaverOptions o;
+        std::wstring mode, wmode;
+        ExpectTrue(ParseSaveMessage(L"monitormode=per&wpmonitormode=span", o, nullptr, &mode,
+                                    &wmode),
+                   "parses both monitor modes");
+        ExpectEq(mode, std::wstring(L"per"), "saver monitor mode");
+        ExpectEq(wmode, std::wstring(L"span"), "wallpaper monitor mode");
+        ExpectTrue(ParseSaveMessage(L"scene=void", o, nullptr, &mode, &wmode) && wmode.empty(),
+                   "absent wpmonitormode yields empty out-param");
+        ExpectTrue(!ParseSaveMessage(L"wpmonitormode=weird", o, nullptr, &mode, &wmode),
+                   "reject bad wpmonitormode");
+    }
+
+    // 16. The wallpaper half of the same message, read by its own parser into
+    // its own set. A value the message does not mention must not be invented —
+    // the v0.10 lesson: a save that materialised absent values killed the
+    // wallpaper.
+    {
+        SaverOptions wp;
+        ExpectTrue(ParseWallpaperSaveMessage(L"wpscene=void&wppreset=phosphor&wpscale=0.5", wp),
+                   "wallpaper save: parses");
+        ExpectEq(wp.scene, std::wstring(L"void"), "wallpaper save: scene");
+        ExpectEq(wp.preset, std::wstring(L"phosphor"), "wallpaper save: preset");
+        ExpectEq(wp.scale, std::wstring(L"0.5"), "wallpaper save: raw numeric");
+
+        // Saver keys in the same message are ignored by the wallpaper parser.
+        SaverOptions wp2;
+        ExpectTrue(ParseWallpaperSaveMessage(L"scene=terrain&monitormode=span&m0id=A&wpscene=void",
+                                             wp2),
+                   "wallpaper save: tolerates the saver half");
+        ExpectEq(wp2.scene, std::wstring(L"void"), "wallpaper save: ignores saver keys");
+
+        // Out-of-range numeric rejects the whole message (all-or-nothing).
+        SaverOptions wp3;
+        ExpectTrue(!ParseWallpaperSaveMessage(L"wpscale=9", wp3),
+                   "wallpaper save: rejects out-of-range numeric");
+        ExpectTrue(!ParseWallpaperSaveMessage(L"wpevil=1", wp3),
+                   "wallpaper save: rejects unknown wp key");
+        ExpectEq(wp3.scale, SaverOptions{}.scale, "wallpaper save: rejection leaves out untouched");
+
+        // Full round-trip: what the wp query half carries, the wp save half
+        // parses back — the two ends of the same contract.
+        SaverOptions wp4;
+        ExpectTrue(  // substr(1): the save message has no leading separator
+            ParseWallpaperSaveMessage(WpPrefixed(std::wstring(L"?") + kFlipQuery).substr(1), wp4),
+            "wallpaper save: parses the full flip");
+        ExpectEq(BuildWallpaperQuerySuffix(wp4, L""), WpPrefixed(std::wstring(L"?") + kFlipQuery) +
+                                                          L"&wprunning=",
+                 "wallpaper query/save round-trip");
+    }
+
     if (failures) {
         fprintf(stderr, "%d failure(s)\n", failures);
         return 1;
