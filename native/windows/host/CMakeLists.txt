@@ -25,6 +25,8 @@ endif()
 
 add_library(host_lib STATIC
   src/options.cpp
+  src/monitors.cpp
+  src/render_policy.cpp
   src/webview_host.cpp
   src/saver_window.cpp
   src/preview_window.cpp

@@ -1,0 +1,45 @@
+#pragma once
+#include <windows.h>
+
+#include <string>
+#include <vector>
+
+#include "options.h"  // kRegPath
+
+// One attached display as the saver/wallpaper hosts see it.
+struct MonitorInfo {
+    std::wstring id;    // stable EDID-based identity (sanitized) — registry subkey name
+    std::wstring name;  // friendly name from the display target, possibly empty
+    RECT rect{};        // physical pixels in virtual-screen coordinates
+    bool primary = false;
+    bool portrait = false;  // rect is taller than wide
+};
+
+// Enumerates attached monitors. Ids come from the EDID-based DISPLAYCONFIG
+// monitorDevicePath (stable across docking/re-plugging), falling back to the
+// GDI device name; sanitized-id collisions get _2/_3… suffixes.
+std::vector<MonitorInfo> EnumMonitors();
+
+// Reduces a raw device path to registry-safe [A-Za-z0-9_-] (every other
+// character becomes '_'), capped at 128 chars; empty input yields L"UNKNOWN".
+std::wstring SanitizeMonitorId(const std::wstring& raw);
+
+// Per-monitor overrides under <regPath>\Monitors\<id>. mode/scene/preset
+// drive the saver, the w-prefixed trio the wallpaper. LoadMonitorConfig stays
+// neutral about the wallpaper "primary defaults to on" rule — callers check
+// MonitorConfigExists and apply that default when the subkey is missing.
+struct MonitorConfig {
+    std::wstring mode = L"on";  // on|off|random|scene
+    std::wstring scene, preset;
+    std::wstring wmode = L"off";
+    std::wstring wscene, wpreset;
+};
+bool MonitorConfigExists(const std::wstring& id, const wchar_t* regPath = kRegPath);
+MonitorConfig LoadMonitorConfig(const std::wstring& id, const wchar_t* regPath = kRegPath);
+void SaveMonitorConfig(const std::wstring& id, const MonitorConfig& c,
+                       const wchar_t* regPath = kRegPath);
+
+// Global MonitorMode (saver) / WallpaperMonitorMode value: L"per" (default)
+// or L"span" — anything else in the registry normalizes to L"per".
+std::wstring LoadMonitorMode(bool wallpaper, const wchar_t* regPath = kRegPath);
+void SaveMonitorMode(bool wallpaper, const std::wstring& mode, const wchar_t* regPath = kRegPath);

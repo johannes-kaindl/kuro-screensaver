@@ -1,5 +1,6 @@
 #include "webview_host.h"
 
+#include <shlobj.h>
 #include <shlwapi.h>
 #include <wrl.h>
 
@@ -18,7 +19,17 @@ std::wstring ExeDir() {
 }
 
 std::wstring UserDataDir() {
-    wchar_t tmp[MAX_PATH];
+    // Persistent profile: the Chromium GPU/shader cache survives reboots and
+    // temp cleaners there — a TEMP profile costs a cold shader compile on
+    // every start (spec §3.5).
+    wchar_t appData[MAX_PATH];
+    DWORD n = GetEnvironmentVariableW(L"LOCALAPPDATA", appData, MAX_PATH);
+    if (n > 0 && n < MAX_PATH) {
+        std::wstring dir = std::wstring(appData) + L"\\KuroScreensaver\\WebView2";
+        SHCreateDirectoryExW(nullptr, dir.c_str(), nullptr);  // creates the whole chain
+        return dir;
+    }
+    wchar_t tmp[MAX_PATH];  // no LOCALAPPDATA (odd service context) — old TEMP path
     GetTempPathW(MAX_PATH, tmp);
     return std::wstring(tmp) + L"KuroScreensaverWV2";
 }
@@ -42,7 +53,7 @@ bool EnsureWebView2Runtime() {
 
 void CreateWebView(HWND hwnd, const std::wstring& pageAndQuery,
                    std::function<void(const std::wstring&)> onWebMessage,
-                   std::function<void(ICoreWebView2Controller*)> onCreated) {
+                   std::function<void(ICoreWebView2Controller*, ICoreWebView2*)> onCreated) {
     std::wstring url = L"https://kuro.local/" + pageAndQuery;
 
     CreateCoreWebView2EnvironmentWithOptions(
@@ -106,7 +117,7 @@ void CreateWebView(HWND hwnd, const std::wstring& pageAndQuery,
                                 c2->put_DefaultBackgroundColor({255, 0, 0, 0});  // opaque black
 
                             webview->Navigate(url.c_str());
-                            if (onCreated) onCreated(controller);
+                            if (onCreated) onCreated(controller, webview.Get());
                             return S_OK;
                         })
                         .Get());

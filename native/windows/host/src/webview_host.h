@@ -4,6 +4,7 @@
 #include <functional>
 #include <string>
 
+struct ICoreWebView2;
 struct ICoreWebView2Controller;
 
 // Returns true when the WebView2 Evergreen runtime is available; otherwise
@@ -16,7 +17,9 @@ bool EnsureWebView2Runtime();
 // folder next to the exe (Chromium refuses ES modules over file://).
 // `onWebMessage` (nullable) receives string messages posted by the page.
 // `onCreated` hands over the controller holding ONE extra AddRef — the
-// window owns that reference and must Release() it when it is destroyed.
+// window owns that reference and must Release() it when it is destroyed —
+// plus the raw ICoreWebView2 (NOT AddRef'd: callers who keep it, e.g. for
+// PostWebMessageAsString replies, must AddRef/Release it themselves).
 void CreateWebView(HWND hwnd, const std::wstring& pageAndQuery,
                    std::function<void(const std::wstring&)> onWebMessage,
-                   std::function<void(ICoreWebView2Controller*)> onCreated);
+                   std::function<void(ICoreWebView2Controller*, ICoreWebView2*)> onCreated);
