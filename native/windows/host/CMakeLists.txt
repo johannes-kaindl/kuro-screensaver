@@ -7,6 +7,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Static CRT — pairs with WebView2LoaderStatic.lib for a single-file exe.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_compile_definitions(UNICODE _UNICODE _WIN32_WINNT=0x0A00)
+# The sources are UTF-8 without BOM. Without this MSVC decodes them as the
+# system codepage and mangles every non-ASCII literal — the tray menu shipped
+# "Einstellungenâ€¦" through v0.10. Guarded by TestSourceEncoding in options_test.
+add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
 # --- WebView2 SDK (headers + static loader) via NuGet ------------------------
 set(WEBVIEW2_VERSION "1.0.2478.35")
@@ -40,6 +44,13 @@ target_link_libraries(host_lib PUBLIC
 
 add_executable(KuroScreensaver WIN32 src/main.cpp app.rc)
 target_link_libraries(KuroScreensaver PRIVATE host_lib)
+
+# The wallpaper app: same host_lib, same main.cpp — only the no-argument default
+# and the identity in VERSIONINFO differ. It exists because the shell will not
+# pass an argument through a .scr shortcut (see wallpaper.rc).
+add_executable(KuroWallpaper WIN32 src/main.cpp wallpaper.rc)
+target_link_libraries(KuroWallpaper PRIVATE host_lib)
+target_compile_definitions(KuroWallpaper PRIVATE KURO_WALLPAPER_APP=1)
 
 add_executable(options_test tests/options_test.cpp)
 target_link_libraries(options_test PRIVATE host_lib)

@@ -33,6 +33,9 @@ mkdir -p "$OUT"
 
 # A .scr is just the renamed executable; the web/ assets ride next to it.
 cp "$BUILD/Release/KuroScreensaver.exe" "$OUT/KuroScreensaver.scr"
+# The wallpaper app ships beside it — same binary, but a .exe, because the shell
+# drops a .scr shortcut's arguments and runs the screensaver instead.
+cp "$BUILD/Release/KuroWallpaper.exe" "$OUT/KuroWallpaper.exe"
 cp -R "$ROOT/native/windows/web" "$OUT/web"
 
 ZIP="$ROOT/dist-native/KuroScreensaver-windows.zip"

@@ -1,5 +1,10 @@
 // Kuro Screensaver — Windows .scr micro-host (C++/Win32 + WebView2).
 //
+// This source builds TWO programs (see CMakeLists.txt), differing only in their
+// no-argument default and their VERSIONINFO:
+//   KuroScreensaver.scr — the screensaver, defaults to /s
+//   KuroWallpaper.exe   — the wallpaper app, defaults to /w
+//
 // A .scr is a normal Windows executable the OS invokes with one of:
 //   /s            run the screensaver fullscreen
 //   /c  /c:<hwnd> show the configuration dialog
@@ -51,7 +56,15 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
 
     int argc = 0;
     LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    std::wstring arg = argc > 1 ? argv[1] : L"/s";
+    // The same source builds both programs; only the no-argument default differs
+    // (CMakeLists.txt). KuroWallpaper.exe exists because the shell will not pass
+    // /w through a .scr shortcut — it runs the default verb instead.
+#ifdef KURO_WALLPAPER_APP
+    constexpr const wchar_t* kDefaultArg = L"/w";
+#else
+    constexpr const wchar_t* kDefaultArg = L"/s";
+#endif
+    std::wstring arg = argc > 1 ? argv[1] : kDefaultArg;
     std::wstring flag = arg.substr(0, arg.size() < 2 ? arg.size() : 2);
     for (wchar_t& c : flag) c = static_cast<wchar_t>(towlower(c));
 

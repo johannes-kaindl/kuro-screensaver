@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- The 16px cut of kuro.svg. Same subject, fewer strokes and heavier weights:
+       at 16px the full version's five vanishing lines and two scanlines collapse
+       into a smear. Icons are drawn per size, not scaled — this is the one the
+       tray shows all day. -->
+  <rect width="64" height="64" rx="9" fill="#0a0a0c"/>
+  <g stroke="#39ff7a" fill="none" stroke-linecap="round">
+    <rect x="10" y="14" width="44" height="32" rx="4" stroke-width="4.5"/>
+    <path d="M12 34 H52" stroke-width="3.5"/>
+    <path d="M32 34 L21 45 M32 34 L43 45" stroke-width="2.6"/>
+    <path d="M25 53 H39" stroke-width="4.5"/>
+  </g>
+</svg>

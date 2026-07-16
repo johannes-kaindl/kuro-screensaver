@@ -1,0 +1,49 @@
+// Win32 resources for KuroWallpaper.exe — the same binary as the .scr, with a
+// different identity.
+//
+// Why a second executable at all: the shell drops a .scr shortcut's arguments
+// and applies the file type's default verb, so a start-menu entry pointing at
+// KuroScreensaver.scr with "/w" runs the SCREENSAVER (confirmed on-device,
+// v0.10.1). A .exe passes its arguments through.
+//
+// Why its own VERSIONINFO: without it the wallpaper app reports itself as
+// "Kuro Screensaver" with OriginalFilename KuroScreensaver.scr in the task
+// manager and the file properties — misleading for two programs from one source.
+//
+// No preview bitmap here: that is the .scr's /p mini-preview, which the
+// wallpaper app never serves.
+
+#include <windows.h>
+
+#include "src/resource.h"
+
+IDI_APPICON ICON "assets/kuro.ico"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 0, 10, 1, 0
+ PRODUCTVERSION 0, 10, 1, 0
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"  // U.S. English, Unicode
+        BEGIN
+            VALUE "CompanyName", "Kuro"
+            VALUE "FileDescription", "Kuro Wallpaper"
+            VALUE "FileVersion", "0.10.1.0"
+            VALUE "InternalName", "KuroWallpaper"
+            VALUE "LegalCopyright", "Johannes Kaindl"
+            VALUE "OriginalFilename", "KuroWallpaper.exe"
+            VALUE "ProductName", "Kuro Wallpaper"
+            VALUE "ProductVersion", "0.10.1"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

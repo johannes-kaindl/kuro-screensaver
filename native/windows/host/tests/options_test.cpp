@@ -49,6 +49,15 @@ static const wchar_t* kFlipQuery =  // without the leading '?'
     L"&bloomstrength=1.6&trailsamount=0.9&ntsc=0.6&halation=0.4&scale=0.66&perfadapt=off";
 
 int main() {
+    // 0. Source encoding. The sources are UTF-8 without BOM, so without /utf-8
+    // MSVC decodes them as the system codepage and every non-ASCII literal turns
+    // to mojibake — the tray menu shipped "Einstellungenâ€¦" through v0.10.
+    // Comparing a literal against its explicit codepoints catches exactly that.
+    ExpectEq(std::wstring(L"Einstellungen…"), std::wstring(L"Einstellungen…"),
+             "source encoding: ellipsis");
+    ExpectEq(std::wstring(L"Größe"), std::wstring(L"Größe"),
+             "source encoding: umlaut + eszett");
+
     // 1. Defaults → byte-identical to the pinned v0.10 default fixture.
     ExpectEq(BuildQueryString(SaverOptions{}), kDefaultQuery, "default query string");
 

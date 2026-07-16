@@ -14,6 +14,9 @@
 
 IDR_PREVIEW_IMAGE RCDATA "assets/preview.jpg"
 
+// Also lifts the entry in the screensaver picker, which draws this icon.
+IDI_APPICON ICON "assets/kuro.ico"
+
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 0, 10, 1, 0
  PRODUCTVERSION 0, 10, 1, 0

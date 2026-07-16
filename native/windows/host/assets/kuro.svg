@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Kuro app icon: a CRT screen showing the terrain scene's vanishing-point
+       horizon. Phosphor green (#39ff7a) is the engine's own preset colour
+       (src/engine/data/story-content.json). Chosen over the 黒 kanji because it
+       survives 16px in the tray and needs no Japanese font on the system.
+       Source of assets/kuro.ico — regenerate with scripts/make-icon.sh. -->
+  <rect width="64" height="64" rx="11" fill="#0a0a0c"/>
+  <g stroke="#39ff7a" fill="none" stroke-linecap="round">
+    <rect x="11" y="14" width="42" height="32" rx="4" stroke-width="2.6"/>
+    <path d="M11 34 H53" stroke-width="1.6"/>
+    <path d="M32 34 L20 46 M32 34 L44 46 M32 34 L32 46 M32 34 L9 42 M32 34 L55 42" stroke-width="1.1" opacity=".85"/>
+    <path d="M13 39 H51 M15 43 H49" stroke-width=".9" opacity=".6"/>
+    <path d="M26 52 H38" stroke-width="2.6"/>
+  </g>
+</svg>

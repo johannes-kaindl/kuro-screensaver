@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 
+#include "resource.h"
 #include "settings_window.h"
 
 namespace {
@@ -30,7 +31,10 @@ bool AddTrayIcon() {
     nid.uID = kTrayIconId;
     nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     nid.uCallbackMessage = kTrayMessage;
-    nid.hIcon = LoadIconW(nullptr, IDI_APPLICATION);  // stock icon is enough for v0.10
+    // Own icon, stock as fallback: the tray is the wallpaper's only control
+    // surface (pause/settings/quit), so it must never end up iconless.
+    HICON own = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(IDI_APPICON));
+    nid.hIcon = own ? own : LoadIconW(nullptr, IDI_APPLICATION);
     wcscpy_s(nid.szTip, L"Kuro Wallpaper");
     return Shell_NotifyIconW(NIM_ADD, &nid) != FALSE;
 }
