@@ -53,7 +53,7 @@ let state: SettingsFormState = isWallpaperTab() ? wallpaperState : saverState;
 // independent of the saver's — v0.10 just had no UI for it.
 const monitorModes: Record<Tab, string> = {
   saver: params.get('monitormode') ?? '',
-  wallpaper: params.get('wmonitormode') ?? '',
+  wallpaper: params.get('wpmonitormode') ?? '',
 };
 if (monitors.length >= 2) {
   for (const t of ['saver', 'wallpaper'] as const) {
@@ -297,6 +297,10 @@ function badge(text: string): HTMLElement {
   return b;
 }
 
+// One card per monitor, serving BOTH tabs: the accessors below read and write
+// the saver's trio or the wallpaper's depending on the active tab, exactly like
+// `state` does for the 33 globals. The wallpaper's trio has lived in the
+// registry since v0.10 and was reachable from no UI at all until now.
 function monitorCard(entry: MonitorEntry, ms: MonitorFormState): HTMLElement {
   const card = document.createElement('div');
   card.className = 'mon-card';
@@ -309,17 +313,22 @@ function monitorCard(entry: MonitorEntry, ms: MonitorFormState): HTMLElement {
   if (entry.primary) head.append(badge('Hauptmonitor'));
   if (entry.portrait) head.append(badge('Hochformat'));
 
-  const modeSelect = select(opts(['on', 'off', 'random', 'scene']), () => ms.mode, (v) => (ms.mode = v));
+  const getMode = (): string => (isWallpaperTab() ? ms.wmode : ms.mode);
+  const setMode = (v: string): void => { if (isWallpaperTab()) ms.wmode = v; else ms.mode = v; };
+  const getScene = (): string => (isWallpaperTab() ? ms.wscene : ms.scene);
+  const setScene = (v: string): void => { if (isWallpaperTab()) ms.wscene = v; else ms.scene = v; };
+  const getPreset = (): string => (isWallpaperTab() ? ms.wpreset : ms.preset);
+  const setPreset = (v: string): void => { if (isWallpaperTab()) ms.wpreset = v; else ms.preset = v; };
+
+  const modeSelect = select(opts(['on', 'off', 'random', 'scene']), getMode, setMode);
   modeSelect.addEventListener('change', refreshAll);
   const sceneRow = row('Scene', select(
-    [{ value: '', label: 'global' }, ...opts(SCENES)],
-    () => ms.scene, (v) => (ms.scene = v),
+    [{ value: '', label: 'global' }, ...opts(SCENES)], getScene, setScene,
   ));
-  sceneRow.hidden = ms.mode !== 'scene';
-  refreshers.push(() => { sceneRow.hidden = ms.mode !== 'scene'; });
+  sceneRow.hidden = getMode() !== 'scene';
+  refreshers.push(() => { sceneRow.hidden = getMode() !== 'scene'; });
   const presetRow = row('Color', select(
-    [{ value: '', label: 'global' }, ...opts(Object.keys(PRESETS))],
-    () => ms.preset, (v) => (ms.preset = v),
+    [{ value: '', label: 'global' }, ...opts(Object.keys(PRESETS))], getPreset, setPreset,
   ));
   card.append(head, row('Mode', modeSelect), sceneRow, presetRow);
   return card;
@@ -357,31 +366,20 @@ if (monitors.length > 0) {
   // Save-format cap: ParseSaveMessage accepts m0..m7 only, buildSaveMessage
   // slices accordingly — so no card for what would silently not be saved.
   monitors.slice(0, MONITOR_CAP).forEach((entry, i) => {
-    const card = monitorCard(entry, monitorStates[i]);
-    // The cards edit the saver's per-monitor trio. The wallpaper's own trio
-    // (WMode/WScene/WPreset) is a separate registry vocabulary that no query
-    // key carries yet, so showing these cards under the wallpaper tab would
-    // silently edit the wrong set.
-    refreshers.push(() => { card.hidden = isWallpaperTab(); });
-    mon.grid.append(card);
+    mon.grid.append(monitorCard(entry, monitorStates[i]));
   });
   if (monitors.length > MONITOR_CAP) {
     const capHint = document.createElement('div');
     capHint.className = 'hint';
     capHint.textContent = `Maximal ${MONITOR_CAP} Monitore konfigurierbar`;
     capHint.style.gridColumn = '1 / -1';
-    refreshers.push(() => { capHint.hidden = isWallpaperTab(); });
     mon.grid.append(capHint);
   }
-  const perMonHint = document.createElement('div');
-  perMonHint.className = 'hint';
-  perMonHint.textContent = 'Je-Monitor-Zuordnung: derzeit nur für den Screensaver einstellbar';
-  refreshers.push(() => { perMonHint.hidden = !isWallpaperTab(); });
   const hint = document.createElement('div');
   hint.className = 'hint';
   hint.textContent = 'Empfehlung: Render-Scale ≤ 66 % bei 3 Monitoren';
   refreshers.push(() => { hint.hidden = monitorModes[tab] !== 'span'; });
-  mon.root.append(perMonHint, hint);
+  mon.root.append(hint);
 }
 
 const perf = section('Leistung');

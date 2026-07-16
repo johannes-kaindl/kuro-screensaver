@@ -11,7 +11,13 @@ import {
   readWallpaperInitial,
   readWallpaperRunning,
   type MonitorEntry,
+  type MonitorFormState,
 } from '../src/settings/form-state';
+
+/** A monitor form state; both trios default to neutral, override what matters. */
+const MON = (id: string, over: Partial<MonitorFormState> = {}): MonitorFormState => ({
+  id, mode: 'on', scene: '', preset: '', wmode: 'on', wscene: '', wpreset: '', ...over,
+});
 
 // v0.10 fixtures — pinned on both sides (options_test.cpp mirrors them byte-identically).
 const DEFAULT_QUERY =
@@ -71,18 +77,17 @@ describe('settings form state (native /c dialog bridge)', () => {
 
   it('appends monitor entries in index order', () => {
     const mons = [
-      { id: 'DELL_ABC1', mode: 'scene', scene: 'matrix', preset: 'phosphor' },
-      { id: 'LAPTOP_0', mode: 'off', scene: '', preset: '' },
+      MON('DELL_ABC1', { mode: 'scene', scene: 'matrix', preset: 'phosphor' }),
+      MON('LAPTOP_0', { mode: 'off' }),
     ];
+    // No wallpaper half passed → no wallpaper trio, byte-identical to v0.10.
     expect(buildSaveMessage(FORM_DEFAULTS, mons)).toContain(
       '&m0id=DELL_ABC1&m0mode=scene&m0scene=matrix&m0preset=phosphor&m1id=LAPTOP_0&m1mode=off&m1scene=&m1preset=',
     );
   });
 
   it('caps the serialised monitors at 8 (ParseSaveMessage accepts m0..m7 only)', () => {
-    const mons = Array.from({ length: 9 }, (_, i) => ({
-      id: `MON_${i}`, mode: 'on', scene: '', preset: '',
-    }));
+    const mons = Array.from({ length: 9 }, (_, i) => MON(`MON_${i}`));
     const msg = buildSaveMessage(FORM_DEFAULTS, mons);
     expect(msg).toContain('&m7id=MON_7');
     expect(msg).not.toContain('m8id');
@@ -92,8 +97,9 @@ describe('settings form state (native /c dialog bridge)', () => {
     expect(buildSaveMessage(FORM_DEFAULTS, [], 'span')).toMatch(/&perfadapt=on&monitormode=span$/);
     expect(buildSaveMessage(FORM_DEFAULTS, [], '')).not.toContain('monitormode');
     expect(buildSaveMessage(FORM_DEFAULTS)).not.toContain('monitormode');
-    const mons = [{ id: 'A', mode: 'on', scene: '', preset: '' }];
-    expect(buildSaveMessage(FORM_DEFAULTS, mons, 'per')).toContain('&perfadapt=on&monitormode=per&m0id=A');
+    expect(buildSaveMessage(FORM_DEFAULTS, [MON('A')], 'per')).toContain(
+      '&perfadapt=on&monitormode=per&m0id=A',
+    );
   });
 
   it('readMonitors parses the host monitor list', () => {
@@ -123,12 +129,22 @@ describe('settings form state (native /c dialog bridge)', () => {
   it('monitor cards start from the host config, missing subkey falls back to on/global', () => {
     const entries: MonitorEntry[] = [
       { id: 'A', name: 'Dell', w: 1920, h: 1080, portrait: false, primary: true,
-        mode: 'scene', scene: 'matrix', preset: 'phosphor' },
+        mode: 'scene', scene: 'matrix', preset: 'phosphor',
+        wmode: 'random', wscene: '', wpreset: 'kuro' },
       { id: 'B', name: 'Laptop', w: 1280, h: 800, portrait: false, primary: false },
     ];
     const states = initialMonitorStates(entries);
-    expect(states[0]).toEqual({ id: 'A', mode: 'scene', scene: 'matrix', preset: 'phosphor' });
-    expect(states[1]).toEqual({ id: 'B', mode: 'on', scene: '', preset: '' });
+    expect(states[0]).toEqual({
+      id: 'A', mode: 'scene', scene: 'matrix', preset: 'phosphor',
+      wmode: 'random', wscene: '', wpreset: 'kuro',
+    });
+    // A host that sends no trio at all: wmode stays '' so the save omits the
+    // keys and the host's "never set" sentinel survives — this side must not
+    // invent 'on'/'off' for an absence only the host can resolve.
+    expect(states[1]).toEqual({
+      id: 'B', mode: 'on', scene: '', preset: '',
+      wmode: '', wscene: '', wpreset: '',
+    });
   });
 
   it('round-trips: an untouched save reproduces the loaded per-monitor config', () => {
@@ -142,6 +158,46 @@ describe('settings form state (native /c dialog bridge)', () => {
     expect(buildSaveMessage(FORM_DEFAULTS, initialMonitorStates(loaded))).toContain(
       '&m0id=A&m0mode=scene&m0scene=matrix&m0preset=phosphor&m1id=B&m1mode=off&m1scene=&m1preset=',
     );
+  });
+});
+
+// v0.11 — the wallpaper's per-monitor assignment. It has existed in the registry
+// since v0.10 (WMode/WScene/WPreset) and was reachable from no UI at all.
+describe('per-monitor wallpaper assignment', () => {
+  it('reads the wallpaper trio the host resolved for it', () => {
+    const json = encodeURIComponent(JSON.stringify([{
+      id: 'A', name: 'Dell', w: 1920, h: 1080, portrait: false, primary: true,
+      mode: 'on', scene: '', preset: '',
+      wmode: 'scene', wscene: 'void', wpreset: 'phosphor',
+    }]));
+    const [m] = readMonitors(new URLSearchParams('?monitors=' + json));
+    expect(m.wmode).toBe('scene');
+    expect(m.wscene).toBe('void');
+    expect(m.wpreset).toBe('phosphor');
+  });
+
+  it('sends the trio per monitor once a wallpaper half is in play', () => {
+    const mons = [MON('A', { mode: 'off', wmode: 'scene', wscene: 'void', wpreset: 'phosphor' })];
+    const msg = buildSaveMessage(FORM_DEFAULTS, mons, 'per', WALLPAPER_FORM_DEFAULTS, 'per');
+    expect(msg).toContain('&m0id=A&m0mode=off&m0scene=&m0preset=');
+    expect(msg).toContain('&m0wmode=scene&m0wscene=void&m0wpreset=phosphor');
+  });
+
+  it('never sends an empty wmode — absence is the host sentinel, not a value', () => {
+    // The empty string means "never set" = "primary on, others off" in the host.
+    // Spelling it out in a save would materialise it as a real value and put the
+    // v0.10 black-wallpaper bug back — so the key stays away entirely.
+    const mons = [MON('A', { wmode: '' })];
+    const msg = buildSaveMessage(FORM_DEFAULTS, mons, 'per', WALLPAPER_FORM_DEFAULTS, 'per');
+    expect(msg).not.toContain('m0wmode');
+    expect(msg).toContain('&m0id=A');
+  });
+
+  it('leaves the saver-only save byte-identical to v0.10', () => {
+    // The /c dialog has no wallpaper half, so it must not gain the trio: the
+    // host would then start writing WMode for every monitor the saver touches.
+    const mons = [MON('A', { wmode: 'scene', wscene: 'void' })];
+    expect(buildSaveMessage(FORM_DEFAULTS, mons, 'per')).not.toContain('m0wmode');
   });
 });
 
@@ -207,19 +263,19 @@ describe('wallpaper tab', () => {
     expect(msg.startsWith('save:' + DEFAULT_QUERY + '&wpscene=')).toBe(true);
   });
 
-  it('appends the wp half after the monitor keys, and wmonitormode last', () => {
-    const mons = [{ id: 'A', mode: 'on', scene: '', preset: '' }];
+  it('appends the wp half after the monitor keys, and wpmonitormode last', () => {
+    const mons = [MON('A')];
     const msg = buildSaveMessage(FORM_DEFAULTS, mons, 'per', WALLPAPER_FORM_DEFAULTS, 'span');
-    expect(msg).toContain('&m0preset=&wpscene=');
-    expect(msg).toMatch(/&wpperfadapt=on&wmonitormode=span$/);
+    expect(msg).toContain('&m0wpreset=&wpscene=');
+    expect(msg).toMatch(/&wpperfadapt=on&wpmonitormode=span$/);
   });
 
-  it('omits the wp half and wmonitormode entirely when not passed', () => {
+  it('omits the wp half and wpmonitormode entirely when not passed', () => {
     // The saver-only callers (and the pinned fixtures) must not gain a byte.
     expect(buildSaveMessage(FORM_DEFAULTS)).toBe('save:' + DEFAULT_QUERY);
     expect(buildSaveMessage(FORM_DEFAULTS, [], 'span')).not.toContain('wp');
     expect(buildSaveMessage(FORM_DEFAULTS, [], 'span', WALLPAPER_FORM_DEFAULTS)).not.toContain(
-      'wmonitormode',
+      'wpmonitormode=',
     );
   });
 

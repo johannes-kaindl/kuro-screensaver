@@ -395,7 +395,7 @@ int RunWallpaper(bool showSettings) {
     // this — a window popping up at every login is exactly what nobody wants.
     // After InitTray on purpose: the dialog is non-modal and the loop below
     // dispatches for it, so the tray must exist first.
-    if (showSettings) OpenSettingsWindow();
+    if (showSettings) OpenSettingsWindow(true);
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0) > 0) {

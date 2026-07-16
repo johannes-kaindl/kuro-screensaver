@@ -61,14 +61,29 @@ export interface MonitorEntry {
   mode?: string;   // on|off|random|scene
   scene?: string;  // slug or '' (= global scene)
   preset?: string; // slug or '' (= global preset)
+  // The wallpaper's own per-monitor trio (registry WMode/WScene/WPreset). wmode
+  // arrives ALREADY RESOLVED by the host (EffectiveWallpaperMode): its registry
+  // sentinel — the empty string — means "never set", which in turn means
+  // "primary on, others off", NOT off. Rendering that absence as 'off' and
+  // letting the user save it is what turned the wallpaper permanently black in
+  // v0.10, so the rule lives host-side and this side never re-derives it.
+  wmode?: string;   // on|off|random|scene, always concrete
+  wscene?: string;  // slug or '' (= global scene)
+  wpreset?: string; // slug or '' (= global preset)
 }
 
-/** Per-monitor form state, serialised as mNid/mNmode/mNscene/mNpreset. */
+/**
+ * Per-monitor form state, serialised as mNid/mNmode/mNscene/mNpreset plus the
+ * wallpaper's mNwmode/mNwscene/mNwpreset.
+ */
 export interface MonitorFormState {
   id: string;
   mode: string;   // on|off|random|scene
   scene: string;  // slug or '' (= global scene)
   preset: string; // slug or '' (= global preset)
+  wmode: string;   // on|off|random|scene
+  wscene: string;  // slug or '' (= global scene)
+  wpreset: string; // slug or '' (= global preset)
 }
 
 /** Mirrors the engine defaults (defaults.ts) and the host's SaverOptions defaults. */
@@ -279,6 +294,12 @@ export function initialMonitorStates(entries: readonly MonitorEntry[]): MonitorF
     mode: m.mode ?? 'on',
     scene: m.scene ?? '',
     preset: m.preset ?? '',
+    // '' only when a host too old to send the trio is on the other end — the
+    // save then omits the key and the host keeps its sentinel, rather than this
+    // side inventing a value for an absence it cannot see (see MonitorEntry).
+    wmode: m.wmode ?? '',
+    wscene: m.wscene ?? '',
+    wpreset: m.wpreset ?? '',
   }));
 }
 
@@ -314,12 +335,19 @@ export function buildSaveMessage(
   if (monitorMode) msg += `&monitormode=${monitorMode}`;
   monitors.slice(0, MONITOR_CAP).forEach((m, i) => {
     msg += `&m${i}id=${m.id}&m${i}mode=${m.mode}&m${i}scene=${m.scene}&m${i}preset=${m.preset}`;
+    // The wallpaper trio only when this dialog actually has a wallpaper half to
+    // speak for, and never with an empty wmode: the host reads an absent key as
+    // its "never set" sentinel and leaves the registry alone, which is exactly
+    // what the saver-only /c dialog needs it to do.
+    if (wallpaper && m.wmode) {
+      msg += `&m${i}wmode=${m.wmode}&m${i}wscene=${m.wscene}&m${i}wpreset=${m.wpreset}`;
+    }
   });
   if (wallpaper) {
     msg += '&' + serializeSet(wallpaper, WALLPAPER_PREFIX);
     // Same empty-means-not-sent rule as monitormode: the host can then tell
     // "the dialog had no choice to offer" from "the user picked per".
-    if (wallpaperMonitorMode) msg += `&wmonitormode=${wallpaperMonitorMode}`;
+    if (wallpaperMonitorMode) msg += `&${WALLPAPER_PREFIX}monitormode=${wallpaperMonitorMode}`;
   }
   return msg;
 }
