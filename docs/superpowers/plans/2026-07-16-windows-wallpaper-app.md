@@ -1024,6 +1024,32 @@ git commit -m "feat(windows): additive wp-prefixed query half for the wallpaper 
 
 **Warum (Spec §5.2):** Beide Tabs im selben Dialog. Ein Save darf nur schreiben, was der Dialog geladen hat — kein Read-modify-write über fremde Bereiche (der WMode-Bug aus v0.10).
 
+> **BLOCKER — zuerst lesen.** `ParseSaveMessage` (`options.cpp`, Zweig `if (!flag) return false;`)
+> weist **jeden unbekannten Key ab**; der bestehende Test `reject unknown key` pinnt dieses
+> Verhalten, und es ist richtig so (all-or-nothing). Die Web-Seite sendet seit Commit
+> `3bbccb9` aber `wp*`-Keys, `wpmonitormode` und `wpautostart` mit. **Bis dieser Task
+> fertig ist, schlägt daher JEDER Save fehl** — der Dialog bleibt offen und meldet
+> `saveerror`. Die beiden Hälften müssen zusammen gemerged werden.
+>
+> Konsequenz für die Umsetzung: `ParseSaveMessage` muss die `wp`-präfixierten Keys
+> **überspringen** (sie gehören dem Wallpaper-Parser), statt sie abzulehnen — und dabei
+> weiterhin echte Tippfehler ablehnen. Ein Test dafür gehört in diesen Task:
+>
+> ```cpp
+> // The dialog sends both halves in one message. The saver parser must skip the
+> // wallpaper's keys — but must NOT turn into a parser that swallows anything:
+> // a typo has to stay a rejected message.
+> SaverOptions both;
+> ExpectTrue(ParseSaveMessage(L"scene=void&wpscene=terrain&wpmonitormode=span&wpautostart=on", both),
+>            "saver parser skips wp keys");
+> ExpectEq(both.scene, std::wstring(L"void"), "saver parser ignores wp values");
+> ExpectTrue(!ParseSaveMessage(L"wpevil=1", both), "unknown wp key still rejected");
+> ExpectTrue(!ParseSaveMessage(L"evil=1", both), "unknown key still rejected");
+> ```
+>
+> „Unbekannter `wp`-Key wird abgelehnt" heißt: gegen dieselbe Feldliste prüfen, die der
+> Wallpaper-Parser kennt — nicht blind alles mit `wp` durchwinken.
+
 - [ ] **Step 1: Write the failing test**
 
 ```cpp
@@ -1096,8 +1122,15 @@ bool ParseSaveMessage(const std::wstring& body, SaverOptions& o,
 ```
 
 Im Rumpf, an der Stelle, die heute `mode` liest (`grep -n "L\"mode\"" native/windows/host/src/settings_window.cpp`),
-denselben Zweig für den Key `wmonitormode` ergänzen. Alle bestehenden Aufrufer um
+denselben Zweig für den Key **`wpmonitormode`** ergänzen. Alle bestehenden Aufrufer um
 `, &wmode` erweitern.
+
+> **Korrektur 2026-07-16:** Frühere Fassungen dieses Plans schrieben hier `wmonitormode`
+> und widersprachen damit der eigenen Global Constraint („Präfix ist `wp`, nicht `w`" —
+> weil `WMode`/`WScene`/`WPreset` bereits das Monitor-Trio bedeuten). Der Web-Task hat
+> den Widerspruch gemeldet statt zu raten, und die Web-Seite emittiert nach der
+> Korrektur `wpmonitormode`. **Beide Seiten müssen denselben Namen tragen** — sonst
+> kommt die Span/Per-Wahl des Wallpapers nie an.
 
 - [ ] **Step 5: Query-Bau erweitert**
 
@@ -1116,6 +1149,31 @@ Die Stelle finden, die `BuildQueryString` für den Dialog aufruft (`grep -n "Bui
 
 Zeile 154: `L"Kuro Screensaver"` → `L"Kuro"`. Der Dialog bedient jetzt beides.
 
+- [ ] **Step 6b: Autostart-Häkchen bedienen**
+
+Der Autostart-Schalter im Wallpaper-Tab (Task 11) hatte keinen Kontrakt — die Web-Seite hat
+sich einen definiert, den der Host jetzt erfüllen muss, sonst ist das Häkchen eine Attrappe:
+
+- **Query:** `&wpautostart=on|off` anhängen. Der Zustand kommt aus dem Run-Key, nicht aus der
+  Registry-Optionsliste — es ist eine Windows-Einstellung, keine Engine-Einstellung.
+- **Nachricht:** `autostart:on` / `autostart:off` in `HandleWebMessage` behandeln, VOR dem
+  `save:`-Zweig. Sofort wirksam (wie der Tray-Schalter), nicht erst beim Speichern.
+
+```cpp
+    // Its own message rather than a save key, on purpose: the host rejects
+    // unknown save KEYS all-or-nothing, but ignores unknown messages — so this
+    // could ship before the web side and vice versa without breaking saves.
+    // Immediate-apply also matches the tray toggle, which writes the key at once.
+    if (message.rfind(L"autostart:", 0) == 0) {
+        SetAutostartEnabled(message.substr(10) == L"on");
+        return;
+    }
+```
+
+`SetAutostartEnabled(bool)` in `tray.h` exportieren — `ToggleAutostart()` in `tray.cpp` wird
+darauf umgebaut (`SetAutostartEnabled(!AutostartEnabled())`), damit der Run-Key-Pfad an EINER
+Stelle lebt und Tray und Dialog nicht auseinanderlaufen können.
+
 - [ ] **Step 7: Run test to verify it passes**
 
 Push + `gh run watch`. Expected: grün.
@@ -1127,6 +1185,141 @@ git add native/windows/host/src/settings_window.cpp native/windows/host/src/sett
         native/windows/host/src/wallpaper_window.h native/windows/host/src/wallpaper_window.cpp \
         native/windows/host/tests/options_test.cpp
 git commit -m "feat(windows): dialog carries both option sets, saves them apart"
+```
+
+---
+
+### Task 10b: Je-Monitor-Zuordnung im Wallpaper-Tab
+
+**Files:**
+- Modify: `native/windows/host/src/settings_window.cpp` (Query + ParseSaveMessage + Save)
+- Modify: `src/settings/form-state.ts`, `src/settings/main.ts` (Karten im Wallpaper-Tab)
+- Test: `native/windows/host/tests/options_test.cpp`, `tests/settings-form.test.ts`
+
+**Interfaces:**
+- Consumes: `LoadMonitorConfig`/`SaveMonitorConfig` mit dem W-Trio (bestehend, `monitors.h`)
+- Produces: Query-Keys `m<N>wmode`, `m<N>wscene`, `m<N>wpreset`; `MonitorEntry` um `wmode`/`wscene`/`wpreset` erweitert
+
+**Warum:** Task 11 hat die Per-Monitor-Karten im Wallpaper-Tab **ausgeblendet**, weil kein
+Query-Key das W-Trio transportiert — die Karten hätten sonst still die Saver-Werte verstellt.
+Das war richtig, lässt aber Johannes' ausdrücklichen Wunsch (Multi-Monitor im Wallpaper-Tab)
+halb erfüllt: Span/Per geht, die Je-Monitor-Zuordnung nicht. Das W-Trio existiert seit v0.10
+in der Registry und ist bis heute **aus keiner UI erreichbar**.
+
+> **Die Sentinel-Falle — der Grund, warum dieser Task heikel ist.** `wmode = ""` heißt
+> „nie gesetzt", und die Abwesenheit bedeutet **nicht** `off`, sondern „Hauptmonitor an,
+> übrige aus" (`monitors.h`). Genau das Materialisieren dieser Abwesenheit als `off` hat
+> in v0.10 das Wallpaper dauerhaft schwarz geschaltet (LESSONS 2026-07-16).
+>
+> Sobald der Wallpaper-Tab die Karten anzeigt, MUSS er dieselbe Regel rendern, die der
+> Wallpaper-Host anwendet — sonst zeigt die UI `off`, der Nutzer speichert arglos, und der
+> Bug ist zurück. Die Regel gehört an EINE Stelle: der Host löst sie beim Query-Bau auf
+> und sendet den **effektiven** Wert. Die UI rät nie.
+
+- [ ] **Step 1: Write the failing test (C++)**
+
+```cpp
+// The dialog must receive the EFFECTIVE wallpaper mode, not the raw sentinel:
+// an unset monitor means "primary on, others off" (monitors.h), and a UI that
+// renders the empty string as "off" would let the user save the v0.10 black-
+// wallpaper bug straight back in.
+void TestEffectiveWallpaperMonitorMode() {
+    ExpectEq(EffectiveWallpaperMode(L"", true), std::wstring(L"on"),
+             "unset primary is on");
+    ExpectEq(EffectiveWallpaperMode(L"", false), std::wstring(L"off"),
+             "unset secondary is off");
+    ExpectEq(EffectiveWallpaperMode(L"scene", true), std::wstring(L"scene"),
+             "explicit value wins over the rule");
+    ExpectEq(EffectiveWallpaperMode(L"off", true), std::wstring(L"off"),
+             "explicitly off primary stays off");
+}
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Push + `gh run watch`. Expected: Kompilierfehler — `EffectiveWallpaperMode` gibt es nicht.
+
+- [ ] **Step 3: Write minimal implementation**
+
+In `monitors.h`:
+
+```cpp
+// Resolves the wallpaper's per-monitor mode for display. The empty sentinel is
+// not a value but an absence, and absence means "primary on, others off" — the
+// rule the wallpaper host applies. Anything explicit wins unchanged.
+std::wstring EffectiveWallpaperMode(const std::wstring& wmode, bool isPrimary);
+```
+
+In `monitors.cpp`:
+
+```cpp
+std::wstring EffectiveWallpaperMode(const std::wstring& wmode, bool isPrimary) {
+    if (!wmode.empty()) return wmode;
+    return isPrimary ? L"on" : L"off";
+}
+```
+
+- [ ] **Step 4: Query trägt das W-Trio**
+
+An der Stelle, die die `m<N>…`-Keys baut (`grep -n "m\" + std::to_wstring" native/windows/host/src/settings_window.cpp`),
+pro Monitor zusätzlich anhängen — den Sentinel dabei über `EffectiveWallpaperMode` auflösen:
+
+```cpp
+        // Effective, not raw: see EffectiveWallpaperMode. The UI must never see
+        // the empty sentinel, or it will render (and then save) it as "off".
+        MonitorConfig c = LoadMonitorConfig(m.id);
+        q += L"&m" + idx + L"wmode=" + EscapeDataString(EffectiveWallpaperMode(c.wmode, m.primary));
+        q += L"&m" + idx + L"wscene=" + EscapeDataString(c.wscene);
+        q += L"&m" + idx + L"wpreset=" + EscapeDataString(c.wpreset);
+```
+
+- [ ] **Step 5: ParseSaveMessage liest das Trio**
+
+`MonitorSave` (`options.h`) um `wmode, wscene, wpreset` erweitern. In `ParseSaveMessage` die
+Zweige für `m<N>wmode`/`m<N>wscene`/`m<N>wpreset` ergänzen — `wmode` gegen dieselbe
+Whitelist wie `mode` prüfen (`on|off|random|scene`).
+
+- [ ] **Step 6: Speichern**
+
+In `HandleWebMessage`, im Monitor-Loop, das Trio mitschreiben:
+
+```cpp
+        MonitorConfig c = LoadMonitorConfig(m.id);
+        c.mode = m.mode;
+        c.scene = m.scene;
+        c.preset = m.preset;
+        // The wallpaper tab now sends these explicitly, so writing them is no
+        // longer materialising an absence — the dialog showed the user exactly
+        // the value being saved (EffectiveWallpaperMode). SaveMonitorConfig's
+        // empty-sentinel guard still protects the /c path, which sends none.
+        if (!m.wmode.empty()) {
+            c.wmode = m.wmode;
+            c.wscene = m.wscene;
+            c.wpreset = m.wpreset;
+        }
+        SaveMonitorConfig(m.id, c);
+```
+
+- [ ] **Step 7: Web-Seite zeigt die Karten**
+
+`MonitorEntry` in `form-state.ts` um `wmode`/`wscene`/`wpreset` erweitern, aus
+`m<N>wmode` usw. lesen, und in `main.ts` die im Wallpaper-Tab ausgeblendeten Karten wieder
+einblenden — im Wallpaper-Tab an das W-Trio gebunden, im Saver-Tab wie bisher. Den
+Platzhalter-Hinweis („Je-Monitor-Zuordnung: derzeit nur für den Screensaver einstellbar")
+entfernen. `buildSaveMessage` sendet die drei Keys pro Monitor mit.
+
+- [ ] **Step 8: Tests beidseitig**
+
+`npm test` (Web) + CI (C++). Expected: beide grün, bestehende Fixtures unverändert.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add native/windows/host/src/monitors.h native/windows/host/src/monitors.cpp \
+        native/windows/host/src/options.h native/windows/host/src/settings_window.cpp \
+        native/windows/host/tests/options_test.cpp src/settings/form-state.ts \
+        src/settings/main.ts tests/settings-form.test.ts
+git commit -m "feat(settings): per-monitor wallpaper assignment, sentinel resolved host-side"
 ```
 
 ---
