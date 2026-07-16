@@ -70,26 +70,95 @@ Done. The screensaver now starts after the idle time you chose.
 ## Configure it
 
 Right-click `KuroScreensaver.scr` → **Configure** (or click **Settings…** in the
-Screen Saver Settings dialog). The config dialog mirrors the persistent options
-of the web version (settings are saved to `HKCU\Software\KuroScreensaver`):
+Screen Saver Settings dialog). Since **v0.10.0** the dialog matches the macOS
+app's config window (settings are saved to `HKCU\Software\KuroScreensaver`):
 
-- **Scene** — opening scene (`random` runs the procedural film from a calm start;
-  `terrain · city · rift · tunnel · void · wreckage · matrix`).
-- **Color** — one of the 13 phosphor presets (e.g. `toxic-haze`, `crimson`,
-  `phosphor`, `voidwitch`…).
-- **Speed** — flight speed (`slow · norm · fast`).
-- **Audio** — on/off (off by default).
-- **FX / HUD toggles** — Bloom, Scanlines, CRT simulation, Crosshair, Matrix
-  rain, Afterburn, Story terminal, Radar.
+- **Look** — one-click vibe bundles (*Clean · Heavy CRT · Broken Terminal ·
+  Vaporwave · Matrix*) that set every CRT knob at once; touching a slider
+  switches to *Custom*.
+- **Picture** — Scene (`random` runs the procedural film from a calm start),
+  Color (13 phosphor presets), Speed, City altitude, View distance/fog, Weather.
+- **CRT effects** — seven sliders: glitch intensity, curvature, aperture mask,
+  bloom, phosphor trails, NTSC shimmer, halation — plus Scanlines and the CRT
+  simulation toggle.
+- **Motion & story** — flight banking, reactive world, automatic scene warps
+  (+ interval), story terminal.
+- **Terminal** — layout: off, bottom strip, or the Apple-Lisa center window.
+- **Display & automation** — HUD, Radar, Crosshair, Matrix rain, boot sequence
+  (+ speed), day/night cycle, audio.
+- **Monitors** — see [Multiple monitors](#multiple-monitors).
+- **Performance** — see [Performance](#performance).
 
-> The web version's **live** control bar and hotkeys (← → course-correction,
-> scene hotkeys, etc.) don't exist in a screensaver by design — a screensaver
-> exits the moment you touch the keyboard or mouse. Everything that can be a
-> *persistent* setting is in the Configure dialog instead.
+> The web version's **live** control bar and hotkeys don't exist in a
+> screensaver by design — a screensaver exits the moment you touch the keyboard
+> or mouse (since v0.10.0 the saver runs fully chrome-less; the bar no longer
+> flashes up at start). Everything that can be a *persistent* setting is in the
+> Configure dialog instead.
 
 The story, the corruption escalation, and the automatic scene warps all run on
-their own — no input required. Multi-monitor is supported (one instance per
-display).
+their own — no input required.
+
+---
+
+## Multiple monitors
+
+Two modes (Configure → **Monitors**, visible when more than one display is
+connected):
+
+- **Span** — ONE panoramic image stretches across the whole desktop, following
+  your monitor layout from Windows display settings. A portrait monitor shows
+  its tall slice of the panorama. With three displays, pair this with a render
+  scale of ~66 % (see Performance).
+- **Per monitor** (default) — every display gets its own instance. Each monitor
+  card in the dialog offers: **on** (global settings), **random** (rolls its own
+  scene), a **fixed scene** with an optional own color preset, or **off**
+  (covered in black, no engine running — costs nothing).
+
+Monitors are identified by their hardware ID, so a docking station can come and
+go: reconnected displays keep their configuration, unknown ones default to
+**on** with the global settings.
+
+---
+
+## Animated wallpaper (`/w`)
+
+Since **v0.10.0** the same host can render the engine as your **desktop
+wallpaper** — behind the icons, on top of nothing:
+
+```
+KuroScreensaver.scr /w
+```
+
+- A **tray icon** appears: pause/resume, **Settings…**, **Start with Windows**
+  (autostart via `HKCU\…\Run`), and quit.
+- By default only the **primary monitor** animates (the wallpaper runs all
+  day — this keeps it cheap). Configure per-monitor or span mode in Settings →
+  Monitors (the wallpaper has its own set of per-monitor switches).
+- Audio is always off in wallpaper mode, and the render scale defaults to 66 %.
+- A **power policy** keeps it invisible in daily use: it freezes behind
+  fullscreen apps and presentations, suspends completely (RAM drops too) when
+  the session is locked or the display sleeps, and freezes on battery. On AC it
+  animates at 30 fps.
+
+> Wallpaper mode hooks into the desktop's `WorkerW` window — a Windows
+> implementation detail that shifted in 24H2. The host detects both layouts; if
+> your desktop icons ever vanish, quit via the tray icon and they return.
+
+---
+
+## Performance
+
+If the animation stutters:
+
+1. **Render scale** (Configure → Performance) — drop to 66 % or 50 %. The CRT
+   aesthetic hides the lower resolution remarkably well.
+2. **Adaptive quality** (default on) — automatically dials back bloom/trails,
+   then resolution, when the frame rate drops; recovers when there's headroom.
+3. **Hybrid-GPU laptops** — Windows decides which GPU renders the WebView2
+   process. If it picks the integrated one: **Settings → System → Display →
+   Graphics**, add `msedgewebview2.exe`, set **High performance**.
+4. The heaviest effects are **Bloom** and the **CRT simulation** — turning
+   either off buys the most frames.
 
 ---
 

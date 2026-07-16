@@ -30,7 +30,14 @@ plugin). **The headline is a full native rewrite in Metal** — a real, live-ren
 macOS screensaver: no WebView, no pre-rendered video, the whole engine running on
 the GPU. The web build lives on for in-browser play and cross-platform packaging.
 
-**New in v0.6.0 — the world reacts to the story.** As the operator's shift escalates
+**New in v0.10.0 — Windows grows up.** The `.scr` gets the full settings dialog
+(looks, seven CRT sliders, story & automation — parity with the macOS app),
+multi-monitor support (one panoramic image spanning all displays, or per-monitor
+scene/color/off), an **animated desktop wallpaper mode** (`/w`) with a tray icon
+and a power policy that freezes it behind fullscreen apps, on battery, or when
+locked — plus a render-scale + adaptive-quality package against dropped frames.
+
+**v0.6.0 — the world reacts to the story.** As the operator's shift escalates
 (`ROUTINE → INTRUSION → ALARM → PANIC`), the 3D world tightens with it: the fog closes
 in, the CRT degrades, the camera hesitates when something is noticed, a storm builds,
 and an "enemy" colour bleeds into the geometry — a subtle build that pays off near
@@ -111,12 +118,13 @@ every CRT effect, the whole narrative.
 > Notarized + stapled with a Developer ID — it opens cleanly, no Gatekeeper
 > warning. Requires macOS 14+ (Apple Silicon).
 
-### Windows 11 (`.scr`)
+### Windows 11 (`.scr` + animated wallpaper)
 
 A real `.scr` — since **v0.9.0** a tiny native host (~270 KB zip, no bundled
 runtime; the old ~65 MB .NET package is history). WebView2 does the rendering
 and is built into Windows 11 (on Windows 10 the host shows a download link if
-it's missing).
+it's missing). Since **v0.10.0** it also runs as an **animated desktop
+wallpaper** (`KuroScreensaver.scr /w`) and understands multi-monitor setups.
 
 | Download | Run |
 |---|---|
@@ -138,7 +146,7 @@ All versions: **[releases page](https://codeberg.org/jkaindl/kuro-screensaver/re
 
 ---
 
-## What it does
+## Features
 
 - **Six procedural 3D scenes** — `TERRAIN · CITY · THE RIFT · TUNNEL · VOID` plus
   a static **MATRIX** rain scene. **Dynamic banking flight**: a weaving camera
@@ -162,9 +170,40 @@ All versions: **[releases page](https://codeberg.org/jkaindl/kuro-screensaver/re
   audio assets.
 - **Day/night + weather**, **13 color presets**, scene auto-cycle, and
   auto-start-on-idle (native app).
+- **Multi-monitor (Windows)** — span one panoramic image across every display
+  (portrait monitors show their tall slice of it), or configure each monitor
+  individually: on with its own scene + color, random, or off.
+- **Animated wallpaper (Windows)** — the engine behind your desktop icons, with
+  a tray icon (pause / settings / autostart / quit) and a power policy that
+  suspends it when hidden, frozen behind fullscreen apps, or on battery.
+- **Performance controls** — render-scale slider plus adaptive quality that
+  first dials back effects, then resolution, when frames drop.
 
 <sub>Native macOS app: Swift + Metal (shaders compiled at runtime — no Xcode
 needed). Web / cross-platform builds: TypeScript + three.js (WebGL2).</sub>
+
+---
+
+## Usage
+
+- **macOS app** — launch `KuroMetalApp.app`: the config window has a live
+  preview, one-click Looks, and every slider; **Start fullscreen** (Enter) runs
+  the saver, **←/→** switch scenes with a warp transition, any other input
+  exits. Enable *auto-start-on-idle* to use it as the real screensaver, or *Set
+  as wallpaper* for an animated desktop.
+- **Windows `.scr`** — right-click → **Install**, then configure via the
+  Windows screensaver dialog (**Settings…**): scene/color/tempo, Looks, CRT
+  sliders, story & automation, per-monitor setup, and the performance section.
+  Every input exits the running saver.
+- **Windows wallpaper** — run `KuroScreensaver.scr /w` (or enable autostart in
+  the tray menu). The tray icon pauses/resumes, opens settings, and quits.
+- **Browser** — [launch the web app](https://jkaindl.codeberg.page/kuro-screensaver/):
+  `1–9` pick scenes, `←/→` cycle, `M` mutes, `P` pauses, `S` screenshots,
+  **Esc** exits; the control bar (mouse) exposes everything else.
+
+Details, troubleshooting, and the full Windows walkthrough:
+[docs/WINDOWS-INSTALL.md](docs/WINDOWS-INSTALL.md) ·
+[docs/MACOS-INSTALL.md](docs/MACOS-INSTALL.md).
 
 ---
 
@@ -181,6 +220,14 @@ bash scripts/run-native-tests.sh       # logic tests (assert-based, headless)
 The renderer is verified headlessly by rendering frames to PNG
 (`scripts/build-native-harness.sh`) — no window or real screensaver activation
 needed.
+
+### No build step
+
+The native macOS app deliberately needs **no Xcode and no build system** beyond
+`swiftc` — the Metal shaders ship as source and compile at runtime, so the
+whole app builds from a plain shell script in seconds and stays reviewable as
+text. (The web target does use Vite, but only as a bundler for three.js — the
+engine itself is framework-free TypeScript.)
 
 ### Web app
 
