@@ -196,7 +196,9 @@ screensaver behaviour).
 ## Uninstall
 
 Installed with the installer? Use **Settings → Apps → Installed apps → Kuro
-Screensaver → Uninstall**; it handles all of the below. From the ZIP:
+Screensaver → Uninstall**; it does steps 1–4 for you. Your settings are kept on
+purpose, so a reinstall finds them again — run step 5 by hand to remove those
+too. From the ZIP:
 
 1. If the wallpaper runs, **quit it from the tray icon** — Windows won't delete a
    running program.
@@ -231,7 +233,12 @@ you and removes the "don't move the folder" footgun:
 - installs the whole folder to a fixed **per-user** location (`%LOCALAPPDATA%\
   Programs\Kuro Screensaver`) — **no admin rights**,
 - checks for the WebView2 runtime and warns if it's missing,
-- speaks **German or English**, following your Windows display language,
+- speaks **German or English**, picked from your Windows display language (you
+  are only asked when it matches neither),
+- **upgrades over a running wallpaper**: it asks the app to quit first, so no
+  reboot is needed (one exception — upgrading *from v0.10.1 or older*, which
+  can't hear the request; quit the wallpaper from its tray icon first if that
+  setup asks you to restart),
 - registers a clean **Add/Remove Programs** uninstall (which only unsets the
   screen saver and the autostart entry if they still point at Kuro, and asks a
   running wallpaper to quit before removing its files).

@@ -103,9 +103,19 @@ jobs:
         # here can diverge from what windows-host.yml's `installer` job proves on
         # every commit. Spelling these steps out again is exactly how v0.7.0
         # shipped a framework-dependent installer: the duplicated build command
-        # drifted from the script's. KURO_REQUIRE_ISCC makes a missing compiler
-        # fatal — without it the script exits 0 with the publish folder only, and
-        # a release would silently carry no installer.
+        # drifted from the script's. KURO_REQUIRE_ISCC turns a missing compiler
+        # into a failed step instead of a silent exit 0 with the publish folder
+        # only.
+        #
+        # It does NOT guarantee the release carries an installer, and nothing in
+        # this job does: continue-on-error above (deliberately) greens the job
+        # anyway, publish's nullglob then matches no Setup.exe and the release
+        # goes out without one — with the ::warning:: publish emits, not an error.
+        # That is the accepted trade: publish `needs` this job, so failing hard
+        # would block the whole release over an optional convenience deliverable.
+        # The real guard lives in windows-host.yml's `installer` job, which has no
+        # continue-on-error and so breaks the build on the commit that breaks the
+        # .iss — long before a tag exists.
         env:
           KURO_REQUIRE_ISCC: "1"
         run: |

@@ -65,11 +65,18 @@ SolidCompression=yes
 WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+; Only ask for the language when the Windows UI language matches neither entry
+; in [Languages]. The default is "yes" — every user would get a "Select Setup
+; Language" dialog they never saw in v0.10 (one language = never shown).
+ShowLanguageDialog=auto
 
 [Languages]
 ; Inno picks by the Windows UI language and shows the language dialog only when
-; nothing matches (ShowLanguageDialog=auto, the default). German first because
-; it is the project's own language; English is the fallback for everyone else.
+; nothing matches (ShowLanguageDialog=auto, set in [Setup] — the DEFAULT is yes,
+; which would ask every single user to pick a language before installing, a
+; regression against v0.10's one-language setup that never asked). German first
+; because it is the project's own language; English is the fallback for everyone
+; else.
 Name: "german";  MessagesFile: "compiler:Languages\German.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
@@ -194,6 +201,30 @@ function InitializeUninstall(): Boolean;
 begin
   StopRunningWallpaper();
   Result := True;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  // Upgrading over a RUNNING wallpaper is the normal case for the autostart
+  // user this feature targets — [Files] then has to overwrite a locked .exe.
+  // Without this, Inno falls back to CloseApplications=yes → Restart Manager,
+  // which posts WM_CLOSE to top-level windows; the tray window (src/tray.cpp)
+  // quits on our registered message, not on WM_CLOSE, and the wallpaper windows
+  // are WorkerW children RM never sees. RM would fail to close us and demand a
+  // reboot. Called here on purpose: PrepareToInstall runs BEFORE the
+  // CloseApplications scan, so by the time RM looks, the app is already gone
+  // and no restart is flagged.
+  //
+  // Does NOT help the v0.10.1 → v0.11 jump: v0.10 has no instance.h and its
+  // tray.cpp has no quit handler, so it ignores the message and we burn the
+  // full 5 s timeout before installing anyway (that upgrade may still ask for a
+  // reboot — accepted, it is a one-time cost on a single version step). AppMutex
+  // was considered and rejected for the same reason: v0.10 holds no mutex, so it
+  // would not catch that case either, while adding a "please close the app"
+  // prompt to the v0.11+ path that this function is meant to make invisible.
+  // From v0.11 → v0.12 on, this is a silent, reboot-free upgrade.
+  StopRunningWallpaper();
+  Result := '';
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
