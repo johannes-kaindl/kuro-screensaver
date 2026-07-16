@@ -65,10 +65,7 @@ const host = new WebHost({
     colorPreset: preset,
     defaultScene: scene,
     liveHotkeysEnabled: false,
-    // The standalone app runs on capable hardware and the user explicitly
-    // toggles effects — don't let perfAdapt silently kill them (it was
-    // disabling AFTER:BURN/TRAIL a few seconds after the user enabled it).
-    perfAdapt: false,
+    // perfAdapt is user-controlled via ?perfadapt= (params.ts) — engine default on.
   },
 });
 
@@ -76,21 +73,28 @@ const host = new WebHost({
 // partially through it without a type error, so toggle audio directly on the
 // merged settings (deepMerge has already run in the WebHost constructor).
 host.getSettings().sound.master = audioOn;
-// Persistent user toggles bridged from the native config dialog (speed, FX, HUD,
-// matrix-rain). See src/screensaver/params.ts — pinned by screensaver-params.test.ts.
-applyParamOverrides(host.getSettings(), params);
 // The screensaver IS the procedural film: run the phase-driven scene itinerary by
 // default (Brick C film mode). prefers-reduced-motion turns it back off in open().
+// Set BEFORE applyParamOverrides so ?autocycle=off wins.
 host.getSettings().autoCycle.on = true;
-// CRT/weather tuning params (mirror ?threat=) — force an effect so it's judgable alone.
-const ntscP = parseFloat(params.get('ntsc') ?? '');
-if (Number.isFinite(ntscP)) host.getSettings().fx.ntsc = { on: ntscP > 0, amount: ntscP };
-const halP = parseFloat(params.get('halation') ?? '');
-if (Number.isFinite(halP)) host.getSettings().fx.halation = { on: halP > 0, amount: halP };
-const weatherP = params.get('weather');
-if (weatherP) (host.getSettings() as { weather: string }).weather = weatherP;
+// Persistent user toggles bridged from the native config dialog (speed, FX, HUD,
+// matrix-rain + the full v0.10 set incl. ?ntsc/?halation/?weather/?kiosk).
+// See src/screensaver/params.ts — pinned by screensaver-params.test.ts.
+applyParamOverrides(host.getSettings(), params);
 
 const controller = new ScreensaverController(makePluginShim(host));
+
+// Host→page power bridge (Windows wallpaper mode): the C++ host posts
+// 'power:hidden' | 'power:frozen' | 'power:animating:<fps>' as WebMessage strings
+// when desktop visibility / power state changes. Absent in a plain browser → no-op.
+(window as any).chrome?.webview?.addEventListener?.('message', (ev: { data: unknown }) => {
+  const m = typeof ev.data === 'string' ? ev.data : '';
+  if (!m.startsWith('power:')) return;
+  const [, state, fpsRaw] = m.split(':');
+  if (state === 'hidden' || state === 'frozen' || state === 'animating') {
+    controller.applyPowerState(state, fpsRaw ? parseInt(fpsRaw, 10) : undefined);
+  }
+});
 
 // In a native host (macOS .app / Windows .scr), the engine's close button (×)
 // must quit the whole app. Otherwise close() only tears down the overlay and

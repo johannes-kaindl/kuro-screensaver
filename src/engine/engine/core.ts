@@ -186,6 +186,13 @@ export class Engine {
   rng: () => number;
   seed: number;
 
+  /** rAF render throttle (frames/sec) — set by the wallpaper power bridge;
+   *  null = uncapped. Pure render skip: the time base keeps running. */
+  frameCap: number | null = null;
+  private lastFrameT = 0;
+  /** Adaptive downscale factor (1 | 0.85 | 0.7 | 0.55) — perfAdapt escalation tier. */
+  private adaptScale = 1;
+
   private rafId = 0;
   private lastT = 0;
   private clockT = 0;
@@ -221,9 +228,11 @@ export class Engine {
     const W = host.clientWidth || window.innerWidth;
     const H = host.clientHeight || window.innerHeight;
 
-    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
+    // antialias off (v0.10): MSAA fights the CRT pass (scanlines/aperture mask
+    // re-introduce hard edges anyway) and costs real fillrate on iGPUs.
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false });
     this.renderer.setSize(W, H);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.applyPixelRatio();
     this.renderer.setClearColor(0x000000, 1);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
@@ -324,11 +333,36 @@ export class Engine {
     const W = window.innerWidth, H = window.innerHeight;
     this.renderer.setSize(W, H);
     this.composer.setSize(W, H);
+    // Re-apply the pixel ratio: devicePixelRatio changes when the window moves
+    // to a monitor with a different scale factor (per-monitor DPI on Windows).
+    this.applyPixelRatio();
     this.crtPass.uniforms.resolution.value.set(W, H);
     this.cam.aspect = W / H;
     this.cam.fov = Engine.defaultFov(W, H);
     this.cam.updateProjectionMatrix();
   };
+
+  /** Effective pixel ratio = capped devicePixelRatio × user renderScale × adaptive tier. */
+  private applyPixelRatio() {
+    const base = Math.min(window.devicePixelRatio, 2);
+    const scale = Math.min(1, Math.max(0.25, this.settings.renderScale ?? 1));
+    this.renderer.setPixelRatio(base * scale * this.adaptScale);
+    // EffectComposer caches the renderer's pixelRatio at construction — keep it
+    // in sync so the post buffers follow. (No-op before the composer exists;
+    // its own setSize call re-allocates the render targets.)
+    this.composer?.setPixelRatio(base * scale * this.adaptScale);
+  }
+
+  /** perfAdapt escalation: step the render resolution down (1 | 0.85 | 0.7 | 0.55)
+   *  without touching the user's persisted renderScale. Re-applies sizes so the
+   *  renderer + composer buffers actually shrink/grow. */
+  setAdaptiveScale(f: number) {
+    this.adaptScale = f;
+    this.applyPixelRatio();
+    const W = window.innerWidth, H = window.innerHeight;
+    this.renderer.setSize(W, H);
+    this.composer.setSize(W, H);
+  }
 
   /** Drive the analog-CRT pass uniforms from settings (off → 0, so the pass is a
    *  no-op when nothing is enabled). */
@@ -472,8 +506,14 @@ export class Engine {
   }
 
   start() {
+    if (this.rafId) return;   // idempotent — the power bridge may re-enter while running
     const tick = (now: number) => {
       this.rafId = requestAnimationFrame(tick);
+      // frameCap (wallpaper power policy): pure render skip — keep scheduling,
+      // drop the frame. -1 ms tolerance so a 30 fps cap doesn't skip every
+      // other vsync tick on a 60 Hz display.
+      if (this.frameCap && now - this.lastFrameT < 1000 / this.frameCap - 1) return;
+      this.lastFrameT = now;
       const dt = this.lastT === 0 ? 16 : Math.min(50, now - this.lastT);
       this.lastT = now;
       this.clockT += dt / 1000;
@@ -547,6 +587,7 @@ export class Engine {
 
   stop() {
     cancelAnimationFrame(this.rafId);
+    this.rafId = 0;   // lets the start() idempotency guard re-arm
   }
 
   setColor(c: ResolvedColor) {

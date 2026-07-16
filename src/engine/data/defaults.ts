@@ -10,6 +10,8 @@ export interface ScreensaverSettings {
   tunnelAutoBoost: boolean;
   bankStrength: number;          // flight banking intensity (0 = level, 2 = aggressive)
   seedLock: number | null;
+  renderScale: number;           // 0.25..1 — multiplies the devicePixelRatio cap (perf knob)
+  kioskMode: boolean;            // UI-less operation inside a native saver host (no control bar / cursor / fullscreen request)
 
   colorMode: 'kuro-auto' | 'kuro-preset' | 'custom';
   colorPreset: string;
@@ -92,7 +94,7 @@ export interface ScreensaverSettings {
     synthSoundscape: 'off' | 'carpenter' | 'bach';
   };
 
-  autoCycle:   { on: boolean; intervalMin: 2 | 5 | 10 };
+  autoCycle:   { on: boolean; intervalMin: number };
   idleLaunch:  { on: boolean; minutes: 5 | 10 | 15 | 30 };
   embed:       { on: boolean; opacity: number; hudHidden: boolean };
   parallax:    boolean;
@@ -144,6 +146,8 @@ export const DEFAULT_SCREENSAVER: ScreensaverSettings = {
   tunnelAutoBoost: true,
   bankStrength: 1,
   seedLock: null,
+  renderScale: 1,
+  kioskMode: false,
 
   colorMode: 'kuro-auto',
   colorPreset: 'toxic-haze',

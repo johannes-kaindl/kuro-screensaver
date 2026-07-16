@@ -107,6 +107,17 @@ export class Hud {
       'position:absolute;inset:0;z-index:30;pointer-events:none;' +
       'background:repeating-linear-gradient(to bottom,transparent 0,transparent 3px,rgba(0,0,0,.11) 3px,rgba(0,0,0,.11) 4px);' +
       'transition:opacity .3s');
+    // Scanline drift as a compositor-driven CSS animation (v0.10): the old
+    // per-frame backgroundPositionY write forced style/layout work on every
+    // rAF tick. The JS loop keeps only the rare sync-tear. Duration matches
+    // the old rate — speed*0.6 px/frame @60fps over the 4px pattern.
+    if (!document.getElementById('ks-drift-style')) {
+      const st = document.createElement('style');
+      st.id = 'ks-drift-style';
+      st.textContent = '@keyframes ks-drift { from { background-position-y: 0; } to { background-position-y: 4px; } }';
+      document.head.appendChild(st);
+    }
+    this.scanlines.style.animation = `ks-drift ${this.driftDurationSec()}s linear infinite`;
 
     // Vignette
     this.vignette = make('div',
@@ -482,6 +493,11 @@ export class Hud {
     }
   }
 
+  /** Seconds per 4px drift cycle — matches the old per-frame rate (speed*0.6 px @60fps). */
+  private driftDurationSec(): number {
+    return 4 / (Math.max(0.05, this.settings.fx.scanlineDrift.speed) * 0.6 * 60);
+  }
+
   applySettings(s: ScreensaverSettings) {
     this.settings = s;
     this.hl.style.display = s.hud.left ? '' : 'none';
@@ -496,6 +512,9 @@ export class Hud {
     this.termBackdrop.style.opacity = (s.terminalLayout === 'center-window' && s.hud.terminal) ? '1' : '0';
     this.kanji.style.display = s.hud.vaultKanji ? '' : 'none';
     this.scanlines.style.opacity = s.fx.scan.on ? String(s.fx.scan.opacity * 5) : '0';
+    // Drift animation follows the setting live (duration re-derived on speed change).
+    this.scanlines.style.animationDuration = `${this.driftDurationSec()}s`;
+    this.scanlines.style.animationPlayState = s.fx.scanlineDrift.on ? 'running' : 'paused';
     this.vignette.style.opacity = s.fx.vignette.on ? String(s.fx.vignette.strength) : '0';
     // Vignette strength via inline gradient stop
     this.vignette.style.background = `radial-gradient(ellipse at center, transparent ${52 - s.fx.vignette.strength * 30}%, rgba(0,0,0,.72) 100%)`;
@@ -688,9 +707,10 @@ export class Hud {
     return cursor + 200;
   }
 
-  // Per-frame loop: radar, scanline drift, ping, noise, flash, hud values, terminal, day-night
+  // Per-frame loop: radar, scanline sync-tear, ping, noise, flash, hud values, terminal
   startLoop(t0: number) {
-    let prevDriftY = 0;
+    if (this.rafId) return;   // idempotent — the power bridge may re-enter while running
+    if (this.settings.fx.scanlineDrift.on) this.scanlines.style.animationPlayState = 'running';
     const tick = (now: number) => {
       this.rafId = requestAnimationFrame(tick);
       const elapsed = (now - t0) / 1000;
@@ -727,15 +747,11 @@ export class Hud {
       // Radar
       if (this.settings.hud.radar) this.drawRadar();
 
-      // Scanline drift
-      if (this.settings.fx.scanlineDrift.on) {
-        prevDriftY = (prevDriftY + this.settings.fx.scanlineDrift.speed * 0.6) % 4;
-        this.scanlines.style.backgroundPositionY = prevDriftY + 'px';
-        // Sync-tear ~2% chance
-        if (Math.random() < 0.002) {
-          this.scanlines.style.transform = `translateY(${(Math.random() - 0.5) * 6}px)`;
-          setTimeout(() => this.scanlines.style.transform = '', 80);
-        }
+      // Scanline drift runs as a CSS keyframes animation (see buildDOM) — the
+      // loop keeps only the rare sync-tear (~0.2% per frame).
+      if (this.settings.fx.scanlineDrift.on && Math.random() < 0.002) {
+        this.scanlines.style.transform = `translateY(${(Math.random() - 0.5) * 6}px)`;
+        setTimeout(() => this.scanlines.style.transform = '', 80);
       }
 
       // Radar ping
@@ -780,7 +796,12 @@ export class Hud {
     this.rafId = requestAnimationFrame(tick);
   }
 
-  stopLoop() { cancelAnimationFrame(this.rafId); }
+  stopLoop() {
+    cancelAnimationFrame(this.rafId);
+    this.rafId = 0;   // lets the startLoop() idempotency guard re-arm
+    // Freeze the compositor-driven drift too (power bridge / off path).
+    this.scanlines.style.animationPlayState = 'paused';
+  }
 
   private drawRadar() {
     const c = this.color.rgb;

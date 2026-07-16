@@ -169,14 +169,19 @@ export class ScreensaverController {
       //            also drives parallax with a top-deadzone so the user can reach the bar.
       // Click outside the bar: dismiss the bar immediately (alternative to waiting for timeout).
       this.overlay.addEventListener('mousemove', (ev) => {
-        this.overlay!.style.cursor = '';
-        clearTimeout(this.cursorHideTimer);
-        this.cursorHideTimer = window.setTimeout(() => {
-          if (this.overlay) this.overlay.style.cursor = 'none';
-        }, 2500);
+        // Kiosk (native saver host): the host exits on real input, so a revealed
+        // cursor / control bar would only ever burn in — keep both hidden.
+        // Parallax stays active (harmless without a moving mouse).
+        if (!s.kioskMode) {
+          this.overlay!.style.cursor = '';
+          clearTimeout(this.cursorHideTimer);
+          this.cursorHideTimer = window.setTimeout(() => {
+            if (this.overlay) this.overlay.style.cursor = 'none';
+          }, 2500);
 
-        if (s.hud.controlBar && this.hud) {
-          this.hud.showControlBar(this.s.controlBarAutoHideSec);
+          if (s.hud.controlBar && this.hud) {
+            this.hud.showControlBar(this.s.controlBarAutoHideSec);
+          }
         }
 
         if (s.parallax && this.engine) {
@@ -229,7 +234,7 @@ export class ScreensaverController {
 
       if (s.hud.controlBar) this.buildControlBar(s);
     }
-    if (s.hud.controlBar && !this.state.embed) {
+    if (s.hud.controlBar && !this.state.embed && !s.kioskMode) {
       // Show briefly on first open as orientation; auto-hides per setting.
       this.hud.showControlBar(this.s.controlBarAutoHideSec);
     }
@@ -239,8 +244,9 @@ export class ScreensaverController {
       document.addEventListener('keydown', this.onKeyDown, { capture: true });
     }
 
-    // Fullscreen (only non-embed)
-    if (!this.state.embed) {
+    // Fullscreen (only non-embed; kiosk hosts size their own window — a
+    // requestFullscreen without user gesture just throws in WebView2 anyway)
+    if (!this.state.embed && !s.kioskMode) {
       try { await this.overlay.requestFullscreen(); } catch { /* user denied or unsupported */ }
     }
 
@@ -362,19 +368,43 @@ export class ScreensaverController {
       }
     }
 
-    // Performance auto-adapt: monitor FPS, downgrade FX when sustained low
+    // Performance auto-adapt: monitor FPS, downgrade FX when sustained low.
+    // v0.10 two-stage escalation: first the cheap FX throttle (trails + bloom),
+    // then step the render resolution down tier by tier (0.85/0.7/0.55). Sustained
+    // headroom (~20 s > 55 fps) steps the resolution back up — the FX throttle
+    // stays (it was needed once; re-enabling would oscillate).
     if (s.perfAdapt) {
       let lowFrames = 0;
+      let highFrames = 0;
+      let throttledFx = false;
+      let perfTier = 0;
+      const TIER_SCALE = [1, 0.85, 0.7, 0.55];
       (this as any)._perfInterval = window.setInterval(() => {
         if (!this.engine) return;
+        // Wallpaper power bridge caps the frame rate — measured fps then IS the
+        // cap, not a perf signal. Don't escalate (or recover) against it.
+        if (this.engine.frameCap !== null) { lowFrames = 0; highFrames = 0; return; }
         const fps = this.engine.fps;
         if (fps && fps < 40) lowFrames++; else lowFrames = 0;
+        if (fps && fps > 55) highFrames++; else highFrames = 0;
         if (lowFrames >= 3) {
-          // Reduce trails + bloom strength
-          this.engine.bloomBase = Math.max(0.4, this.engine.bloomBase * 0.85);
-          if (this.engine.trailPass.enabled) this.engine.trailPass.enabled = false;
-          if (this.engine.burnPass.enabled) this.engine.burnPass.enabled = false;
           lowFrames = 0;
+          if (!throttledFx) {
+            // Stage 1 — reduce trails + bloom strength
+            throttledFx = true;
+            this.engine.bloomBase = Math.max(0.4, this.engine.bloomBase * 0.85);
+            if (this.engine.trailPass.enabled) this.engine.trailPass.enabled = false;
+            if (this.engine.burnPass.enabled) this.engine.burnPass.enabled = false;
+          } else if (perfTier < 3) {
+            // Stage 2 — adaptive render-resolution downscale
+            perfTier++;
+            this.engine.setAdaptiveScale(TIER_SCALE[perfTier]);
+          }
+        }
+        if (highFrames >= 13 && perfTier > 0) {   // 13 × 1.5 s ≈ 20 s recovery window
+          highFrames = 0;
+          perfTier--;
+          this.engine.setAdaptiveScale(TIER_SCALE[perfTier]);
         }
       }, 1500);
     }
@@ -898,6 +928,28 @@ export class ScreensaverController {
     }
 
     this.switchScene(next, { user: true, dir: step });
+  }
+
+  /**
+   * Host→page power bridge (Windows wallpaper mode). The native host maps its
+   * render policy onto three states:
+   *   hidden/frozen — stop rendering entirely (engine rAF + HUD loop),
+   *   animating     — run, optionally throttled to <fps> (battery cap).
+   * engine.start()/stop() and hud.startLoop()/stopLoop() are idempotent, so
+   * repeated messages (e.g. fps-cap changes) are safe.
+   */
+  applyPowerState(state: 'hidden' | 'frozen' | 'animating', fps?: number): void {
+    if (!this.engine) return;
+    if (state === 'hidden' || state === 'frozen') {
+      this.engine.frameCap = null;
+      this.engine.stop();
+      this.hud?.stopLoop();
+    } else {
+      this.engine.frameCap = fps && fps > 0 ? fps : null;
+      this.engine.start();
+      // Resume the HUD on the original open-t0 so the T+ shift clock stays real-time.
+      this.hud?.startLoop(this.dayNightT0 || performance.now());
+    }
   }
 
   takeScreenshot() {

@@ -108,3 +108,63 @@ describe('applyParamOverrides — HUD params survive the engine preset', () => {
     expect(s.hud.vaultKanji).toBe(true); // non-overridden field stays at the tactical/default value
   });
 });
+
+// v0.10 — the Windows host bridges the FULL settings dialog through the query
+// string (keys 13–33 of the pinned contract in the v0.10 implementation plan).
+describe('applyParamOverrides — v0.10 keys', () => {
+  it('maps enums with whitelist validation', () => {
+    expect(apply('altitude=high').cityAltitude).toBe('high');
+    expect(apply('altitude=orbit').cityAltitude).toBe(DEFAULT_SCREENSAVER.cityAltitude);
+    expect(apply('fog=dense').fogMode).toBe('dense');
+    expect(apply('weather=storm').weather).toBe('storm');
+    expect(apply('weather=sharknado').weather).toBe(DEFAULT_SCREENSAVER.weather);
+    expect(apply('bootspeed=cinematic').bootSpeed).toBe('cinematic');
+    expect(apply('termlayout=window').terminalLayout).toBe('center-window');
+    expect(apply('termlayout=strip').terminalLayout).toBe('bottom-strip');
+  });
+  it('maps bools', () => {
+    expect(apply('reactive=off').narrativeReactiveWorld).toBe(false);
+    expect(apply('autocycle=off').autoCycle.on).toBe(false);
+    expect(apply('boot=off').bootEnabled).toBe(false);
+    expect(apply('daynight=off').dayNightCycle.on).toBe(false);
+    expect(apply('perfadapt=off').perfAdapt).toBe(false);
+  });
+  it('maps clamped numerics from raw strings', () => {
+    expect(apply('bank=2').bankStrength).toBe(2);
+    expect(apply('bank=9').bankStrength).toBe(2);          // clamp
+    expect(apply('cyclemin=0.5').autoCycle.intervalMin).toBe(0.5);
+    expect(apply('crtintensity=0.85').crtSim.intensity).toBe(0.85);
+    expect(apply('curvature=0.022').fx.curvature).toEqual({ on: true, amount: 0.022 });
+    expect(apply('curvature=0').fx.curvature.on).toBe(false);
+    expect(apply('aperture=0.45').fx.aperture).toEqual({ on: true, strength: 0.45 });
+    expect(apply('trailsamount=0.9').fx.trails.damp).toBe(0.9);
+    expect(apply('ntsc=0.6').fx.ntsc).toEqual({ on: true, amount: 0.6 });
+    expect(apply('halation=0.4').fx.halation).toEqual({ on: true, amount: 0.4 });
+    expect(apply('scale=0.66').renderScale).toBe(0.66);
+    expect(apply('scale=0.1').renderScale).toBe(0.25);     // clamp low
+    expect(apply('bank=abc').bankStrength).toBe(DEFAULT_SCREENSAVER.bankStrength);
+  });
+  it('bloomstrength disables theme inheritance so the value sticks', () => {
+    const s = apply('bloomstrength=1.6');
+    expect(s.fx.bloom.strength).toBe(1.6);
+    expect(s.fxInheritFromTheme).toBe(false);
+  });
+  it('ignores look (dialog-only key)', () => {
+    expect(apply('look=heavy')).toEqual(DEFAULT_SCREENSAVER);
+  });
+});
+
+describe('applyParamOverrides — kiosk mode', () => {
+  it('kiosk=on hides the control bar and survives applyHudPreset', () => {
+    const s = apply('kiosk=on');
+    expect(s.kioskMode).toBe(true);
+    expect(s.hud.controlBar).toBe(false);
+    expect(s.hudPreset).toBe('custom');
+    applyHudPreset(s);
+    expect(s.hud.controlBar).toBe(false);
+  });
+  it('defaults stay without the param', () => {
+    expect(apply('').kioskMode).toBe(false);
+    expect(apply('').hud.controlBar).toBe(true);
+  });
+});
