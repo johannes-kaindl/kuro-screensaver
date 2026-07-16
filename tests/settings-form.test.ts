@@ -14,9 +14,14 @@ import {
   type MonitorFormState,
 } from '../src/settings/form-state';
 
-/** A monitor form state; both trios default to neutral, override what matters. */
+/**
+ * A monitor form state as the dialog starts it: both trios neutral, the
+ * wallpaper card untouched (what initialMonitorStates produces) — override what
+ * matters. `wtouched: true` is a user who picked something in the wallpaper tab.
+ */
 const MON = (id: string, over: Partial<MonitorFormState> = {}): MonitorFormState => ({
-  id, mode: 'on', scene: '', preset: '', wmode: 'on', wscene: '', wpreset: '', ...over,
+  id, mode: 'on', scene: '', preset: '', wmode: 'on', wscene: '', wpreset: '',
+  wtouched: false, ...over,
 });
 
 // v0.10 fixtures — pinned on both sides (options_test.cpp mirrors them byte-identically).
@@ -66,6 +71,26 @@ describe('settings form state (native /c dialog bridge)', () => {
     expect(s.bank).toBe(FORM_DEFAULTS.bank);
     expect(s.crtintensity).toBe(FORM_DEFAULTS.crtintensity);
     expect(s.scale).toBe(FORM_DEFAULTS.scale);
+  });
+
+  it('readInitial rejects unknown enum values back to the defaults', () => {
+    // Same threat model as the numerics: LoadOptions reads these straight out of
+    // the registry, and ParseOptionField whitelists them on the way back — an
+    // unknown value would fail every save of BOTH tabs, and on the inactive tab
+    // no select ever renders to normalise it away.
+    const s = readInitial(new URLSearchParams(
+      '?speed=warp&altitude=orbit&fog=soup&weather=hail&termlayout=fullscreen&bootspeed=instant',
+    ));
+    expect(s.speed).toBe(FORM_DEFAULTS.speed);
+    expect(s.altitude).toBe(FORM_DEFAULTS.altitude);
+    expect(s.fog).toBe(FORM_DEFAULTS.fog);
+    expect(s.weather).toBe(FORM_DEFAULTS.weather);
+    expect(s.termlayout).toBe(FORM_DEFAULTS.termlayout);
+    expect(s.bootspeed).toBe(FORM_DEFAULTS.bootspeed);
+    // Valid ones pass through untouched — including the wp half's own defaults.
+    expect(readInitial(new URLSearchParams('?speed=fast&fog=dense')).speed).toBe('fast');
+    expect(readWallpaperInitial(new URLSearchParams('?wpspeed=warp')).speed)
+      .toBe(WALLPAPER_FORM_DEFAULTS.speed);
   });
 
   it('readInitial keeps valid raw numeric strings byte-identical, incl. range bounds', () => {
@@ -136,14 +161,14 @@ describe('settings form state (native /c dialog bridge)', () => {
     const states = initialMonitorStates(entries);
     expect(states[0]).toEqual({
       id: 'A', mode: 'scene', scene: 'matrix', preset: 'phosphor',
-      wmode: 'random', wscene: '', wpreset: 'kuro',
+      wmode: 'random', wscene: '', wpreset: 'kuro', wtouched: false,
     });
     // A host that sends no trio at all: wmode stays '' so the save omits the
     // keys and the host's "never set" sentinel survives — this side must not
     // invent 'on'/'off' for an absence only the host can resolve.
     expect(states[1]).toEqual({
       id: 'B', mode: 'on', scene: '', preset: '',
-      wmode: '', wscene: '', wpreset: '',
+      wmode: '', wscene: '', wpreset: '', wtouched: false,
     });
   });
 
@@ -176,28 +201,45 @@ describe('per-monitor wallpaper assignment', () => {
     expect(m.wpreset).toBe('phosphor');
   });
 
-  it('sends the trio per monitor once a wallpaper half is in play', () => {
-    const mons = [MON('A', { mode: 'off', wmode: 'scene', wscene: 'void', wpreset: 'phosphor' })];
+  it('sends the trio per monitor once the user touched the card', () => {
+    const mons = [MON('A', {
+      mode: 'off', wmode: 'scene', wscene: 'void', wpreset: 'phosphor', wtouched: true,
+    })];
     const msg = buildSaveMessage(FORM_DEFAULTS, mons, 'per', WALLPAPER_FORM_DEFAULTS, 'per');
     expect(msg).toContain('&m0id=A&m0mode=off&m0scene=&m0preset=');
     expect(msg).toContain('&m0wmode=scene&m0wscene=void&m0wpreset=phosphor');
   });
 
+  it('sends no trio for an untouched card, even though every save has a wp half', () => {
+    // main.ts ALWAYS passes a wallpaper half (it serves both tabs from one Save
+    // button), so `wallpaper` says nothing about whether the user ever decided
+    // anything per monitor — only wtouched does. Sending the trio here writes
+    // WMode explicitly for every monitor and the host's "unset primary = on"
+    // rule can never fire again (the v0.10 black-wallpaper bug, one dock away).
+    // The dialog-level proof of this lives in settings-dialog.test.ts.
+    const mons = [MON('A', { wmode: 'on' }), MON('B', { wmode: 'off' })];
+    const msg = buildSaveMessage(FORM_DEFAULTS, mons, 'per', WALLPAPER_FORM_DEFAULTS, 'per');
+    expect(msg).toContain('&m0id=A&m0mode=on&m0scene=&m0preset=&m1id=B');
+    expect(msg).not.toContain('m0wmode');
+    expect(msg).not.toContain('m1wmode');
+  });
+
   it('never sends an empty wmode — absence is the host sentinel, not a value', () => {
     // The empty string means "never set" = "primary on, others off" in the host.
     // Spelling it out in a save would materialise it as a real value and put the
-    // v0.10 black-wallpaper bug back — so the key stays away entirely.
-    const mons = [MON('A', { wmode: '' })];
+    // v0.10 black-wallpaper bug back — so the key stays away entirely, even for
+    // a card the user did touch (a host too old to send the trio at all).
+    const mons = [MON('A', { wmode: '', wtouched: true })];
     const msg = buildSaveMessage(FORM_DEFAULTS, mons, 'per', WALLPAPER_FORM_DEFAULTS, 'per');
     expect(msg).not.toContain('m0wmode');
     expect(msg).toContain('&m0id=A');
   });
 
-  it('leaves the saver-only save byte-identical to v0.10', () => {
-    // The /c dialog has no wallpaper half, so it must not gain the trio: the
-    // host would then start writing WMode for every monitor the saver touches.
-    const mons = [MON('A', { wmode: 'scene', wscene: 'void' })];
-    expect(buildSaveMessage(FORM_DEFAULTS, mons, 'per')).not.toContain('m0wmode');
+  it('touching a card only affects its own trio', () => {
+    const mons = [MON('A'), MON('B', { wmode: 'random', wtouched: true })];
+    const msg = buildSaveMessage(FORM_DEFAULTS, mons, 'per', WALLPAPER_FORM_DEFAULTS, 'per');
+    expect(msg).not.toContain('m0wmode');
+    expect(msg).toContain('&m1wmode=random&m1wscene=&m1wpreset=');
   });
 });
 
@@ -264,7 +306,7 @@ describe('wallpaper tab', () => {
   });
 
   it('appends the wp half after the monitor keys, and wpmonitormode last', () => {
-    const mons = [MON('A')];
+    const mons = [MON('A', { wtouched: true })];
     const msg = buildSaveMessage(FORM_DEFAULTS, mons, 'per', WALLPAPER_FORM_DEFAULTS, 'span');
     expect(msg).toContain('&m0wpreset=&wpscene=');
     expect(msg).toMatch(/&wpperfadapt=on&wpmonitormode=span$/);

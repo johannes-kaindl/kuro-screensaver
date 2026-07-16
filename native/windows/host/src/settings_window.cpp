@@ -143,19 +143,21 @@ void HandleWebMessage(HWND hwnd, const std::wstring& message) {
     if (!wmode.empty()) SaveMonitorMode(true, wmode);
     for (const MonitorSave& m : mons) {
         // Replace only what the message carried — the wallpaper's
-        // WMode/WScene/WPreset in the same subkey must survive a saver-only save
-        // untouched: an existing WMode round-trips via LoadMonitorConfig, a
-        // missing one stays the empty sentinel and SaveMonitorConfig skips the
-        // trio (never materializing WMode=off — see monitors.h).
+        // WMode/WScene/WPreset in the same subkey must survive a save that never
+        // touched this monitor's wallpaper card: an existing WMode round-trips
+        // via LoadMonitorConfig, a missing one stays the empty sentinel and
+        // SaveMonitorConfig skips the trio (never materializing WMode=off — see
+        // monitors.h).
         MonitorConfig c = LoadMonitorConfig(m.id);
         c.mode = m.mode;
         c.scene = m.scene;
         c.preset = m.preset;
-        // The wallpaper tab sends these explicitly, so writing them is not
-        // materialising an absence: the dialog showed the user the very value
-        // being saved (EffectiveWallpaperMode resolved it host-side). An empty
-        // wmode means the message had no wallpaper half at all — then the
-        // sentinel must stay untouched.
+        // The trio arrives only for a card the user touched in the wallpaper tab
+        // (buildSaveMessage / form-state.ts), so writing it is not materialising
+        // an absence: the dialog showed the user the very value being saved
+        // (EffectiveWallpaperMode resolved it host-side). Absent keys leave wmode
+        // empty — nobody has decided anything for this monitor, and the sentinel
+        // must stay so "unset primary = on" keeps following the primary.
         if (!m.wmode.empty()) {
             c.wmode = m.wmode;
             c.wscene = m.wscene;

@@ -15,6 +15,7 @@ import { SCENES } from '../engine/data/defaults';
 import { LOOKS } from '../engine/data/looks';
 import { PRESETS } from '../engine/data/presets';
 import {
+  ENUM_VALUES,
   MONITOR_CAP,
   NUMERIC_RANGES,
   buildSaveMessage,
@@ -32,8 +33,6 @@ import {
   type SettingsFormState,
   type Tab,
 } from './form-state';
-
-const SPEEDS = ['slow', 'norm', 'fast'] as const;
 
 const params = new URLSearchParams(location.search);
 const saverState = readInitial(params);
@@ -64,8 +63,9 @@ if (monitors.length >= 2) {
 let autostart = readAutostart(params);
 
 // Per-monitor overrides start from the existing config the host embeds in
-// the monitors=-JSON — an untouched save keeps them (unknown registry values
-// are normalised by the selects below, exactly like the global fields).
+// the monitors=-JSON — an untouched save keeps them: the saver trio round-trips
+// verbatim, the wallpaper trio is not sent at all until a card is touched in the
+// wallpaper tab (see monitorCard / buildSaveMessage).
 const monitorStates: MonitorFormState[] = initialMonitorStates(monitors);
 
 // Every control registers a refresher so state mutations from elsewhere
@@ -103,8 +103,11 @@ function select(options: readonly Option[], get: () => string, set: (v: string) 
     opt.textContent = o.label ?? o.value;
     sel.append(opt);
   }
-  // Normalise unknown registry values to a real option — on load AND on every
-  // refresh, because a tab switch shows a set this select has never seen.
+  // Normalise unknown values to a real option — on load AND on every refresh,
+  // because a tab switch shows a set this select has never seen. This is the
+  // last line of defence, not the first: only the tab on screen has selects, so
+  // registry garbage is rejected in readInitial (form-state.ts), which sees both
+  // halves. Both tabs travel in one all-or-nothing save message.
   const normalise = (): void => {
     const current = get();
     sel.value = options.some((o) => o.value === current) ? current : options[0].value;
@@ -221,13 +224,12 @@ const bild = section('Bild');
 bild.grid.append(
   row('Scene', select(opts(['random', ...SCENES]), () => state.scene, (v) => (state.scene = v))),
   row('Color', select(opts(Object.keys(PRESETS)), () => state.preset, (v) => (state.preset = v))),
-  row('Speed', select(opts(SPEEDS), () => state.speed, (v) => (state.speed = v))),
-  row('Altitude', select(opts(['low', 'mid', 'high']), () => state.altitude, (v) => (state.altitude = v))),
-  row('Fog', select(opts(['auto', 'clear', 'dense']), () => state.fog, (v) => (state.fog = v))),
-  row('Weather', select(
-    opts(['light-fog', 'heavy-fog', 'storm', 'dust', 'clear']),
-    () => state.weather, (v) => (state.weather = v),
-  )),
+  // Option lists come from the shared ENUM_VALUES table (form-state.ts), so the
+  // UI can never offer a value readInitial's guard — or the host — rejects.
+  row('Speed', select(opts(ENUM_VALUES.speed), () => state.speed, (v) => (state.speed = v))),
+  row('Altitude', select(opts(ENUM_VALUES.altitude), () => state.altitude, (v) => (state.altitude = v))),
+  row('Fog', select(opts(ENUM_VALUES.fog), () => state.fog, (v) => (state.fog = v))),
+  row('Weather', select(opts(ENUM_VALUES.weather), () => state.weather, (v) => (state.weather = v))),
 );
 
 const crtFx = section('CRT-Effekte');
@@ -256,8 +258,7 @@ motion.grid.append(
 
 const term = section('Terminal');
 const termlayoutSelect = select(
-  [{ value: 'strip', label: 'strip' }, { value: 'window', label: 'window' }],
-  () => state.termlayout, (v) => (state.termlayout = v),
+  opts(ENUM_VALUES.termlayout), () => state.termlayout, (v) => (state.termlayout = v),
 );
 refreshers.push(() => { termlayoutSelect.disabled = !state.terminal; });
 termlayoutSelect.disabled = !state.terminal;
@@ -269,7 +270,7 @@ display.grid.append(
   toggle('crosshair', 'Crosshair'),
   toggle('matrix', 'Matrix rain'),
   toggle('boot', 'Boot sequence'),
-  row('Boot speed', select(opts(['fast', 'normal', 'cinematic']), () => state.bootspeed, (v) => (state.bootspeed = v))),
+  row('Boot speed', select(opts(ENUM_VALUES.bootspeed), () => state.bootspeed, (v) => (state.bootspeed = v))),
   toggle('daynight', 'Day/night'),
 );
 
@@ -320,17 +321,26 @@ function monitorCard(entry: MonitorEntry, ms: MonitorFormState): HTMLElement {
   const getPreset = (): string => (isWallpaperTab() ? ms.wpreset : ms.preset);
   const setPreset = (v: string): void => { if (isWallpaperTab()) ms.wpreset = v; else ms.preset = v; };
 
+  // "The user decided something about this monitor's wallpaper" — the flag the
+  // save reads to know whether the trio may be written at all (form-state.ts).
+  // Only a real `change` marks it: the selects also call their setter from
+  // normalise() on every refresh, and a tab switch normalising a card the user
+  // never looked at must not count as a decision.
+  const markWallpaperTouched = (): void => { if (isWallpaperTab()) ms.wtouched = true; };
+
   const modeSelect = select(opts(['on', 'off', 'random', 'scene']), getMode, setMode);
+  modeSelect.addEventListener('change', markWallpaperTouched);
   modeSelect.addEventListener('change', refreshAll);
-  const sceneRow = row('Scene', select(
-    [{ value: '', label: 'global' }, ...opts(SCENES)], getScene, setScene,
-  ));
+  const sceneSelect = select([{ value: '', label: 'global' }, ...opts(SCENES)], getScene, setScene);
+  sceneSelect.addEventListener('change', markWallpaperTouched);
+  const sceneRow = row('Scene', sceneSelect);
   sceneRow.hidden = getMode() !== 'scene';
   refreshers.push(() => { sceneRow.hidden = getMode() !== 'scene'; });
-  const presetRow = row('Color', select(
+  const presetSelect = select(
     [{ value: '', label: 'global' }, ...opts(Object.keys(PRESETS))], getPreset, setPreset,
-  ));
-  card.append(head, row('Mode', modeSelect), sceneRow, presetRow);
+  );
+  presetSelect.addEventListener('change', markWallpaperTouched);
+  card.append(head, row('Mode', modeSelect), sceneRow, row('Color', presetSelect));
   return card;
 }
 

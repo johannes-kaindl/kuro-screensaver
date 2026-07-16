@@ -51,9 +51,11 @@ struct SaverOptions {
 
 // One per-monitor override entry from the settings dialog (save-message keys
 // m<N>id/m<N>mode/m<N>scene/m<N>preset, N = 0..7 gapless), plus the wallpaper's
-// own trio (m<N>wmode/m<N>wscene/m<N>wpreset). The w-trio is optional: the
-// screensaver's /c dialog sends none, and wmode stays empty then — the "never
-// set" sentinel that MonitorConfig relies on (monitors.h).
+// own trio (m<N>wmode/m<N>wscene/m<N>wpreset). The w-trio is optional and comes
+// ONLY for a card the user touched in the wallpaper tab — every other monitor
+// leaves the keys away, and wmode stays empty then: the "never set" sentinel
+// that MonitorConfig relies on (monitors.h). The dialog serves both tabs from
+// one Save button, so which tab it opened on says nothing about this.
 struct MonitorSave {
     std::wstring id, mode, scene, preset;
     std::wstring wmode, wscene, wpreset;

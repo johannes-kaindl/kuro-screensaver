@@ -84,6 +84,14 @@ export interface MonitorFormState {
   wmode: string;   // on|off|random|scene
   wscene: string;  // slug or '' (= global scene)
   wpreset: string; // slug or '' (= global preset)
+  // Did the user touch this card IN THE WALLPAPER TAB? Only then does the trio
+  // travel. The wmode the host sends is already resolved (EffectiveWallpaperMode
+  // turns the "never set" sentinel into on/off for display), so the value alone
+  // cannot answer "has anyone ever decided this?" — and a save that answers it
+  // wrongly writes WMode for every monitor, killing the "unset primary = on"
+  // rule forever. The touch is the only honest signal, so it is carried, not
+  // re-derived.
+  wtouched: boolean;
 }
 
 /** Mirrors the engine defaults (defaults.ts) and the host's SaverOptions defaults. */
@@ -186,13 +194,39 @@ export const NUMERIC_RANGES = {
 
 export type NumericKey = keyof typeof NUMERIC_RANGES;
 
+/**
+ * The closed value sets of the enum fields — the single source for the dialog's
+ * option lists (main.ts) AND readInitial's garbage guard, same contract as
+ * NUMERIC_RANGES. Mirrors the whitelists in ParseOptionField (options.cpp),
+ * which rejects anything else and fails the whole save with it.
+ *
+ * scene/preset/look are absent on purpose: they are open slug sets (the host
+ * only checks the charset), and their option lists come from the engine data.
+ */
+export const ENUM_VALUES = {
+  speed: ['slow', 'norm', 'fast'],
+  altitude: ['low', 'mid', 'high'],
+  fog: ['auto', 'clear', 'dense'],
+  weather: ['light-fog', 'heavy-fog', 'storm', 'dust', 'clear'],
+  termlayout: ['strip', 'window'],
+  bootspeed: ['fast', 'normal', 'cinematic'],
+} as const satisfies Partial<Record<StringKey, readonly string[]>>;
+
 // Same shape the host accepts (IsValidNumber → wcstod): plain unsigned
 // decimals. Anything else ("1,5", "abc", "1#") would poison the save loop.
 const NUMERIC_RE = /^[0-9]+(\.[0-9]+)?$/;
 
+/**
+ * Whether a raw registry value may enter the form. Numerics must be in range,
+ * enums must be in their whitelist — the selects normalise only what they
+ * render, and the inactive tab renders nothing, so this side (which sees both
+ * halves) is the only place that can defend both.
+ */
 function isAcceptableRaw(key: StringKey, v: string): boolean {
+  const values = (ENUM_VALUES as Partial<Record<StringKey, readonly string[]>>)[key];
+  if (values) return values.includes(v);
   const range = (NUMERIC_RANGES as Partial<Record<StringKey, NumericRange>>)[key];
-  if (!range) return true; // enum-ish raw keys are normalised by the selects
+  if (!range) return true; // open slug sets (scene/preset/look) — host checks the charset
   if (!NUMERIC_RE.test(v)) return false;
   const n = parseFloat(v);
   return n >= range.min && n <= range.max;
@@ -225,13 +259,14 @@ export function readInitial(
   const get = (key: string): string | null => params.get(prefix + key);
   for (const key of ['scene', 'preset', 'speed'] as const) {
     const v = get(key);
-    if (v) s[key] = v;
+    if (v && isAcceptableRaw(key, v)) s[key] = v;
   }
   for (const key of RAW_STRING_KEYS) {
     const v = get(key);
-    // Numeric fields reject registry garbage / out-of-range values back to
-    // the defaults — otherwise the host rejects EVERY save until the user
-    // happens to drag exactly the poisoned slider.
+    // Numeric and enum fields reject registry garbage back to the defaults —
+    // otherwise the host rejects EVERY save (both tabs travel in one
+    // all-or-nothing message) until the user happens to touch exactly the
+    // poisoned control, which on the inactive tab they cannot even see.
     if (v !== null && isAcceptableRaw(key, v)) s[key] = v;
   }
   for (const key of BOOL_KEYS) {
@@ -300,6 +335,7 @@ export function initialMonitorStates(entries: readonly MonitorEntry[]): MonitorF
     wmode: m.wmode ?? '',
     wscene: m.wscene ?? '',
     wpreset: m.wpreset ?? '',
+    wtouched: false, // loading is not deciding
   }));
 }
 
@@ -335,11 +371,14 @@ export function buildSaveMessage(
   if (monitorMode) msg += `&monitormode=${monitorMode}`;
   monitors.slice(0, MONITOR_CAP).forEach((m, i) => {
     msg += `&m${i}id=${m.id}&m${i}mode=${m.mode}&m${i}scene=${m.scene}&m${i}preset=${m.preset}`;
-    // The wallpaper trio only when this dialog actually has a wallpaper half to
-    // speak for, and never with an empty wmode: the host reads an absent key as
-    // its "never set" sentinel and leaves the registry alone, which is exactly
-    // what the saver-only /c dialog needs it to do.
-    if (wallpaper && m.wmode) {
+    // The wallpaper trio only for a card the user actually touched in the
+    // wallpaper tab (main.ts sets wtouched there, and only from a real change
+    // event). Every save carries a wallpaper half — the dialog serves both tabs
+    // — so `wallpaper` alone would send the trio for every monitor on every
+    // save, materialising WMode where the host's "never set" sentinel must
+    // stay. An absent key is the ONLY way to say "nobody decided this yet", and
+    // `wmode` is belt and braces: the empty sentinel is never spelled out.
+    if (wallpaper && m.wtouched && m.wmode) {
       msg += `&m${i}wmode=${m.wmode}&m${i}wscene=${m.wscene}&m${i}wpreset=${m.wpreset}`;
     }
   });

@@ -29,7 +29,8 @@ std::wstring SanitizeMonitorId(const std::wstring& raw);
 // string as a "never set" sentinel: LoadMonitorConfig yields L"" when the
 // WMode value is missing (callers apply the "primary defaults to on" rule
 // then), and SaveMonitorConfig writes the wallpaper trio only when wmode is
-// non-empty — a saver-dialog save must never materialize WMode=off.
+// non-empty — a save for a monitor whose wallpaper card the user never touched
+// must never materialize WMode=off.
 struct MonitorConfig {
     std::wstring mode = L"on";  // on|off|random|scene
     std::wstring scene, preset;
