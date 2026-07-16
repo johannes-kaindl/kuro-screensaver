@@ -23,3 +23,11 @@ UINT WallpaperQuitMessage();
 // Window class of the wallpaper's hidden tray window — the target of both
 // messages, and how the uninstaller finds a running app.
 inline constexpr const wchar_t* kTrayWindowClass = L"KuroTrayWindow";
+
+// Rewrites a v0.10 autostart value ("<dir>\KuroScreensaver.scr" /w) to the new
+// app ("<dir>\KuroWallpaper.exe" /silent). Without it Windows keeps launching
+// the .scr after an update: that still paints a wallpaper, but the settings
+// window is unreachable from it. Only touches a value that points at our own
+// .scr, and never creates one. The path parameter exists for the tests.
+void MigrateAutostartKey(
+    const wchar_t* runKeyPath = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run");

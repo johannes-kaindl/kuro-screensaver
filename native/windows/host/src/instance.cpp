@@ -1,5 +1,9 @@
 #include "instance.h"
 
+#include <string>
+
+#include "options.h"
+
 namespace {
 HANDLE g_instanceMutex = nullptr;
 }  // namespace
@@ -31,4 +35,20 @@ UINT WallpaperShowSettingsMessage() {
 UINT WallpaperQuitMessage() {
     static const UINT msg = RegisterWindowMessageW(L"KuroWallpaper.Quit");
     return msg;
+}
+
+void MigrateAutostartKey(const wchar_t* runKeyPath) {
+    std::wstring cur = ReadReg(runKeyPath, L"KuroWallpaper", L"");
+    if (cur.empty()) return;                                             // never create one
+    if (cur.find(L"KuroScreensaver.scr") == std::wstring::npos) return;  // not ours
+
+    // Swap the filename in place: the install directory is the user's choice and
+    // survives an update, so re-deriving it from our own module path would be
+    // wrong for a value written by a differently-located install.
+    size_t pos = cur.find(L"KuroScreensaver.scr");
+    std::wstring next = cur.substr(0, pos) + L"KuroWallpaper.exe";
+    size_t closing = cur.find(L'"', pos);
+    if (closing != std::wstring::npos) next += L"\"";
+    next += L" /silent";
+    WriteReg(runKeyPath, L"KuroWallpaper", next);
 }

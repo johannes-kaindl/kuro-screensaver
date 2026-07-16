@@ -90,6 +90,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
             SignalExistingInstance();
             rc = 0;
         } else {
+            MigrateAutostartKey();  // a v0.10 key still points at the .scr
             // /silent = autostart: tray only. Everything else (start-menu click,
             // the bare KuroWallpaper.exe) wants its window.
             const bool silent = argc > 1 && _wcsicmp(argv[1], L"/silent") == 0;

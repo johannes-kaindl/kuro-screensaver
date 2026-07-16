@@ -6,7 +6,7 @@
 // Menu command ids (v0.10 plan, task 11):
 inline constexpr unsigned int IDM_TRAY_TOGGLE = 1;     // Wallpaper anhalten/fortsetzen
 inline constexpr unsigned int IDM_TRAY_SETTINGS = 2;   // Einstellungen… (non-modal dialog)
-inline constexpr unsigned int IDM_TRAY_AUTOSTART = 3;  // Run key KuroWallpaper = "<exe>" /w
+inline constexpr unsigned int IDM_TRAY_AUTOSTART = 3;  // Run key = "<dir>\KuroWallpaper.exe" /silent
 inline constexpr unsigned int IDM_TRAY_EXIT = 4;       // PostQuitMessage → RunWallpaper returns
 
 // Creates a hidden tray window plus the "Kuro Wallpaper" notification icon.

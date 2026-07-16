@@ -52,7 +52,14 @@ void ToggleAutostart() {
     }
     wchar_t exe[MAX_PATH];
     GetModuleFileNameW(nullptr, exe, MAX_PATH);
-    std::wstring cmd = L"\"" + std::wstring(exe) + L"\" /w";
+    // GetModuleFileName gives whichever binary is running. When the wallpaper
+    // runs from the .scr (an unmigrated v0.10 autostart), still register the
+    // .exe — that is the file the shell passes arguments through, and /silent on
+    // a .scr would be dropped for the default verb.
+    std::wstring exe_s(exe);
+    size_t slash = exe_s.find_last_of(L'\\');
+    std::wstring dir = slash == std::wstring::npos ? L"" : exe_s.substr(0, slash + 1);
+    std::wstring cmd = L"\"" + dir + L"KuroWallpaper.exe\" /silent";
     RegSetKeyValueW(HKEY_CURRENT_USER, kRunKeyPath, kRunValueName, REG_SZ, cmd.c_str(),
                     static_cast<DWORD>((cmd.size() + 1) * sizeof(wchar_t)));
 }
