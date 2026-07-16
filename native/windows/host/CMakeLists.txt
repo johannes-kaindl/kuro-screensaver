@@ -30,11 +30,13 @@ add_library(host_lib STATIC
   src/webview_host.cpp
   src/saver_window.cpp
   src/preview_window.cpp
-  src/settings_window.cpp)
+  src/settings_window.cpp
+  src/wallpaper_window.cpp
+  src/tray.cpp)
 target_include_directories(host_lib PUBLIC src "${WEBVIEW2_DIR}/build/native/include")
 target_link_libraries(host_lib PUBLIC
   "${WEBVIEW2_DIR}/build/native/x64/WebView2LoaderStatic.lib"
-  user32 gdi32 gdiplus shell32 shlwapi ole32 oleaut32 advapi32 version)
+  user32 gdi32 gdiplus shell32 shlwapi ole32 oleaut32 advapi32 version wtsapi32)
 
 add_executable(KuroScreensaver WIN32 src/main.cpp app.rc)
 target_link_libraries(KuroScreensaver PRIVATE host_lib)

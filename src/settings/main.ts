@@ -13,6 +13,7 @@ import { LOOKS } from '../engine/data/looks';
 import { PRESETS } from '../engine/data/presets';
 import {
   buildSaveMessage,
+  initialMonitorStates,
   readInitial,
   readMonitors,
   type BoolKey,
@@ -32,10 +33,10 @@ const monitors = readMonitors(params);
 let monitorMode = params.get('monitormode') ?? '';
 if (monitors.length >= 2 && monitorMode !== 'per' && monitorMode !== 'span') monitorMode = 'per';
 
-// Per-monitor overrides start neutral; the host applies its own defaults.
-const monitorStates: MonitorFormState[] = monitors.map((m) => ({
-  id: m.id, mode: 'on', scene: '', preset: '',
-}));
+// Per-monitor overrides start from the existing config the host embeds in
+// the monitors=-JSON — an untouched save keeps them (unknown registry values
+// are normalised by the selects below, exactly like the global fields).
+const monitorStates: MonitorFormState[] = initialMonitorStates(monitors);
 
 // Every control registers a refresher so state mutations from elsewhere
 // (look bundles, dependent enable/visibility rules) reflect in the DOM.

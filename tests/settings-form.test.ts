@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { FORM_DEFAULTS, buildSaveMessage, readInitial, readMonitors } from '../src/settings/form-state';
+import {
+  FORM_DEFAULTS,
+  buildSaveMessage,
+  initialMonitorStates,
+  readInitial,
+  readMonitors,
+  type MonitorEntry,
+} from '../src/settings/form-state';
 
 // v0.10 fixtures — pinned on both sides (options_test.cpp mirrors them byte-identically).
 const DEFAULT_QUERY =
@@ -70,5 +77,40 @@ describe('settings form state (native /c dialog bridge)', () => {
   it('readMonitors tolerates malformed JSON', () => {
     expect(readMonitors(new URLSearchParams('?monitors=%7Bnope'))).toEqual([]);
     expect(readMonitors(new URLSearchParams('?monitors=42'))).toEqual([]);
+  });
+
+  it('readMonitors passes the existing per-monitor config through', () => {
+    const json = encodeURIComponent(JSON.stringify([{
+      id: 'A', name: 'Dell', w: 1920, h: 1080, portrait: false, primary: true,
+      mode: 'scene', scene: 'matrix', preset: 'phosphor',
+    }]));
+    const [m] = readMonitors(new URLSearchParams('?monitors=' + json));
+    expect(m.mode).toBe('scene');
+    expect(m.scene).toBe('matrix');
+    expect(m.preset).toBe('phosphor');
+  });
+
+  it('monitor cards start from the host config, missing subkey falls back to on/global', () => {
+    const entries: MonitorEntry[] = [
+      { id: 'A', name: 'Dell', w: 1920, h: 1080, portrait: false, primary: true,
+        mode: 'scene', scene: 'matrix', preset: 'phosphor' },
+      { id: 'B', name: 'Laptop', w: 1280, h: 800, portrait: false, primary: false },
+    ];
+    const states = initialMonitorStates(entries);
+    expect(states[0]).toEqual({ id: 'A', mode: 'scene', scene: 'matrix', preset: 'phosphor' });
+    expect(states[1]).toEqual({ id: 'B', mode: 'on', scene: '', preset: '' });
+  });
+
+  it('round-trips: an untouched save reproduces the loaded per-monitor config', () => {
+    const json = encodeURIComponent(JSON.stringify([
+      { id: 'A', name: 'Dell', w: 1920, h: 1080, portrait: false, primary: true,
+        mode: 'scene', scene: 'matrix', preset: 'phosphor' },
+      { id: 'B', name: 'Laptop', w: 1280, h: 800, portrait: false, primary: false,
+        mode: 'off', scene: '', preset: '' },
+    ]));
+    const loaded = readMonitors(new URLSearchParams('?monitors=' + json));
+    expect(buildSaveMessage(FORM_DEFAULTS, initialMonitorStates(loaded))).toContain(
+      '&m0id=A&m0mode=scene&m0scene=matrix&m0preset=phosphor&m1id=B&m1mode=off&m1scene=&m1preset=',
+    );
   });
 });

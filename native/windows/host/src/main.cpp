@@ -4,6 +4,8 @@
 //   /s            run the screensaver fullscreen
 //   /c  /c:<hwnd> show the configuration dialog
 //   /p  <hwnd>    render a small preview into the given parent window
+//   /w            run as animated desktop wallpaper (tray-controlled, not
+//                 invoked by the OS — autostart Run key or manual launch)
 //
 // The visuals are the project's web build: the host embeds WebView2 (inbox on
 // Windows 11) and loads the bundled web/screensaver.html via the
@@ -25,6 +27,7 @@
 #include "preview_window.h"
 #include "saver_window.h"
 #include "settings_window.h"
+#include "wallpaper_window.h"
 #include "webview_host.h"
 
 namespace {
@@ -60,6 +63,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     } else if (flag == L"/p") {
         HWND parent = ParsePreviewHandle(arg, argc, argv);
         rc = parent ? RunPreview(parent) : 0;
+    } else if (flag == L"/w") {
+        rc = RunWallpaper();
     } else {
         rc = RunSaver();
     }

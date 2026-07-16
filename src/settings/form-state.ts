@@ -54,6 +54,13 @@ export interface MonitorEntry {
   h: number;
   portrait: boolean;
   primary: boolean;
+  // Existing per-monitor saver config, carried along by the host so the
+  // dialog starts from it (data-loss guard: an untouched save must reproduce
+  // these instead of resetting every monitor to neutral). Absent fields mean
+  // "no registry subkey yet" → mode 'on', scene/preset ''.
+  mode?: string;   // on|off|random|scene
+  scene?: string;  // slug or '' (= global scene)
+  preset?: string; // slug or '' (= global preset)
 }
 
 /** Per-monitor form state, serialised as mNid/mNmode/mNscene/mNpreset. */
@@ -157,6 +164,20 @@ export function readMonitors(params: URLSearchParams): MonitorEntry[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Initial per-monitor form state from the host's monitor entries: starts from
+ * the existing config the host embedded in the `monitors=`-JSON, so a save
+ * without touching the cards round-trips the loaded values byte-identically.
+ */
+export function initialMonitorStates(entries: readonly MonitorEntry[]): MonitorFormState[] {
+  return entries.map((m) => ({
+    id: m.id,
+    mode: m.mode ?? 'on',
+    scene: m.scene ?? '',
+    preset: m.preset ?? '',
+  }));
 }
 
 /**

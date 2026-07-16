@@ -8,6 +8,7 @@
 
 #include <WebView2.h>
 
+#include "monitors.h"
 #include "options.h"
 #include "webview_host.h"
 
@@ -69,10 +70,40 @@ LRESULT CALLBACK SaverWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     return DefWindowProcW(hwnd, msg, wp, lp);
 }
 
-BOOL CALLBACK MonitorEnum(HMONITOR, HDC, LPRECT rect, LPARAM lp) {
-    reinterpret_cast<std::vector<RECT>*>(lp)->push_back(*rect);
-    return TRUE;
+// screensaver.html URL for the (possibly per-monitor overridden) options.
+// kiosk=on is a constant URL flag — UI-less engine mode, never persisted.
+std::wstring BuildSaverPage(const SaverOptions& o) {
+    return L"screensaver.html" + BuildQueryString(o) + L"&kiosk=on";
 }
+
+// Fullscreen popup + input watchdog. State leaks intentionally: saver windows
+// live until process exit — the message loop ends via PostQuitMessage, never
+// by destroying them one by one.
+HWND CreateSaverWindow(const RECT& rc) {
+    HWND hwnd = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, L"KuroSaverWindow", L"",
+                                WS_POPUP | WS_VISIBLE, rc.left, rc.top, rc.right - rc.left,
+                                rc.bottom - rc.top, nullptr, nullptr, GetModuleHandleW(nullptr),
+                                nullptr);
+    if (!hwnd) return nullptr;
+    auto* st = new SaverState();
+    st->startTick = GetTickCount64();
+    SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(st));
+    SetTimer(hwnd, kWatchTimer, 120, nullptr);
+    return hwnd;
+}
+
+void CreateSaverWindowWithWebView(const RECT& rc, const std::wstring& page) {
+    HWND hwnd = CreateSaverWindow(rc);
+    if (!hwnd) return;
+    auto* st = reinterpret_cast<SaverState*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+    CreateWebView(
+        hwnd, page, [](const std::wstring&) { ExitSaver(); },  // engine close button (×)
+        [st](ICoreWebView2Controller* c, ICoreWebView2*) { st->controller = c; });
+}
+
+// Monitors set to "off": same window class, same input watchdog (input on any
+// monitor still ends the saver), no WebView — the class brush covers black.
+void CreateBlackCoverWindow(const RECT& rc) { CreateSaverWindow(rc); }
 
 }  // namespace
 
@@ -84,29 +115,33 @@ int RunSaver() {
     wc.hbrBackground = static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
     RegisterClassW(&wc);
 
-    std::vector<RECT> monitors;
-    EnumDisplayMonitors(nullptr, nullptr, MonitorEnum, reinterpret_cast<LPARAM>(&monitors));
-    if (monitors.empty()) return 0;
-
-    std::wstring page = L"screensaver.html" + BuildQueryString(LoadOptions());
+    SaverOptions opts = LoadOptions();
+    std::vector<MonitorInfo> mons = EnumMonitors();
+    if (mons.empty()) return 0;
+    bool span = LoadMonitorMode(false) == L"span";
     ShowCursor(FALSE);
 
-    // States leak intentionally: the windows live until process exit — the
-    // message loop ends via PostQuitMessage, never by destroying them one by one.
-    for (const RECT& rc : monitors) {
-        HWND hwnd = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, L"KuroSaverWindow", L"",
-                                    WS_POPUP | WS_VISIBLE, rc.left, rc.top,
-                                    rc.right - rc.left, rc.bottom - rc.top,
-                                    nullptr, nullptr, wc.hInstance, nullptr);
-        if (!hwnd) continue;
-        auto* st = new SaverState();
-        st->startTick = GetTickCount64();
-        SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(st));
-        SetTimer(hwnd, kWatchTimer, 120, nullptr);
-        CreateWebView(
-            hwnd, page,
-            [](const std::wstring&) { ExitSaver(); },  // engine close button (×)
-            [st](ICoreWebView2Controller* c) { st->controller = c; });
+    if (span) {
+        // One window across the whole virtual screen: one WebView, one timer.
+        RECT vs{GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN), 0, 0};
+        vs.right = vs.left + GetSystemMetrics(SM_CXVIRTUALSCREEN);
+        vs.bottom = vs.top + GetSystemMetrics(SM_CYVIRTUALSCREEN);
+        CreateSaverWindowWithWebView(vs, BuildSaverPage(opts));
+    } else {
+        for (const MonitorInfo& m : mons) {
+            MonitorConfig c = LoadMonitorConfig(m.id);
+            if (c.mode == L"off") {
+                CreateBlackCoverWindow(m.rect);  // watchdog yes, WebView no
+                continue;
+            }
+            SaverOptions per = opts;
+            if (c.mode == L"random")
+                per.scene = L"random";
+            else if (c.mode == L"scene" && !c.scene.empty())
+                per.scene = c.scene;
+            if (!c.preset.empty()) per.preset = c.preset;
+            CreateSaverWindowWithWebView(m.rect, BuildSaverPage(per));
+        }
     }
 
     MSG msg;
