@@ -39,6 +39,11 @@ using Microsoft::WRL::ComPtr;
 
 constexpr UINT_PTR kPollTimer = 1;
 constexpr UINT kPollMs = 2000;  // battery/quiet-state/occlusion have no change broadcast
+// WebView/page startup race: the WebView2 controller and the page's message
+// listener come up asynchronously, so early power messages can be swallowed.
+// For this long after window creation every poll re-posts the current policy
+// message (idempotent page-side) instead of deduplicating.
+constexpr ULONGLONG kStartupReplayMs = 15000;
 
 struct WallpaperWindow {
     HWND hwnd = nullptr;
@@ -47,10 +52,12 @@ struct WallpaperWindow {
     ICoreWebView2* webview = nullptr;  // AddRef'd, lives until process exit
     std::wstring lastPowerMsg;
     bool suspended = false;
+    ULONGLONG createdTick = 0;  // GetTickCount64 stamp — see kStartupReplayMs
 };
 
 // Leak intentionally: wallpaper windows live until process exit.
 std::vector<WallpaperWindow*> g_windows;
+HWND g_host = nullptr;  // WorkerW/Progman host — re-resolved after explorer restarts
 bool g_paused = false;  // tray "anhalten" — overrides the power policy
 bool g_sessionLocked = false;
 bool g_displayOff = false;
@@ -113,6 +120,9 @@ std::wstring BuildWallpaperPage(SaverOptions o) {
 // page then merely idles behind a covered/off screen at frameCap null).
 void SetSuspended(WallpaperWindow& w, bool suspend) {
     if (suspend == w.suspended) return;
+    // Creation race: nothing to act on yet — do not latch the flag, or the
+    // real suspend would be skipped once the WebView exists.
+    if (!w.controller && !w.webview) return;
     w.suspended = suspend;
     ComPtr<ICoreWebView2_3> wv3;
     if (w.webview) {
@@ -176,7 +186,14 @@ void ApplyPowerStates(bool force) {
                            : d.state == RenderState::Frozen ? std::wstring(L"power:frozen")
                                                             : L"power:animating:" +
                                                                   std::to_wstring(d.fps);
-        if (!force && msg == w->lastPowerMsg) continue;
+        // The dedupe only kicks in once the window is past the startup replay
+        // phase (kStartupReplayMs) — before that the WebView/page may not have
+        // existed when lastPowerMsg was recorded, so the message is re-posted
+        // every poll tick. A successfully suspended window already received
+        // its message (suspend happens after the post), so it may skip too —
+        // re-posting would resume the suspended WebView.
+        bool settled = GetTickCount64() - w->createdTick >= kStartupReplayMs;
+        if (!force && (settled || w->suspended) && msg == w->lastPowerMsg) continue;
         w->lastPowerMsg = msg;
 
         bool toHidden = d.state == RenderState::Hidden;
@@ -201,6 +218,25 @@ void SetWallpaperPaused(bool paused) {
     if (!paused) ApplyPowerStates(true);
 }
 
+// Explorer restart: the WorkerW host (owned by explorer.exe) dies with it and
+// our children end up orphaned. Detected in the 2 s poll — re-resolve the
+// fresh host, re-parent every surviving window and re-map its position.
+void ReattachIfHostLost() {
+    if (g_host && IsWindow(g_host)) return;
+    HWND host = FindWallpaperHost();
+    if (!host) return;  // explorer still coming up — retry on the next poll
+    g_host = host;
+    for (WallpaperWindow* w : g_windows) {
+        if (!IsWindow(w->hwnd)) continue;  // died with the old host
+        SetParent(w->hwnd, host);
+        POINT pts[2] = {{w->monitorRect.left, w->monitorRect.top},
+                        {w->monitorRect.right, w->monitorRect.bottom}};
+        MapWindowPoints(nullptr, host, pts, 2);
+        SetWindowPos(w->hwnd, nullptr, pts[0].x, pts[0].y, pts[1].x - pts[0].x,
+                     pts[1].y - pts[0].y, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+}
+
 void CreateWallpaperWindow(HWND host, const RECT& screenRect, const std::wstring& page) {
     // Child coordinates are relative to the host's client area.
     POINT pts[2] = {{screenRect.left, screenRect.top}, {screenRect.right, screenRect.bottom}};
@@ -212,6 +248,7 @@ void CreateWallpaperWindow(HWND host, const RECT& screenRect, const std::wstring
     auto* w = new WallpaperWindow();
     w->hwnd = hwnd;
     w->monitorRect = screenRect;
+    w->createdTick = GetTickCount64();
     SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(w));
     g_windows.push_back(w);
     CreateWebView(hwnd, page, nullptr,  // kiosk page posts no messages
@@ -227,6 +264,7 @@ void CreateWallpaperWindow(HWND host, const RECT& screenRect, const std::wstring
 LRESULT CALLBACK PowerWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
         case WM_TIMER:
+            ReattachIfHostLost();  // explorer restart tears the WorkerW down
             ApplyPowerStates(false);
             return 0;
         case WM_WTSSESSION_CHANGE:
@@ -257,6 +295,7 @@ LRESULT CALLBACK PowerWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 int RunWallpaper() {
     HWND host = FindWallpaperHost();
     if (!host) return 1;
+    g_host = host;  // watched by ReattachIfHostLost (explorer restarts)
 
     WNDCLASSW wc{};
     wc.lpfnWndProc = WallpaperWndProc;
@@ -277,11 +316,11 @@ int RunWallpaper() {
     } else {
         for (const MonitorInfo& m : mons) {
             MonitorConfig c = LoadMonitorConfig(m.id);
-            // Missing subkey: the primary monitor defaults to on, others off
-            // (LoadMonitorConfig itself stays neutral — see monitors.h).
-            std::wstring wmode = MonitorConfigExists(m.id)
-                                     ? c.wmode
-                                     : std::wstring(m.primary ? L"on" : L"off");
+            // WMode never set (empty sentinel — see monitors.h): the primary
+            // monitor defaults to on, others off. A saver-dialog save may have
+            // materialized the subkey without touching WMode.
+            std::wstring wmode =
+                c.wmode.empty() ? std::wstring(m.primary ? L"on" : L"off") : c.wmode;
             if (wmode == L"off") continue;  // static wallpaper stays visible there
             SaverOptions per = opts;
             if (wmode == L"random")

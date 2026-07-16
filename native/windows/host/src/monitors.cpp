@@ -146,9 +146,14 @@ void SaveMonitorConfig(const std::wstring& id, const MonitorConfig& c, const wch
     WriteReg(key, L"Mode", c.mode);
     WriteReg(key, L"Scene", c.scene);
     WriteReg(key, L"Preset", c.preset);
-    WriteReg(key, L"WMode", c.wmode);
-    WriteReg(key, L"WScene", c.wscene);
-    WriteReg(key, L"WPreset", c.wpreset);
+    // Empty wmode = "never set" sentinel: leave the wallpaper trio alone —
+    // writing WMode=off here would kill the "primary defaults to on" rule
+    // for every monitor on a plain saver-dialog save (no UI can undo that).
+    if (!c.wmode.empty()) {
+        WriteReg(key, L"WMode", c.wmode);
+        WriteReg(key, L"WScene", c.wscene);
+        WriteReg(key, L"WPreset", c.wpreset);
+    }
 }
 
 std::wstring LoadMonitorMode(bool wallpaper, const wchar_t* regPath) {

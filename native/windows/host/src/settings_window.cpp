@@ -2,6 +2,7 @@
 
 #include <windows.h>
 
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -52,8 +53,19 @@ std::wstring JsonEscape(const std::wstring& s) {
     std::wstring out;
     out.reserve(s.size());
     for (wchar_t c : s) {
-        if (c == L'"' || c == L'\\') out += L'\\';
-        out += c;
+        if (c == L'"' || c == L'\\') {
+            out += L'\\';
+            out += c;
+        } else if (c < 0x20) {
+            // JSON forbids raw control chars — registry values and EDID names
+            // are free-form, and one stray '\n' would kill JSON.parse (and
+            // with it the whole monitor section of the dialog).
+            wchar_t hex[8];
+            swprintf(hex, 8, L"\\u%04X", static_cast<unsigned int>(c));
+            out += hex;
+        } else {
+            out += c;
+        }
     }
     return out;
 }
@@ -101,7 +113,10 @@ void HandleWebMessage(HWND hwnd, const std::wstring& message) {
     if (!mode.empty()) SaveMonitorMode(false, mode);
     for (const MonitorSave& m : mons) {
         // Replace only the saver trio — the wallpaper's WMode/WScene/WPreset
-        // in the same subkey must survive a saver-dialog save untouched.
+        // in the same subkey must survive a saver-dialog save untouched: an
+        // existing WMode round-trips via LoadMonitorConfig, a missing one
+        // stays the empty sentinel and SaveMonitorConfig skips the trio
+        // (never materializing WMode=off — see monitors.h).
         MonitorConfig c = LoadMonitorConfig(m.id);
         c.mode = m.mode;
         c.scene = m.scene;
@@ -115,10 +130,16 @@ void HandleWebMessage(HWND hwnd, const std::wstring& message) {
 
 HWND OpenSettingsWindow() {
     // The tray can re-trigger this while the dialog is open — focus it instead
-    // of stacking a second one.
+    // of stacking a second one. FindWindow searches ALL processes: a dialog
+    // owned by another process (wallpaper /w tray dialog vs. a parallel /c)
+    // is only brought to the front, never returned — RunSettings would
+    // otherwise pump GetMessage forever for a window this thread does not
+    // own (an invisible zombie process per attempt).
     if (HWND existing = FindWindowW(L"KuroSettingsWindow", nullptr)) {
         SetForegroundWindow(existing);
-        return existing;
+        DWORD pid = 0;
+        GetWindowThreadProcessId(existing, &pid);
+        return pid == GetCurrentProcessId() ? existing : nullptr;
     }
 
     WNDCLASSW wc{};

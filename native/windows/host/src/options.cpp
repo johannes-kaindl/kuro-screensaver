@@ -23,6 +23,16 @@ bool ReadFlag(const wchar_t* path, const wchar_t* name, bool def) {
     return ReadReg(path, name, def ? L"on" : L"off") == L"on";
 }
 
+// Numeric fields travel raw (un-escaped) through BuildQueryString, so the
+// registry value is re-validated on load against the same contract range as
+// ParseSaveMessage — garbage from hand edits or third-party writers ('#'/'&'
+// would truncate or inject query parameters) falls back to the default.
+std::wstring ReadNumber(const wchar_t* path, const wchar_t* name, const std::wstring& def,
+                        double lo, double hi) {
+    std::wstring v = ReadReg(path, name, def);
+    return IsValidNumber(v, lo, hi) ? v : def;
+}
+
 std::wstring OnOff(bool b) { return b ? L"on" : L"off"; }
 
 // Value charset for scene/preset/look slugs coming back from settings.html.
@@ -123,25 +133,27 @@ SaverOptions LoadOptions(const wchar_t* regPath) {
     o.radar = ReadFlag(regPath, L"Radar", o.radar);
     o.crosshair = ReadFlag(regPath, L"Crosshair", o.crosshair);
     o.look = ReadReg(regPath, L"Look", o.look);
+    if (!o.look.empty() && !IsSlug(o.look)) o.look = L"";  // empty = custom
     o.altitude = ReadReg(regPath, L"Altitude", o.altitude);
     o.fog = ReadReg(regPath, L"Fog", o.fog);
     o.weather = ReadReg(regPath, L"Weather", o.weather);
-    o.bank = ReadReg(regPath, L"Bank", o.bank);
+    // Ranges pinned to ParseSaveMessage — keep the two in sync.
+    o.bank = ReadNumber(regPath, L"Bank", o.bank, 0, 2);
     o.reactive = ReadFlag(regPath, L"Reactive", o.reactive);
     o.autocycle = ReadFlag(regPath, L"AutoCycle", o.autocycle);
-    o.cyclemin = ReadReg(regPath, L"CycleMin", o.cyclemin);
+    o.cyclemin = ReadNumber(regPath, L"CycleMin", o.cyclemin, 0.5, 10);
     o.termlayout = ReadReg(regPath, L"TermLayout", o.termlayout);
     o.boot = ReadFlag(regPath, L"Boot", o.boot);
     o.bootspeed = ReadReg(regPath, L"BootSpeed", o.bootspeed);
     o.daynight = ReadFlag(regPath, L"DayNight", o.daynight);
-    o.crtintensity = ReadReg(regPath, L"CrtIntensity", o.crtintensity);
-    o.curvature = ReadReg(regPath, L"Curvature", o.curvature);
-    o.aperture = ReadReg(regPath, L"Aperture", o.aperture);
-    o.bloomstrength = ReadReg(regPath, L"BloomStrength", o.bloomstrength);
-    o.trailsamount = ReadReg(regPath, L"TrailsAmount", o.trailsamount);
-    o.ntsc = ReadReg(regPath, L"Ntsc", o.ntsc);
-    o.halation = ReadReg(regPath, L"Halation", o.halation);
-    o.scale = ReadReg(regPath, L"Scale", o.scale);
+    o.crtintensity = ReadNumber(regPath, L"CrtIntensity", o.crtintensity, 0, 1);
+    o.curvature = ReadNumber(regPath, L"Curvature", o.curvature, 0, 0.25);
+    o.aperture = ReadNumber(regPath, L"Aperture", o.aperture, 0, 0.5);
+    o.bloomstrength = ReadNumber(regPath, L"BloomStrength", o.bloomstrength, 0, 3);
+    o.trailsamount = ReadNumber(regPath, L"TrailsAmount", o.trailsamount, 0.5, 0.95);
+    o.ntsc = ReadNumber(regPath, L"Ntsc", o.ntsc, 0, 1);
+    o.halation = ReadNumber(regPath, L"Halation", o.halation, 0, 0.6);
+    o.scale = ReadNumber(regPath, L"Scale", o.scale, 0.25, 1);
     o.perfadapt = ReadFlag(regPath, L"PerfAdapt", o.perfadapt);
     return o;
 }
@@ -287,6 +299,8 @@ bool ParseSaveMessage(const std::wstring& msg, SaverOptions& out,
             parsedMode = val;
         } else if (key.size() > 2 && key[0] == L'm' && key[1] >= L'0' && key[1] <= L'7') {
             // Per-monitor keys m<N>id / m<N>mode / m<N>scene / m<N>preset.
+            // Indices 0..7 only — the web dialog caps its monitor list at 8
+            // (spec §4), so higher indices never appear in a valid save.
             int idx = key[1] - L'0';
             std::wstring field = key.substr(2);
             if (field == L"id") {

@@ -12,6 +12,8 @@ import { SCENES } from '../engine/data/defaults';
 import { LOOKS } from '../engine/data/looks';
 import { PRESETS } from '../engine/data/presets';
 import {
+  MONITOR_CAP,
+  NUMERIC_RANGES,
   buildSaveMessage,
   initialMonitorStates,
   readInitial,
@@ -19,7 +21,7 @@ import {
   type BoolKey,
   type MonitorEntry,
   type MonitorFormState,
-  type StringKey,
+  type NumericKey,
 } from './form-state';
 
 const SPEEDS = ['slow', 'norm', 'fast'] as const;
@@ -97,12 +99,14 @@ function toggle(key: BoolKey, labelText: string): HTMLElement {
 }
 
 // Sliders keep the raw input string in state (byte-parity contract); the
-// registry value is only replaced once the user actually drags.
+// registry value is only replaced once the user actually drags. Range
+// attributes come from the shared NUMERIC_RANGES table (form-state.ts) so the
+// UI can never diverge from readInitial's validation or the host's ranges.
 function slider(
-  labelText: string, key: StringKey,
-  min: number, max: number, step: number,
+  labelText: string, key: NumericKey,
   o: { resetsLook?: boolean; fmt?: (v: string) => string } = {},
 ): HTMLElement {
+  const { min, max, step } = NUMERIC_RANGES[key];
   const fmt = o.fmt ?? ((v: string) => v);
   const div = document.createElement('div');
   div.className = 'row slider';
@@ -150,6 +154,12 @@ function applyLookValues(key: string): void {
   if (!L) return;
   state.preset = L.preset;
   state.matrix = L.matrix;
+  // Materialise the on-flags exactly like applyLook (looks.ts) — otherwise the
+  // saver renders the Look differently from web/macOS (e.g. Heavy CRT without
+  // trails, Clean still glitching because crt stays on at intensity 0).
+  state.crt = L.intensity > 0.001;
+  state.trails = L.trails > 0.001;
+  state.bloom = true;
   state.crtintensity = String(L.intensity);
   state.curvature = String(L.curvature);
   state.aperture = String(L.aperture);
@@ -189,13 +199,13 @@ bild.grid.append(
 
 const crtFx = section('CRT-Effekte');
 crtFx.grid.append(
-  slider('Intensity', 'crtintensity', 0, 1, 0.01, { resetsLook: true }),
-  slider('Curvature', 'curvature', 0, 0.25, 0.001, { resetsLook: true }),
-  slider('Aperture', 'aperture', 0, 0.5, 0.01, { resetsLook: true }),
-  slider('Bloom', 'bloomstrength', 0, 3, 0.1, { resetsLook: true }),
-  slider('Trails', 'trailsamount', 0.5, 0.95, 0.01, { resetsLook: true }),
-  slider('NTSC', 'ntsc', 0, 1, 0.01, { resetsLook: true }),
-  slider('Halation', 'halation', 0, 0.6, 0.01, { resetsLook: true }),
+  slider('Intensity', 'crtintensity', { resetsLook: true }),
+  slider('Curvature', 'curvature', { resetsLook: true }),
+  slider('Aperture', 'aperture', { resetsLook: true }),
+  slider('Bloom', 'bloomstrength', { resetsLook: true }),
+  slider('Trails', 'trailsamount', { resetsLook: true }),
+  slider('NTSC', 'ntsc', { resetsLook: true }),
+  slider('Halation', 'halation', { resetsLook: true }),
   toggle('scan', 'Scanlines'),
   toggle('crt', 'CRT simulation'),
   toggle('bloom', 'Bloom'),
@@ -204,10 +214,10 @@ crtFx.grid.append(
 
 const motion = section('Bewegung & Story');
 motion.grid.append(
-  slider('Bank', 'bank', 0, 2, 0.1),
+  slider('Bank', 'bank'),
   toggle('reactive', 'Reactive world'),
   toggle('autocycle', 'Auto-cycle'),
-  slider('Cycle (min)', 'cyclemin', 0.5, 10, 0.5),
+  slider('Cycle (min)', 'cyclemin'),
   toggle('terminal', 'Story terminal'),
 );
 
@@ -296,7 +306,16 @@ if (monitors.length > 0) {
     radios.style.gridColumn = '1 / -1';
     mon.grid.append(radios);
   }
-  monitors.forEach((entry, i) => mon.grid.append(monitorCard(entry, monitorStates[i])));
+  // Save-format cap: ParseSaveMessage accepts m0..m7 only, buildSaveMessage
+  // slices accordingly — so no card for what would silently not be saved.
+  monitors.slice(0, MONITOR_CAP).forEach((entry, i) => mon.grid.append(monitorCard(entry, monitorStates[i])));
+  if (monitors.length > MONITOR_CAP) {
+    const capHint = document.createElement('div');
+    capHint.className = 'hint';
+    capHint.textContent = `Maximal ${MONITOR_CAP} Monitore konfigurierbar`;
+    capHint.style.gridColumn = '1 / -1';
+    mon.grid.append(capHint);
+  }
   const hint = document.createElement('div');
   hint.className = 'hint';
   hint.textContent = 'Empfehlung: Render-Scale ≤ 66 % bei 3 Monitoren';
@@ -307,7 +326,7 @@ if (monitors.length > 0) {
 
 const perf = section('Leistung');
 perf.grid.append(
-  slider('Render scale', 'scale', 0.25, 1, 0.01, {
+  slider('Render scale', 'scale', {
     fmt: (v) => `${Math.round(parseFloat(v) * 100)} %`,
   }),
   toggle('perfadapt', 'Adaptive quality'),

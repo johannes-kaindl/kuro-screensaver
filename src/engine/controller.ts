@@ -67,6 +67,17 @@ export class ScreensaverController {
   private openedAt = 0;
   private statsSaveDebounce = 0;
 
+  /** Power-bridge state (Windows wallpaper): true while 'hidden'/'frozen' has
+   *  the engine loop stopped. Gates the perfAdapt interval and the pause/resume
+   *  of the DOM-side loops (CrtSim, narrative). */
+  private powerPaused = false;
+  /** Last power message — recorded even when open() hasn't built the engine yet
+   *  (the WebMessage listener is live from module load), replayed at the end of
+   *  open(). The host skips identical re-posts, so without the replay a message
+   *  that lands during the boot sequence would be lost for the whole session. */
+  private lastPowerState: 'hidden' | 'frozen' | 'animating' | null = null;
+  private lastPowerFps: number | undefined = undefined;
+
   constructor(public plugin: HostPlugin) {
     this.startIdleWatcher();
   }
@@ -382,8 +393,18 @@ export class ScreensaverController {
       (this as any)._perfInterval = window.setInterval(() => {
         if (!this.engine) return;
         // Wallpaper power bridge caps the frame rate — measured fps then IS the
-        // cap, not a perf signal. Don't escalate (or recover) against it.
-        if (this.engine.frameCap !== null) { lowFrames = 0; highFrames = 0; return; }
+        // cap, not a perf signal. Same when the bridge (powerPaused) or the
+        // p-hotkey stopped the loop entirely (rafId 0): engine.fps freezes on
+        // its last value (core only updates it inside tick), so escalating here
+        // would act on stale data — and setAdaptiveScale on a stopped engine
+        // clears the visible WebGL buffer (renderer.setSize) with nothing
+        // re-rendering it → permanently black frozen frame. Don't escalate (or
+        // recover) in any of these states; counters restart once uncapped
+        // rendering resumes. (rafId read via any-cast — same idiom as the
+        // p-hotkey's `_paused` flag; core.ts stays untouched.)
+        if (this.powerPaused || this.engine.frameCap !== null || !(this.engine as any).rafId) {
+          lowFrames = 0; highFrames = 0; return;
+        }
         const fps = this.engine.fps;
         if (fps && fps < 40) lowFrames++; else lowFrames = 0;
         if (fps && fps > 55) highFrames++; else highFrames = 0;
@@ -493,6 +514,17 @@ export class ScreensaverController {
     // Apply the chosen fog mode (clear/dense set a fixed density now; auto
     // hands fog back to the day/night loop above).
     this.applyFogMode();
+
+    // Power-bridge replay: the WebMessage listener is live from module load, so
+    // the host's FIRST policy message can arrive while open() is still awaiting
+    // the boot sequence — applyPowerState then finds no engine and only records
+    // the state. The host skips identical re-posts (wallpaper_window.cpp,
+    // lastPowerMsg), so nothing would ever correct the default-uncapped engine.
+    // Re-apply the recorded state now that engine/crt/narrative all exist.
+    // ('animating' is replayed too — its fps cap would be lost the same way.)
+    if (this.lastPowerState !== null) {
+      this.applyPowerState(this.lastPowerState, this.lastPowerFps);
+    }
   }
 
   /** Fog / view-distance control — see ScreensaverSettings.fogMode. Sets the engine's
@@ -933,22 +965,37 @@ export class ScreensaverController {
   /**
    * Host→page power bridge (Windows wallpaper mode). The native host maps its
    * render policy onto three states:
-   *   hidden/frozen — stop rendering entirely (engine rAF + HUD loop),
+   *   hidden/frozen — stop rendering entirely (engine rAF + HUD loop) and pause
+   *                   the DOM-side loops the p-hotkey pause path pauses too
+   *                   (CrtSim artifacts, narrative typing), so the "still" frame
+   *                   really is still — no glitches / terminal typing / compositor
+   *                   wakeups in the battery-saving state,
    *   animating     — run, optionally throttled to <fps> (battery cap).
-   * engine.start()/stop() and hud.startLoop()/stopLoop() are idempotent, so
-   * repeated messages (e.g. fps-cap changes) are safe.
+   * engine.start()/stop(), hud.startLoop()/stopLoop(), crt.start()/stop() and
+   * narrative.pause()/resume() are all idempotent, so repeated messages (e.g.
+   * fps-cap changes, double frozen) are safe.
+   * The last state is ALWAYS recorded, even before open() built the engine —
+   * the host never re-posts identical states, so open() replays it at the end.
    */
   applyPowerState(state: 'hidden' | 'frozen' | 'animating', fps?: number): void {
+    this.lastPowerState = state;
+    this.lastPowerFps = fps;
     if (!this.engine) return;
     if (state === 'hidden' || state === 'frozen') {
+      this.powerPaused = true;
       this.engine.frameCap = null;
       this.engine.stop();
       this.hud?.stopLoop();
+      this.crt?.stop();
+      this.narrative?.pause();
     } else {
+      this.powerPaused = false;
       this.engine.frameCap = fps && fps > 0 ? fps : null;
       this.engine.start();
       // Resume the HUD on the original open-t0 so the T+ shift clock stays real-time.
       this.hud?.startLoop(this.dayNightT0 || performance.now());
+      this.crt?.start();
+      this.narrative?.resume();
     }
   }
 

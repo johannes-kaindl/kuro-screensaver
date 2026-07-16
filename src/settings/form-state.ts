@@ -123,6 +123,44 @@ export type BoolKey = {
 
 export type StringKey = Exclude<keyof SettingsFormState, BoolKey>;
 
+/** Save-format contract cap — ParseSaveMessage accepts monitor indices 0..7 only. */
+export const MONITOR_CAP = 8;
+
+export interface NumericRange { min: number; max: number; step: number }
+
+/**
+ * Slider ranges for the 10 raw numeric fields — the single source for the
+ * dialog's range-input attributes (main.ts) AND readInitial's garbage guard,
+ * so UI and validation cannot diverge. min/max mirror the host's
+ * IsValidNumber calls in ParseSaveMessage (options.cpp).
+ */
+export const NUMERIC_RANGES = {
+  bank:          { min: 0,    max: 2,    step: 0.1 },
+  cyclemin:      { min: 0.5,  max: 10,   step: 0.5 },
+  crtintensity:  { min: 0,    max: 1,    step: 0.01 },
+  curvature:     { min: 0,    max: 0.25, step: 0.001 },
+  aperture:      { min: 0,    max: 0.5,  step: 0.01 },
+  bloomstrength: { min: 0,    max: 3,    step: 0.1 },
+  trailsamount:  { min: 0.5,  max: 0.95, step: 0.01 },
+  ntsc:          { min: 0,    max: 1,    step: 0.01 },
+  halation:      { min: 0,    max: 0.6,  step: 0.01 },
+  scale:         { min: 0.25, max: 1,    step: 0.01 },
+} as const satisfies Partial<Record<StringKey, NumericRange>>;
+
+export type NumericKey = keyof typeof NUMERIC_RANGES;
+
+// Same shape the host accepts (IsValidNumber → wcstod): plain unsigned
+// decimals. Anything else ("1,5", "abc", "1#") would poison the save loop.
+const NUMERIC_RE = /^[0-9]+(\.[0-9]+)?$/;
+
+function isAcceptableRaw(key: StringKey, v: string): boolean {
+  const range = (NUMERIC_RANGES as Partial<Record<StringKey, NumericRange>>)[key];
+  if (!range) return true; // enum-ish raw keys are normalised by the selects
+  if (!NUMERIC_RE.test(v)) return false;
+  const n = parseFloat(v);
+  return n >= range.min && n <= range.max;
+}
+
 const BOOL_KEYS: readonly BoolKey[] = [
   'audio', 'bloom', 'trails', 'scan', 'crt', 'matrix', 'terminal', 'radar', 'crosshair',
   'reactive', 'autocycle', 'boot', 'daynight', 'perfadapt',
@@ -144,7 +182,10 @@ export function readInitial(params: URLSearchParams): SettingsFormState {
   }
   for (const key of RAW_STRING_KEYS) {
     const v = params.get(key);
-    if (v !== null) s[key] = v;
+    // Numeric fields reject registry garbage / out-of-range values back to
+    // the defaults — otherwise the host rejects EVERY save until the user
+    // happens to drag exactly the poisoned slider.
+    if (v !== null && isAcceptableRaw(key, v)) s[key] = v;
   }
   for (const key of BOOL_KEYS) {
     const v = params.get(key);
@@ -183,7 +224,9 @@ export function initialMonitorStates(entries: readonly MonitorEntry[]): MonitorF
 /**
  * Serialises in the same key order as the host's BuildQueryString, then the
  * optional `monitormode` (only when non-empty), then the mN monitor keys
- * (index order, gapless — ParseSaveMessage rejects gaps).
+ * (index order, gapless — ParseSaveMessage rejects gaps). At most the first
+ * MONITOR_CAP entries go out — ParseSaveMessage only accepts m0..m7 and would
+ * reject the whole save on an m8 key.
  */
 export function buildSaveMessage(
   s: SettingsFormState,
@@ -196,7 +239,7 @@ export function buildSaveMessage(
   });
   let msg = 'save:' + parts.join('&');
   if (monitorMode) msg += `&monitormode=${monitorMode}`;
-  monitors.forEach((m, i) => {
+  monitors.slice(0, MONITOR_CAP).forEach((m, i) => {
     msg += `&m${i}id=${m.id}&m${i}mode=${m.mode}&m${i}scene=${m.scene}&m${i}preset=${m.preset}`;
   });
   return msg;

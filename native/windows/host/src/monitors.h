@@ -25,13 +25,15 @@ std::vector<MonitorInfo> EnumMonitors();
 std::wstring SanitizeMonitorId(const std::wstring& raw);
 
 // Per-monitor overrides under <regPath>\Monitors\<id>. mode/scene/preset
-// drive the saver, the w-prefixed trio the wallpaper. LoadMonitorConfig stays
-// neutral about the wallpaper "primary defaults to on" rule — callers check
-// MonitorConfigExists and apply that default when the subkey is missing.
+// drive the saver, the w-prefixed trio the wallpaper. wmode uses the empty
+// string as a "never set" sentinel: LoadMonitorConfig yields L"" when the
+// WMode value is missing (callers apply the "primary defaults to on" rule
+// then), and SaveMonitorConfig writes the wallpaper trio only when wmode is
+// non-empty — a saver-dialog save must never materialize WMode=off.
 struct MonitorConfig {
     std::wstring mode = L"on";  // on|off|random|scene
     std::wstring scene, preset;
-    std::wstring wmode = L"off";
+    std::wstring wmode;  // on|off|random|scene, empty = never set (sentinel)
     std::wstring wscene, wpreset;
 };
 bool MonitorConfigExists(const std::wstring& id, const wchar_t* regPath = kRegPath);

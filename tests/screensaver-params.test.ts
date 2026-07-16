@@ -127,6 +127,9 @@ describe('applyParamOverrides — v0.10 keys', () => {
     expect(apply('autocycle=off').autoCycle.on).toBe(false);
     expect(apply('boot=off').bootEnabled).toBe(false);
     expect(apply('daynight=off').dayNightCycle.on).toBe(false);
+    // NOTE: only the param MAPPING is pinned here. The plain-browser default
+    // (absent ?perfadapt → perfAdapt=false, e9e2719 regression guard) is entry
+    // logic in src/screensaver/main.ts, deliberately outside this pure seam.
     expect(apply('perfadapt=off').perfAdapt).toBe(false);
   });
   it('maps clamped numerics from raw strings', () => {

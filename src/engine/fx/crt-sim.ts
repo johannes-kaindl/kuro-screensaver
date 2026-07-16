@@ -58,13 +58,23 @@ export class CrtSim {
   private humBarEl: HTMLDivElement | null = null;
 
   start() {
+    if (this.rafId) return;   // idempotent — the power bridge may re-enter while running
     this.nextTickAt = performance.now() + 600;
     this.rafId = requestAnimationFrame(this.tick);
   }
 
   stop() {
     cancelAnimationFrame(this.rafId);
+    this.rafId = 0;   // lets the start() idempotency guard re-arm
     this.timeouts.splice(0).forEach((id) => clearTimeout(id));
+    // Clearing the timeouts above can orphan an in-flight artifact's restore
+    // step — reset the transient styles so a tear/flicker isn't baked into a
+    // frozen frame (power bridge freezes hold the last frame for minutes).
+    this.canvas.style.transform = '';
+    this.canvas.style.filter = '';
+    this.canvas.style.opacity = '';
+    if (this.scanlinesEl) this.scanlinesEl.style.transform = '';
+    this.engine.chromaPass.uniforms.offset.value = this.baseChromaOffset;
   }
 
   dispose() {
@@ -83,11 +93,12 @@ export class CrtSim {
     this.canvas.style.filter = '';
     this.canvas.style.opacity = '';
     this.canvas.style.transition = '';
-    // Reset scanline element styles we may have touched
+    // Reset scanline element styles we may have touched. (No backgroundPositionY
+    // reset: the always-attached ks-drift CSS animation owns background-position-y
+    // — see hud/index.ts buildDOM — and the interlace flicker uses transform.)
     if (this.scanlinesEl) {
       this.scanlinesEl.style.transform = '';
       this.scanlinesEl.style.transition = '';
-      this.scanlinesEl.style.backgroundPositionY = '';
     }
     // Reset chroma uniform if we changed it
     this.engine.chromaPass.uniforms.offset.value = this.baseChromaOffset;
@@ -293,9 +304,15 @@ export class CrtSim {
     const flicks = 5 + Math.floor(i * 8);
     let count = 0;
     let toggle = false;
+    // transform, NOT background-position-y: the always-attached ks-drift CSS
+    // keyframes animation (hud/index.ts buildDOM) owns background-position-y
+    // and beats inline styles in the cascade — an inline write there is a
+    // silent no-op. translateY shifts the whole pattern instead and composes
+    // with the drift. The chain restores transform to '' in its final timeout.
     const flick = () => {
-      if (count >= flicks || !this.scanlinesEl) return;
-      this.scanlinesEl.style.backgroundPositionY = toggle ? '0px' : '2px';
+      if (!this.scanlinesEl) return;
+      if (count >= flicks) { this.scanlinesEl.style.transform = ''; return; }
+      this.scanlinesEl.style.transform = toggle ? '' : 'translateY(2px)';
       toggle = !toggle;
       count++;
       this.after(35 + Math.random() * 25, flick);

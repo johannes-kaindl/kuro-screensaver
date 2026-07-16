@@ -111,6 +111,10 @@ export class Hud {
     // per-frame backgroundPositionY write forced style/layout work on every
     // rAF tick. The JS loop keeps only the rare sync-tear. Duration matches
     // the old rate — speed*0.6 px/frame @60fps over the 4px pattern.
+    // NOTE: this animation now OWNS background-position-y on the scanlines el
+    // (CSS animations beat inline styles in the cascade, even while paused) —
+    // anything else that wants to nudge the pattern must use transform, see
+    // CrtSim.fireInterlaceFlicker (fx/crt-sim.ts).
     if (!document.getElementById('ks-drift-style')) {
       const st = document.createElement('style');
       st.id = 'ks-drift-style';

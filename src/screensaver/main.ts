@@ -65,7 +65,8 @@ const host = new WebHost({
     colorPreset: preset,
     defaultScene: scene,
     liveHotkeysEnabled: false,
-    // perfAdapt is user-controlled via ?perfadapt= (params.ts) — engine default on.
+    // perfAdapt is user-controlled via ?perfadapt= (params.ts); without the
+    // param this entry forces it OFF below (e9e2719 browser regression guard).
   },
 });
 
@@ -81,6 +82,24 @@ host.getSettings().autoCycle.on = true;
 // matrix-rain + the full v0.10 set incl. ?ntsc/?halation/?weather/?kiosk).
 // See src/screensaver/params.ts — pinned by screensaver-params.test.ts.
 applyParamOverrides(host.getSettings(), params);
+
+// Plain-browser guardrails. The Windows host ALWAYS pins ?perfadapt and ?kiosk
+// in its query (options.cpp BuildQueryString), so both branches only fire for
+// the direct screensaver.html consumer:
+//  • perfAdapt — e9e2719 ("stop perfAdapt killing AFTER effect") disabled it
+//    for this entry because it silently kills user-enabled AFTER:TRAIL/BURN
+//    seconds after enabling (and since v0.10 also downscales the resolution),
+//    and the control bar has no perfadapt toggle to opt out. Keep the browser
+//    on that behaviour; hosts opt in explicitly via ?perfadapt=on.
+if (!params.has('perfadapt')) host.getSettings().perfAdapt = false;
+//  • kiosk — ?kiosk=on mutates the settings tree, which open() persists to
+//    localStorage (stats write); a later param-less visit would restart in
+//    kiosk mode (no control bar, no cursor, no ×) with no in-page way out.
+//    Heal any persisted kiosk residue when the param is absent.
+if (!params.has('kiosk')) {
+  const s = host.getSettings();
+  if (s.kioskMode) { s.kioskMode = false; s.hud.controlBar = true; }
+}
 
 const controller = new ScreensaverController(makePluginShim(host));
 

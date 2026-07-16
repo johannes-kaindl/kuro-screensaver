@@ -48,6 +48,22 @@ describe('settings form state (native /c dialog bridge)', () => {
     expect(buildSaveMessage(readInitial(new URLSearchParams('?' + FLIP_QUERY)))).toBe('save:' + FLIP_QUERY);
   });
 
+  it('readInitial rejects garbage / out-of-range numerics back to the defaults', () => {
+    // Registry values arrive unvalidated (LoadOptions never checks them) —
+    // accepting them verbatim would make the host reject every save.
+    const s = readInitial(new URLSearchParams('?bank=1,5&crtintensity=9&scale=abc'));
+    expect(s.bank).toBe(FORM_DEFAULTS.bank);
+    expect(s.crtintensity).toBe(FORM_DEFAULTS.crtintensity);
+    expect(s.scale).toBe(FORM_DEFAULTS.scale);
+  });
+
+  it('readInitial keeps valid raw numeric strings byte-identical, incl. range bounds', () => {
+    const s = readInitial(new URLSearchParams('?cyclemin=0.5&bank=2&scale=0.66'));
+    expect(s.cyclemin).toBe('0.5');
+    expect(s.bank).toBe('2');
+    expect(s.scale).toBe('0.66');
+  });
+
   it('appends monitor entries in index order', () => {
     const mons = [
       { id: 'DELL_ABC1', mode: 'scene', scene: 'matrix', preset: 'phosphor' },
@@ -56,6 +72,15 @@ describe('settings form state (native /c dialog bridge)', () => {
     expect(buildSaveMessage(FORM_DEFAULTS, mons)).toContain(
       '&m0id=DELL_ABC1&m0mode=scene&m0scene=matrix&m0preset=phosphor&m1id=LAPTOP_0&m1mode=off&m1scene=&m1preset=',
     );
+  });
+
+  it('caps the serialised monitors at 8 (ParseSaveMessage accepts m0..m7 only)', () => {
+    const mons = Array.from({ length: 9 }, (_, i) => ({
+      id: `MON_${i}`, mode: 'on', scene: '', preset: '',
+    }));
+    const msg = buildSaveMessage(FORM_DEFAULTS, mons);
+    expect(msg).toContain('&m7id=MON_7');
+    expect(msg).not.toContain('m8id');
   });
 
   it('appends monitormode after perfadapt and before the monitor keys, only when non-empty', () => {

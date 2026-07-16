@@ -134,6 +134,19 @@ int main() {
     ExpectEq(BuildQueryString(LoadOptions(testKey)), std::wstring(L"?") + kFlipQuery,
              "registry round-trip preserves the full v0.10 format");
 
+    // 9b. Load-side validation: raw numeric fields go un-escaped into the
+    //     query, so registry garbage (hand edits, third-party writers) must
+    //     fall back to the defaults — '#'/'&' would truncate/inject params.
+    RegSetKeyValueW(HKEY_CURRENT_USER, testKey, L"Bank", REG_SZ, L"1,5#x",
+                    static_cast<DWORD>(sizeof(L"1,5#x")));
+    ExpectEq(LoadOptions(testKey).bank, L"1", "load rejects numeric registry garbage");
+    RegSetKeyValueW(HKEY_CURRENT_USER, testKey, L"Scale", REG_SZ, L"1.5",
+                    static_cast<DWORD>(sizeof(L"1.5")));
+    ExpectEq(LoadOptions(testKey).scale, L"1", "load rejects out-of-range numeric");
+    RegSetKeyValueW(HKEY_CURRENT_USER, testKey, L"Look", REG_SZ, L"Heavy CRT!",
+                    static_cast<DWORD>(sizeof(L"Heavy CRT!")));
+    ExpectEq(LoadOptions(testKey).look, L"", "load rejects non-slug look");
+
     // 10. Monitor config subkeys + MonitorMode/WallpaperMonitorMode values.
     ExpectTrue(!MonitorConfigExists(L"TESTMON", testKey), "monitor config initially absent");
     MonitorConfig mc;
@@ -150,8 +163,23 @@ int main() {
     ExpectTrue(mb.wmode == L"on" && mb.wscene == L"void" && mb.wpreset.empty(),
                "monitor config wallpaper trio");
     MonitorConfig unknown = LoadMonitorConfig(L"NEVER_SEEN", testKey);
-    ExpectTrue(unknown.mode == L"on" && unknown.wmode == L"off",
-               "missing subkey yields neutral defaults");
+    ExpectTrue(unknown.mode == L"on" && unknown.wmode.empty(),
+               "missing subkey yields saver default + empty wmode sentinel");
+    // Saver-dialog save path: saver trio replaced, wmode left at the empty
+    // sentinel — a previously set WMode must survive untouched …
+    MonitorConfig saverOnly;
+    saverOnly.mode = L"random";
+    SaveMonitorConfig(L"TESTMON", saverOnly, testKey);
+    MonitorConfig kept = LoadMonitorConfig(L"TESTMON", testKey);
+    ExpectTrue(kept.mode == L"random" && kept.wmode == L"on" && kept.wscene == L"void",
+               "empty-wmode save keeps existing wallpaper trio");
+    // … and on a fresh subkey no WMode may be materialized (WMode=off would
+    // irreversibly kill the wallpaper's "primary defaults to on" rule).
+    SaveMonitorConfig(L"FRESHMON", saverOnly, testKey);
+    MonitorConfig fresh = LoadMonitorConfig(L"FRESHMON", testKey);
+    ExpectTrue(MonitorConfigExists(L"FRESHMON", testKey) && fresh.mode == L"random" &&
+                   fresh.wmode.empty(),
+               "empty-wmode save materializes no WMode");
     ExpectEq(LoadMonitorMode(false, testKey), L"per", "saver monitor mode defaults to per");
     SaveMonitorMode(false, L"span", testKey);
     ExpectEq(LoadMonitorMode(false, testKey), L"span", "saver monitor mode round-trip");

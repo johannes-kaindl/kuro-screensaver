@@ -19,6 +19,21 @@ constexpr const wchar_t* kRunValueName = L"KuroWallpaper";
 HWND g_trayWindow = nullptr;
 bool g_paused = false;
 std::function<void(bool)> g_setPaused;
+// Broadcast by the shell when explorer.exe (re)starts — the icon must be
+// re-added then, or the tray (pause/settings/exit) becomes unreachable.
+UINT g_taskbarCreatedMsg = 0;
+
+bool AddTrayIcon() {
+    NOTIFYICONDATAW nid{};
+    nid.cbSize = sizeof(nid);
+    nid.hWnd = g_trayWindow;
+    nid.uID = kTrayIconId;
+    nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
+    nid.uCallbackMessage = kTrayMessage;
+    nid.hIcon = LoadIconW(nullptr, IDI_APPLICATION);  // stock icon is enough for v0.10
+    wcscpy_s(nid.szTip, L"Kuro Wallpaper");
+    return Shell_NotifyIconW(NIM_ADD, &nid) != FALSE;
+}
 
 bool AutostartEnabled() {
     return RegGetValueW(HKEY_CURRENT_USER, kRunKeyPath, kRunValueName, RRF_RT_REG_SZ, nullptr,
@@ -57,6 +72,11 @@ void ShowTrayMenu(HWND hwnd) {
 }
 
 LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+    // Explorer restart: NIM_ADD state is gone with the old taskbar.
+    if (g_taskbarCreatedMsg && msg == g_taskbarCreatedMsg) {
+        AddTrayIcon();
+        return 0;
+    }
     switch (msg) {
         case kTrayMessage:  // NIF_MESSAGE callback: lParam is the mouse message
             if (static_cast<UINT>(lp) == WM_RBUTTONUP || static_cast<UINT>(lp) == WM_LBUTTONUP)
@@ -89,6 +109,7 @@ LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 bool InitTray(std::function<void(bool paused)> setPaused) {
     g_setPaused = std::move(setPaused);
     g_paused = false;
+    g_taskbarCreatedMsg = RegisterWindowMessageW(L"TaskbarCreated");
 
     WNDCLASSW wc{};
     wc.lpfnWndProc = TrayWndProc;
@@ -97,20 +118,13 @@ bool InitTray(std::function<void(bool paused)> setPaused) {
     RegisterClassW(&wc);
 
     // Hidden top-level window (NOT message-only): TrackPopupMenu needs a
-    // window that can take the foreground.
+    // window that can take the foreground, and the "TaskbarCreated"
+    // broadcast only reaches top-level windows.
     g_trayWindow = CreateWindowExW(0, L"KuroTrayWindow", L"", 0, 0, 0, 0, 0, nullptr, nullptr,
                                    wc.hInstance, nullptr);
     if (!g_trayWindow) return false;
 
-    NOTIFYICONDATAW nid{};
-    nid.cbSize = sizeof(nid);
-    nid.hWnd = g_trayWindow;
-    nid.uID = kTrayIconId;
-    nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
-    nid.uCallbackMessage = kTrayMessage;
-    nid.hIcon = LoadIconW(nullptr, IDI_APPLICATION);  // stock icon is enough for v0.10
-    wcscpy_s(nid.szTip, L"Kuro Wallpaper");
-    if (!Shell_NotifyIconW(NIM_ADD, &nid)) {
+    if (!AddTrayIcon()) {
         DestroyWindow(g_trayWindow);
         g_trayWindow = nullptr;
         return false;
