@@ -11,6 +11,7 @@
 //   /p  <hwnd>    render a small preview into the given parent window
 //   /w            run as animated desktop wallpaper (tray-controlled, not
 //                 invoked by the OS — autostart Run key or manual launch)
+//   /silent       like /w, but without the settings window — the autostart key
 //
 // The visuals are the project's web build: the host embeds WebView2 (inbox on
 // Windows 11) and loads the bundled web/screensaver.html via the
@@ -25,9 +26,11 @@
 #include <shellapi.h>
 
 #include <cstdlib>
+#include <cwchar>
 #include <cwctype>
 #include <string>
 
+#include "instance.h"
 #include "options.h"
 #include "preview_window.h"
 #include "saver_window.h"
@@ -67,6 +70,10 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     std::wstring arg = argc > 1 ? argv[1] : kDefaultArg;
     std::wstring flag = arg.substr(0, arg.size() < 2 ? arg.size() : 2);
     for (wchar_t& c : flag) c = static_cast<wchar_t>(towlower(c));
+    // /silent is the autostart's way of saying "wallpaper, but no window". The
+    // two-character prefix above would otherwise read it as "/s" = run the
+    // screensaver — the exact bug we are fixing, one layer down.
+    if (_wcsicmp(arg.c_str(), L"/silent") == 0) flag = L"/w";
 
     if (!EnsureWebView2Runtime()) return 1;
 
@@ -77,7 +84,17 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         HWND parent = ParsePreviewHandle(arg, argc, argv);
         rc = parent ? RunPreview(parent) : 0;
     } else if (flag == L"/w") {
-        rc = RunWallpaper();
+        // Second instance? Hand the request over and get out of the way — never
+        // render a second wallpaper (instance.h).
+        if (!AcquireWallpaperInstance()) {
+            SignalExistingInstance();
+            rc = 0;
+        } else {
+            // /silent = autostart: tray only. Everything else (start-menu click,
+            // the bare KuroWallpaper.exe) wants its window.
+            const bool silent = argc > 1 && _wcsicmp(argv[1], L"/silent") == 0;
+            rc = RunWallpaper(!silent);
+        }
     } else {
         rc = RunSaver();
     }

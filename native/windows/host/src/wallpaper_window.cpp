@@ -29,6 +29,7 @@
 #include "monitors.h"
 #include "options.h"
 #include "render_policy.h"
+#include "settings_window.h"
 #include "tray.h"
 #include "webview_host.h"
 
@@ -292,7 +293,7 @@ LRESULT CALLBACK PowerWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 
 }  // namespace
 
-int RunWallpaper() {
+int RunWallpaper(bool showSettings) {
     HWND host = FindWallpaperHost();
     if (!host) return 1;
     g_host = host;  // watched by ReattachIfHostLost (explorer restarts)
@@ -351,6 +352,12 @@ int RunWallpaper() {
 
     // Tray runs even when every monitor is off — settings/exit stay reachable.
     InitTray(SetWallpaperPaused);
+
+    // Start-menu click: show the window immediately. Autostart (/silent) skips
+    // this — a window popping up at every login is exactly what nobody wants.
+    // After InitTray on purpose: the dialog is non-modal and the loop below
+    // dispatches for it, so the tray must exist first.
+    if (showSettings) OpenSettingsWindow();
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
