@@ -173,6 +173,25 @@ int main() {
                     static_cast<DWORD>(sizeof(L"Heavy CRT!")));
     ExpectEq(LoadOptions(testKey).look, L"", "load rejects non-slug look");
 
+    // 9c. Same for the enum fields: ParseSaveMessage whitelists them on the way
+    //     back in, so a registry value outside the whitelist would fail every
+    //     save of BOTH dialog tabs (one all-or-nothing message) — and have the
+    //     wallpaper renderer run on a value the engine does not know.
+    RegSetKeyValueW(HKEY_CURRENT_USER, testKey, L"Speed", REG_SZ, L"warp",
+                    static_cast<DWORD>(sizeof(L"warp")));
+    RegSetKeyValueW(HKEY_CURRENT_USER, testKey, L"Weather", REG_SZ, L"hail",
+                    static_cast<DWORD>(sizeof(L"hail")));
+    RegSetKeyValueW(HKEY_CURRENT_USER, testKey, L"BootSpeed", REG_SZ, L"instant",
+                    static_cast<DWORD>(sizeof(L"instant")));
+    SaverOptions poisoned = LoadOptions(testKey);
+    ExpectEq(poisoned.speed, SaverOptions{}.speed, "load rejects unknown speed");
+    ExpectEq(poisoned.weather, SaverOptions{}.weather, "load rejects unknown weather");
+    ExpectEq(poisoned.bootspeed, SaverOptions{}.bootspeed, "load rejects unknown bootspeed");
+    // A valid non-default value still survives — the guard is a whitelist, not a reset.
+    RegSetKeyValueW(HKEY_CURRENT_USER, testKey, L"Speed", REG_SZ, L"fast",
+                    static_cast<DWORD>(sizeof(L"fast")));
+    ExpectEq(LoadOptions(testKey).speed, std::wstring(L"fast"), "load keeps a valid speed");
+
     // 10. Monitor config subkeys + MonitorMode/WallpaperMonitorMode values.
     ExpectTrue(!MonitorConfigExists(L"TESTMON", testKey), "monitor config initially absent");
     MonitorConfig mc;

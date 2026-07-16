@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <cstdio>
+#include <initializer_list>
 #include <vector>
 
 std::wstring ReadReg(const wchar_t* path, const wchar_t* name, const std::wstring& def) {
@@ -31,6 +32,20 @@ std::wstring ReadNumber(const wchar_t* path, const wchar_t* name, const std::wst
                         double lo, double hi) {
     std::wstring v = ReadReg(path, name, def);
     return IsValidNumber(v, lo, hi) ? v : def;
+}
+
+// Enum fields are whitelisted on the way back in (ParseOptionField), but the
+// registry hands them over unchecked — same threat model ReadNumber defends the
+// numerics against. A hand-edited Speed=warp would ride the query into the
+// dialog, fail the all-or-nothing save of BOTH tabs, and meanwhile have the
+// renderer run on a value the engine does not know. Mirrors ENUM_VALUES in
+// src/settings/form-state.ts, which guards the same fields on the page side.
+std::wstring ReadEnum(const wchar_t* path, const wchar_t* name, const std::wstring& def,
+                      std::initializer_list<const wchar_t*> allowed) {
+    std::wstring v = ReadReg(path, name, def);
+    for (const wchar_t* a : allowed)
+        if (v == a) return v;
+    return def;
 }
 
 std::wstring OnOff(bool b) { return b ? L"on" : L"off"; }
@@ -140,7 +155,7 @@ SaverOptions LoadOptions(const wchar_t* regPath) {
     SaverOptions o;
     o.scene = ReadReg(regPath, L"Scene", o.scene);
     o.preset = ReadReg(regPath, L"Preset", o.preset);
-    o.speed = ReadReg(regPath, L"Speed", o.speed);
+    o.speed = ReadEnum(regPath, L"Speed", o.speed, {L"slow", L"norm", L"fast"});
     o.audio = ReadFlag(regPath, L"Audio", o.audio);
     o.bloom = ReadFlag(regPath, L"Bloom", o.bloom);
     o.trails = ReadFlag(regPath, L"Trails", o.trails);
@@ -152,17 +167,18 @@ SaverOptions LoadOptions(const wchar_t* regPath) {
     o.crosshair = ReadFlag(regPath, L"Crosshair", o.crosshair);
     o.look = ReadReg(regPath, L"Look", o.look);
     if (!o.look.empty() && !IsSlug(o.look)) o.look = L"";  // empty = custom
-    o.altitude = ReadReg(regPath, L"Altitude", o.altitude);
-    o.fog = ReadReg(regPath, L"Fog", o.fog);
-    o.weather = ReadReg(regPath, L"Weather", o.weather);
-    // Ranges pinned to ParseSaveMessage — keep the two in sync.
+    o.altitude = ReadEnum(regPath, L"Altitude", o.altitude, {L"low", L"mid", L"high"});
+    o.fog = ReadEnum(regPath, L"Fog", o.fog, {L"auto", L"clear", L"dense"});
+    o.weather = ReadEnum(regPath, L"Weather", o.weather,
+                         {L"light-fog", L"heavy-fog", L"storm", L"dust", L"clear"});
+    // Whitelists and ranges pinned to ParseSaveMessage — keep the two in sync.
     o.bank = ReadNumber(regPath, L"Bank", o.bank, 0, 2);
     o.reactive = ReadFlag(regPath, L"Reactive", o.reactive);
     o.autocycle = ReadFlag(regPath, L"AutoCycle", o.autocycle);
     o.cyclemin = ReadNumber(regPath, L"CycleMin", o.cyclemin, 0.5, 10);
-    o.termlayout = ReadReg(regPath, L"TermLayout", o.termlayout);
+    o.termlayout = ReadEnum(regPath, L"TermLayout", o.termlayout, {L"strip", L"window"});
     o.boot = ReadFlag(regPath, L"Boot", o.boot);
-    o.bootspeed = ReadReg(regPath, L"BootSpeed", o.bootspeed);
+    o.bootspeed = ReadEnum(regPath, L"BootSpeed", o.bootspeed, {L"fast", L"normal", L"cinematic"});
     o.daynight = ReadFlag(regPath, L"DayNight", o.daynight);
     o.crtintensity = ReadNumber(regPath, L"CrtIntensity", o.crtintensity, 0, 1);
     o.curvature = ReadNumber(regPath, L"Curvature", o.curvature, 0, 0.25);
@@ -440,8 +456,9 @@ bool ParseSaveMessage(const std::wstring& msg, SaverOptions& out,
     if (!ok) return false;
 
     // Monitor entries must form a gapless 0..k prefix with all four saver keys
-    // each. The wallpaper trio is optional (the /c dialog sends none), but may
-    // not appear for an index that carries no entry at all.
+    // each. The wallpaper trio is optional (it comes only for cards the user
+    // touched in the wallpaper tab), but may not appear for an index that
+    // carries no entry at all.
     size_t count = 0;
     while (count < 8 && (monSeen[count][0] || monSeen[count][1] || monSeen[count][2] ||
                          monSeen[count][3] || monWSeen[count])) {
