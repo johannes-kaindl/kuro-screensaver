@@ -1,4 +1,4 @@
-# Audit: /Users/Shared/code/kuro/
+# Audit: `../kuro/` (Schwester-Ordner `kuro/` im Workspace)
 
 **Datum:** 2026-05-26
 **Zweck:** Überblick & Konsolidierungsempfehlungen pro Unterordner.
@@ -46,7 +46,7 @@
 ## Strukturvorschlag nach Cleanup
 
 ```
-/Users/Shared/code/kuro/
+../kuro/
 ├── animation/                    # Standalone Engine
 ├── kuro-theme-settings/          # Companion-Plugin Source (Git)
 ├── [evtl. kuro2-theme-settings/] # falls noch aktiv

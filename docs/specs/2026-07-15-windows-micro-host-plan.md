@@ -1627,7 +1627,7 @@ git push github --delete feat/windows-micro-host
 
 Expected: `release`-Workflow läuft auf GitHub; `dist-windows` (zip) + Installer werden ans Codeberg-Release gehängt (publish-Job). Mit `gh run watch` verfolgen.
 
-- [ ] **Step 6: Vault-TaskNote für die on-device-Abnahme anlegen** — `/Users/Shared/10_ObsidianVaults/10_Pallas/25_Coding/kuro-screensaver/_Tasks/v0.9.0 on-device-Abnahme Windows.md` (Frontmatter-Muster: bestehende TaskNotes im selben Ordner, `type: 💪 Aufgabe`, `status: 2_geplant_📅`, `projekt: ["[[25_Coding/kuro-screensaver/kuro-screensaver]]"]`). Checkliste: zip entpacken → `/s` Fullscreen (Multi-Monitor) · rechtsklick → Test · Preview im Settings-Dialog (`/p`) · Configure (`/c`, HTML-Dialog: Werte ändern → speichern → erneut öffnen → Werte da? → Saver zeigt sie?) · Upgrade-Pfad: Settings aus v0.8.0-Installation überleben? · Installer-exe · SmartScreen-Verhalten · Win10-Maschine falls greifbar (Runtime-Hinweis-MessageBox).
+- [ ] **Step 6: Vault-TaskNote für die on-device-Abnahme anlegen** — `$VAULT/25_Coding/kuro-screensaver/_Tasks/v0.9.0 on-device-Abnahme Windows.md` (Frontmatter-Muster: bestehende TaskNotes im selben Ordner, `type: 💪 Aufgabe`, `status: 2_geplant_📅`, `projekt: ["[[25_Coding/kuro-screensaver/kuro-screensaver]]"]`). Checkliste: zip entpacken → `/s` Fullscreen (Multi-Monitor) · rechtsklick → Test · Preview im Settings-Dialog (`/p`) · Configure (`/c`, HTML-Dialog: Werte ändern → speichern → erneut öffnen → Werte da? → Saver zeigt sie?) · Upgrade-Pfad: Settings aus v0.8.0-Installation überleben? · Installer-exe · SmartScreen-Verhalten · Win10-Maschine falls greifbar (Runtime-Hinweis-MessageBox).
 
 ---
 

@@ -33,7 +33,7 @@ zum deployed `main.js` gehört. Im Tausch:
 
 ### Engine (`src/engine/`)
 - **Files überschrieben** (alle aus
-  `/Users/Shared/kuro-konsolidierung/kuro-companion/src/screensaver/` Stand
+  `<kuro-konsolidierung>/kuro-companion/src/screensaver/` (maintainer-lokaler Konsolidierungs-Ordner) Stand
   2026-05-13): `audio/synth.ts`, `controller.ts`, `data/defaults.ts`,
   `data/dictionary.ts`, `engine/color.ts`, `engine/core.ts`,
   `engine/scenes/tunnel.ts`, `engine/scenes/void.ts`, `hud/boot.ts`,

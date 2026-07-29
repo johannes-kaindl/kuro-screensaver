@@ -1,7 +1,8 @@
 # AGENTS.md
 
-> **Workspace-Standards:** Die verbindliche Leitkonvention steht in `_docs/CONVENTIONS.md`
-> (am Workspace-Root `/Users/Shared/code/`), Modell comply-or-explain. Offene Punkte fuer
+> **Workspace-Standards (maintainer-lokal):** Die verbindliche Leitkonvention steht in `_docs/CONVENTIONS.md`
+> im Multi-Projekt-Workspace des Maintainers, `../_docs` relativ zu diesem Repo — nicht Teil dieses Repos,
+> ignorieren falls im Klon nicht vorhanden. Modell comply-or-explain. Offene Punkte fuer
 > dieses Repo siehe Abschnitt "Offene Konventions-Punkte".
 
 Conventions for AI assistants working in this repo.
@@ -25,8 +26,8 @@ Standalone Retro-CRT 3D Screensaver engine — extracted from the
 Vite/TypeScript project, runs in any modern browser.
 
 **Standalone repo since 2026-06-01** — moved out of the `kuro/` monorepo
-subtree (was `/Users/Shared/code/kuro/animation/`) to its own top-level
-project at `/Users/Shared/code/kuro-screensaver/`. Git remotes, the GitHub
+subtree (was `../kuro/animation/`) to its own top-level project directory
+in the maintainer's workspace. Git remotes, the GitHub
 release CI, and the `sync-to-plugin.sh` DST path were unaffected by the move
 (they use absolute paths / the unchanged `kuro-screensaver` repo name).
 
@@ -56,8 +57,19 @@ instance — no shim needed there.
 - **Commit style:** Conventional Commits. AI-pair commits get a
   `Co-Authored-By: Claude <model> <noreply@anthropic.com>` trailer.
 
-## Memory + logs
+## Memory
 
+- **SDD artifacts (since 2026-07-16): Cockpit, not repo** — specs/plans/task reports live in
+  the maintainer's coding cockpit (`$VAULT/25_Coding/kuro-screensaver/_SDD/`, CORE-META-14,
+  maintainer-local). They carry working context (vault paths, sister-repo internals) that is
+  of no use to anyone in a public repo. The repo keeps the design essence in this file +
+  `CHANGELOG.md`.
+- **Legacy stock:** `docs/specs/` and `docs/superpowers/{specs,plans}/` are frozen — do not
+  add anything new there. Existing historical spec files stay where they are.
+- **Never in the repo:** absolute paths outside the repo (`/Users/…`, vault paths) — use
+  placeholders (`$VAULT/…`, `~/…`, repo-relative). Provenance as repo name + `file:line`
+  is welcome, though.
+  Gate: `scripts/check-no-abs-paths.mjs` (part of `npm test`).
 - **Memory** (cross-session, outside the repo):
   `~/.claude/projects/-Users-Shared-code-kuro-screensaver/memory/`
   — index in `MEMORY.md`. See `animation-project.md`,
@@ -65,8 +77,6 @@ instance — no shim needed there.
   `user-style.md`.
 - **Session logs** (in repo, gitignored):
   `.claude/logs/YYYY-MM-DD-<topic>.md`
-- **Design specs** (in repo, committed):
-  `docs/specs/YYYY-MM-DD-<topic>-design.md`
 
 ## Architecture notes
 
@@ -148,9 +158,10 @@ forwards the tag to trigger CI). Build + attach the notarized app with
 No longer siblings — these stayed in the `kuro/` subtree when this project
 moved out to its own top-level dir (2026-06-01):
 
-- `/Users/Shared/code/kuro/kuro-theme-settings/` — the Obsidian plugin (v1 +
+- `../kuro/kuro-theme-settings/` — the Obsidian plugin (v1 +
   v2 unified via build defines `__HAS_ASPECTS__`, `__STYLE_TAG_ID__`,
   `__BODY_CLASS__`). The `sync-to-plugin.sh` DST already points at this
-  absolute path.
-- `kuro-gamification` (symlink → `/Users/Shared/20_Claude/.../40_src/`) —
+  directory (absolute path inside the script).
+- `kuro-gamification` (maintainer-local symlink in the `kuro/` subtree,
+  pointing at that plugin's `40_src/` source dir outside the workspace) —
   separate Obsidian plugin, deployed in vault 10_Pallas.
