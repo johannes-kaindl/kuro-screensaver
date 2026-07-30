@@ -1,7 +1,8 @@
 # Release pipeline (GitHub Actions).
 #
-# Codeberg is the primary repo; a Codeberg → GitHub push mirror forwards commits +
-# tags automatically, so pushing a tag triggers this workflow on the mirror.
+# git.jkaindl.de (Forgejo) is the primary repo; a Forgejo → GitHub push mirror
+# forwards commits + tags automatically, so pushing a tag triggers this workflow
+# on the mirror.
 #
 # macOS deliverable = the standalone native Metal app (KuroMetalApp). It is notarized
 # + uploaded to the release LOCALLY (CI has no Developer ID cert) via
@@ -12,9 +13,10 @@
 # were deprecated 2026-06-03 — the native app replaces them.
 #
 # SETUP (one-time, user side):
-#   1. Codeberg → Settings → Push Mirror to the GitHub repo (incl. tags).
-#   2. GitHub repo → Settings → Secrets → CODEBERG_TOKEN (Codeberg token, repo write).
-#   3. Tag a release on Codeberg: `git tag v0.5.0 && git push origin v0.5.0`.
+#   1. git.jkaindl.de → repo Settings → Push Mirror to the GitHub repo (incl. tags).
+#   2. GitHub repo → Settings → Secrets → FORGEJO_TOKEN (Forgejo token with
+#      write:repository — a release-only token silently fails to publish).
+#   3. Tag a release on git.jkaindl.de: `git tag v0.5.0 && git push origin v0.5.0`.
 
 name: release
 
@@ -134,11 +136,11 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      - name: Attach the Windows .scr to the Codeberg release
+      - name: Attach the Windows .scr to the Forgejo release
         env:
-          TOKEN: ${{ secrets.CODEBERG_TOKEN }}
+          TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           TAG: ${{ github.ref_name }}
-          API: https://codeberg.org/api/v1/repos/jkaindl/kuro-screensaver
+          API: https://git.jkaindl.de/api/v1/repos/jkaindl/kuro-screensaver
         run: |
           set -euo pipefail
 
@@ -154,7 +156,7 @@ jobs:
             | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
           test -n "$rel_id"
 
-          # Upload a file with retry (transient Codeberg 5xx). Delete any same-name
+          # Upload a file with retry (transient 5xx). Delete any same-name
           # asset first so re-runs are idempotent. $2=1 → required (fail if missing),
           # $2=0 → optional (warn + skip if missing).
           attach() {
