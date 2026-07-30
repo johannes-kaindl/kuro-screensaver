@@ -34,7 +34,7 @@ switching, every CRT effect — the same engine the browser runs.
 ## Quick install (recommended)
 
 1. **Download** `KuroScreensaver-windows.zip` from the
-   [latest release](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest).
+   [latest release](https://git.jkaindl.de/jkaindl/kuro-screensaver/releases/latest).
 2. **Unblock the ZIP first** (clears the "downloaded from the internet" flag from
    everything inside, so SmartScreen won't nag): right-click the ZIP →
    **Properties** → tick **Unblock** → **OK**.

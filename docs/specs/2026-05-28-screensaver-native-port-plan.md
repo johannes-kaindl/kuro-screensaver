@@ -216,7 +216,7 @@ Expected: a `KuroScreensaver.exe` under `bin/Release/net8.0-windows/win-x64/publ
 
 - [ ] **Step 2: Attach to Codeberg Release** — `curl` the Codeberg API to create the release and upload `.scr` zip + `.saver` zip as assets, using a CI secret token (`Authorization: token …`, verified working 2026-05-28).
 
-- [ ] **Step 3: Download UI** — add a Downloads section to `README.md` and a download link on the demo `index.html` pointing at `https://codeberg.org/jkaindl/kuro-screensaver/releases/latest`.
+- [ ] **Step 3: Download UI** — add a Downloads section to `README.md` and a download link on the demo `index.html` pointing at `https://git.jkaindl.de/jkaindl/kuro-screensaver/releases/latest`.
 
 - [ ] **Step 4: Commit** — `ci+docs: release pipeline + download links`.
 

@@ -117,7 +117,7 @@ OS options panel → persisted defaults → URL query (?scene=…&audio=…)
 
 ## Autonomy boundary (what needs the user)
 
-1. **GitHub mirror + secret** — create a GitHub repo, add a Codeberg → GitHub push mirror (forwards tags), and add a `CODEBERG_TOKEN` secret to the GitHub repo (release-asset upload). This replaces a local macOS build: the `.saver` is built on GitHub's `macos-latest` runner, so no local Xcode is needed.
+1. **GitHub mirror + secret** — create a GitHub repo, add a Codeberg → GitHub push mirror (forwards tags), and add a `FORGEJO_TOKEN` secret to the GitHub repo (release-asset upload). This replaces a local macOS build: the `.saver` is built on GitHub's `macos-latest` runner, so no local Xcode is needed.
 2. **Release creation** — tag on Codeberg (`git tag v0.1.0 && git push origin v0.1.0`); the mirror triggers the GitHub workflow, which builds both artifacts and attaches them to the Codeberg release.
 3. **Local macOS build (optional fallback)** — only if not using CI: install Xcode and run `scripts/package-macos.sh`.
 

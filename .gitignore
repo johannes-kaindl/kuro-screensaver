@@ -31,5 +31,4 @@ render-out/
 .bump.*
 .superpowers/
 
-# Local, untracked push helper (reads CODEBERG_TOKEN from the environment)
-scripts/push-codeberg.sh
+# Local, untracked push helper (reads FORGEJO_TOKEN from the environment)

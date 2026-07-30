@@ -29,7 +29,7 @@
 
 #define MyAppName "Kuro Screensaver"
 #define MyAppPublisher "Johannes Kaindl"
-#define MyAppURL "https://codeberg.org/jkaindl/kuro-screensaver"
+#define MyAppURL "https://git.jkaindl.de/jkaindl/kuro-screensaver"
 #define ScrName "KuroScreensaver.scr"
 ; The wallpaper app. Every wallpaper shortcut and the Run key point here and
 ; never at the .scr: the shell drops a .scr shortcut's arguments and applies the

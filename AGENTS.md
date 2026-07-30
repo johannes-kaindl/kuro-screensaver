@@ -146,10 +146,10 @@ are gone too.
 
 Releases: GitHub Actions (`johannes-kaindl/kuro-screensaver`) typechecks + runs the
 native tests, compile-checks the macOS app, builds the Windows `.scr`, and attaches
-the `.scr` to the Codeberg release. The **notarized macOS app** is built + attached
+the `.scr` to the release. The **notarized macOS app** is built + attached
 locally (CI has no Developer ID cert). Cut a release: `bash scripts/bump-version.sh
 X.Y.Z` (single source — writes package.json + the app Info.plist together), commit,
-then `git tag vX.Y.Z && git push origin main vX.Y.Z` (the Codeberg→GitHub push mirror
+then `git tag vX.Y.Z && git push origin main vX.Y.Z` (the Forgejo→GitHub push mirror
 forwards the tag to trigger CI). Build + attach the notarized app with
 `scripts/package-native-app.sh`. See `docs/specs/2026-05-28-screensaver-native-port-*.md`.
 

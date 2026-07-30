@@ -12,11 +12,11 @@
 [![Windows — .scr](https://img.shields.io/badge/Windows-.scr-0078d4?style=flat-square)](native/windows)
 
 <p align="center">
-  <a href="https://codeberg.org/jkaindl/kuro-screensaver/releases/latest">
+  <a href="https://git.jkaindl.de/jkaindl/kuro-screensaver/releases/latest">
     <img alt="Download the macOS app" src="https://img.shields.io/badge/Download_macOS_App-39ff7a?style=for-the-badge&logo=apple&logoColor=060709">
   </a>
   &nbsp;
-  <a href="https://jkaindl.codeberg.page/kuro-screensaver/">
+  <a href="https://pages.jkaindl.de/kuro-screensaver/">
     <img alt="Launch the web app" src="https://img.shields.io/badge/Launch_Web_App-16e0e0?style=for-the-badge&logo=pwa&logoColor=060709">
   </a>
 </p>
@@ -113,7 +113,7 @@ seamless loop point — the loop is diegetic, not a hidden crossfade.</sub>
 The live Metal screensaver as a standalone app — full procedural variation,
 every CRT effect, the whole narrative.
 
-**[↓ KuroScreensaver-native-app-macos.dmg](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest)** → open, drag **KuroMetalApp.app** to `Applications`, launch. Turn on **auto-start-on-idle** in its settings to use it as a real screensaver.
+**[↓ KuroScreensaver-native-app-macos.dmg](https://git.jkaindl.de/jkaindl/kuro-screensaver/releases/latest)** → open, drag **KuroMetalApp.app** to `Applications`, launch. Turn on **auto-start-on-idle** in its settings to use it as a real screensaver.
 
 > Notarized + stapled with a Developer ID — it opens cleanly, no Gatekeeper
 > warning. Requires macOS 14+ (Apple Silicon).
@@ -129,14 +129,14 @@ its own settings.
 
 | Download | Run |
 |---|---|
-| [↓ KuroScreensaver-Setup.exe](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest) | Easiest: one-click installer, per-user, no admin rights. |
-| [↓ KuroScreensaver-windows.zip](https://codeberg.org/jkaindl/kuro-screensaver/releases/latest) | Manual: unzip into a folder you keep, right-click `KuroScreensaver.scr` → **Install**. |
+| [↓ KuroScreensaver-Setup.exe](https://git.jkaindl.de/jkaindl/kuro-screensaver/releases/latest) | Easiest: one-click installer, per-user, no admin rights. |
+| [↓ KuroScreensaver-windows.zip](https://git.jkaindl.de/jkaindl/kuro-screensaver/releases/latest) | Manual: unzip into a folder you keep, right-click `KuroScreensaver.scr` → **Install**. |
 
 Full steps + troubleshooting: **[docs/WINDOWS-INSTALL.md](docs/WINDOWS-INSTALL.md)**.
 
-Or just play it in a browser: **[jkaindl.codeberg.page/kuro-screensaver](https://jkaindl.codeberg.page/kuro-screensaver/)**.
+Or just play it in a browser: **[pages.jkaindl.de/kuro-screensaver](https://pages.jkaindl.de/kuro-screensaver/)**.
 
-All versions: **[releases page](https://codeberg.org/jkaindl/kuro-screensaver/releases)**.
+All versions: **[releases page](https://git.jkaindl.de/jkaindl/kuro-screensaver/releases)**.
 
 > The Windows `.scr` is unsigned, so SmartScreen warns on first run — click
 > **"More info" → "Run anyway"** (once). Full notes: [docs/WINDOWS-INSTALL.md](docs/WINDOWS-INSTALL.md).
@@ -203,7 +203,7 @@ needed). Web / cross-platform builds: TypeScript + three.js (WebGL2).</sub>
   settings, where the **Wallpaper** tab holds a full set of values independent
   of the screensaver's. The tray icon pauses/resumes, opens settings, toggles
   autostart, and quits.
-- **Browser** — [launch the web app](https://jkaindl.codeberg.page/kuro-screensaver/):
+- **Browser** — [launch the web app](https://pages.jkaindl.de/kuro-screensaver/):
   `1–9` pick scenes, `←/→` cycle, `M` mutes, `P` pauses, `S` screenshots,
   **Esc** exits; the control bar (mouse) exposes everything else.
 

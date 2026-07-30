@@ -54,7 +54,7 @@ NZIP="$BUILD/KuroMetalApp-notarize.zip"
 ditto -c -k --keepParent "$APP" "$NZIP"
 
 # Retry transient notary failures (network / Apple 5xx) with backoff — mirrors the
-# Codeberg-upload retry in release.yml. The signed app stays on disk, so a failed run
+# Release-upload retry in release.yml. The signed app stays on disk, so a failed run
 # is resumable by simply re-running the script.
 notarized=0
 for attempt in 1 2 3 4; do
