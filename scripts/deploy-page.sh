@@ -17,10 +17,14 @@
 set -euo pipefail
 
 RSYNC="${RSYNC:-/opt/homebrew/bin/rsync}"
-if ! "$RSYNC" --version 2>/dev/null | grep -q 'version 3'; then
-  echo "ERROR: $RSYNC is not rsync 3.x (macOS openrsync won't work): brew install rsync" >&2
-  exit 1
-fi
+# No pipe here: grep -q + pipefail would turn rsync's SIGPIPE into a failure.
+case "$("$RSYNC" --version 2>/dev/null || true)" in
+  *"version 3."*) ;;
+  *)
+    echo "ERROR: $RSYNC is not rsync 3.x (macOS openrsync won't work): brew install rsync" >&2
+    exit 1
+    ;;
+esac
 
 DEST="pages-deploy:kuro-screensaver/"
 
