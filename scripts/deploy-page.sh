@@ -1,32 +1,36 @@
 #!/usr/bin/env bash
-# Deploy the built screensaver to Codeberg Pages.
+# Deploy the built screensaver page to pages.jkaindl.de.
 #
-# Publishes dist/ to a `pages` branch of the kuro-screensaver repo. Codeberg
-# serves any branch named exactly `pages` automatically, so the result lands at:
-#   https://jkaindl.codeberg.page/kuro-screensaver/
+# Builds dist/ and rsyncs it to the pages server (/srv/pages/kuro-screensaver/,
+# served at https://pages.jkaindl.de/kuro-screensaver/). Replaces the old
+# Codeberg Pages flow (throwaway .git + force-push of a `pages` branch).
 #
-# Auth is via SSH (your Codeberg SSH key) — no token, no secret in any URL.
+# Auth is via the dedicated deploy key behind the `pages-deploy` SSH host alias
+# (~/.ssh/config) — restricted server-side to rsync into /srv/pages only.
 #
-# Mechanics: dist/ is gitignored in the main repo, so we drop a throwaway
-# .git inside dist/, commit the build, force-push it as the `pages` branch,
-# then remove the temp .git. The page branch is a snapshot (no history value),
-# hence force-push.
+# Requires real rsync 3.x — macOS ships openrsync, which is incompatible with
+# the server-side rrsync wrapper: brew install rsync
 #
 # Usage:
 #   bash scripts/deploy-page.sh
-#
-# Optional env:
-#   CODEBERG_USER  (default: jkaindl)
-#   CODEBERG_REPO  (default: kuro-screensaver)
 
 set -euo pipefail
 
-USER="${CODEBERG_USER:-jkaindl}"
-REPO="${CODEBERG_REPO:-kuro-screensaver}"
-SSH_URL="git@codeberg.org:$USER/$REPO.git"
+RSYNC="${RSYNC:-/opt/homebrew/bin/rsync}"
+if ! "$RSYNC" --version 2>/dev/null | grep -q 'version 3'; then
+  echo "ERROR: $RSYNC is not rsync 3.x (macOS openrsync won't work): brew install rsync" >&2
+  exit 1
+fi
+
+DEST="pages-deploy:kuro-screensaver/"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
+
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo "ERROR: working tree not clean — commit or stash before deploying." >&2
+  exit 1
+fi
 
 echo "=== Building (npm run build) ==="
 npm run build
@@ -37,27 +41,9 @@ if [[ ! -f "$DIST/index.html" ]]; then
   exit 1
 fi
 
-# Codeberg Pages serves files at the repo root of the `pages` branch. A
-# .domains file is only needed for custom domains — skipped here.
+echo ""
+echo "=== Publishing dist/ via rsync ==="
+"$RSYNC" -az --delete "$DIST"/ "$DEST"
 
 echo ""
-echo "=== Publishing dist/ to '$REPO' pages branch ==="
-
-pushd "$DIST" >/dev/null
-rm -rf .git
-git init -q
-git checkout -q -b pages
-git add -A
-git -c user.name="deploy" -c user.email="deploy@local" \
-    commit -q -m "deploy: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-git push -q --force "$SSH_URL" pages:pages
-rm -rf .git
-popd >/dev/null
-
-echo ""
-echo "✓ Pushed build to the 'pages' branch."
-echo "  Live in ~1-2 min: https://$USER.codeberg.page/$REPO/"
-echo ""
-echo "If it 404s after a few minutes: confirm on Codeberg that the branch is"
-echo "named exactly 'pages' and that the repo is not private (Pages needs a"
-echo "public repo, or Pages enabled for private repos in repo settings)."
+echo "✓ Deployed. Live: https://pages.jkaindl.de/kuro-screensaver/"
