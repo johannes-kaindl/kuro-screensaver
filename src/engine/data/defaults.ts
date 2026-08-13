@@ -4,7 +4,7 @@
 import type { StoryMemory } from '../terminal/arc';
 
 export interface ScreensaverSettings {
-  defaultScene: 'terrain' | 'city' | 'rift' | 'tunnel' | 'void' | 'wreckage' | 'matrix';
+  defaultScene: 'terrain' | 'city' | 'rift' | 'tunnel' | 'void' | 'wreckage' | 'matrix' | 'metro';
   speed: 'slow' | 'norm' | 'fast';
   cityAltitude: 'low' | 'mid' | 'high';
   tunnelAutoBoost: boolean;
@@ -224,7 +224,7 @@ export const DEFAULT_SCREENSAVER: ScreensaverSettings = {
 };
 
 export type SceneId = ScreensaverSettings['defaultScene'];
-export const SCENES: SceneId[] = ['terrain', 'city', 'rift', 'tunnel', 'void', 'wreckage', 'matrix'];
+export const SCENES: SceneId[] = ['terrain', 'city', 'rift', 'tunnel', 'void', 'wreckage', 'matrix', 'metro'];
 
 // Display labels — used by settings dropdown and control bar.
 // (Internal id stays short for storage / commands; label is presentation.)
@@ -236,6 +236,7 @@ export const SCENE_LABELS: Record<SceneId, string> = {
   void:    'VOID',
   wreckage: 'WRECKAGE',
   matrix:  'MATRIX',
+  metro:   'METRO',
 };
 
 export const SPEED_VALUES = { slow: 0.32, norm: 1, fast: 2.8 } as const;

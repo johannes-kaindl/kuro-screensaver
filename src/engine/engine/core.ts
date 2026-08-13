@@ -17,6 +17,7 @@ import { TunnelScene }  from './scenes/tunnel';
 import { VoidScene }    from './scenes/void';
 import { WreckageScene } from './scenes/wreckage';
 import { MatrixScene }  from './scenes/matrix';
+import { MetroScene }   from './scenes/metro';
 import { MatrixRain }   from '../fx/matrix-rain';
 import { MATRIX_SHADER } from '../fx/matrix-pass';
 import { EventBus } from '../events/bus';
@@ -34,6 +35,7 @@ const SCENE_REGISTRY = {
   void:    VoidScene,
   wreckage: WreckageScene,
   matrix:  MatrixScene,
+  metro:   MetroScene,
 };
 
 // Chromatic aberration shader

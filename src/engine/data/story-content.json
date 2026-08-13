@@ -1006,7 +1006,8 @@
       "tunnel": ">> TUNNEL LOCK CONFIRMED // INFIL VECTOR PRIMED",
       "void": ">> VOID DRIFT ACTIVE // DEEP SPACE ANCHOR",
       "wreckage": ">> WRECKAGE FIELD // CORP STATION DEBRIS — SALVAGE SWEEP",
-      "matrix": ">> MATRIX RAIN ENGAGED // DIGITAL DOWNPOUR"
+      "matrix": ">> MATRIX RAIN ENGAGED // DIGITAL DOWNPOUR",
+      "metro": ">> METRO DISTRICT ONLINE // OSM VECTOR RECON // MAP DATA (C) OPENSTREETMAP ODbL"
     }
   },
   "terminalDicts": {
@@ -1098,6 +1099,11 @@
       "RAIN",
       "CASCADE",
       "DELUGE"
+    ],
+    "metro": [
+      "DISTRICT",
+      "OSM RECON",
+      "HIGH PASS"
     ]
   },
   "flashPhrases": [

@@ -295,3 +295,11 @@ design history is under [`docs/specs/`](docs/specs/).
 [GNU AGPL-3.0](LICENSE) — copyleft with the network-use clause. If you host this
 engine (or a fork) so others can use it over a network, the source of your
 variant must also be available under the AGPL.
+
+### Third-party data
+
+The **METRO** scene is seeded by a small real-world building district baked from
+**OpenStreetMap** at build time (`scripts/bake-osm-district.mjs` →
+`src/engine/data/osm-district.json`). Map data © OpenStreetMap contributors,
+licensed under the [Open Database License (ODbL) 1.0](https://www.openstreetmap.org/copyright).
+Only vector building footprints are used — no imagery.

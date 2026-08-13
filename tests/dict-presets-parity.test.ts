@@ -30,7 +30,9 @@ describe('dict/presets SSOT migration parity', () => {
     expect(fnv1a(JSON.stringify(PRESETS))).toBe(7533571888607463794n);
   });
 
+  // Hash re-pinned when the `metro` scene was added (its modeLabels.metro +
+  // boot.headers.metro entries are legitimate new DICT content, not a refactor).
   it('DICT pools survive the move into story-content.json unchanged', () => {
-    expect(fnv1a(JSON.stringify(DICT))).toBe(6710964812096176044n);
+    expect(fnv1a(JSON.stringify(DICT))).toBe(10412751988517699812n);
   });
 });
