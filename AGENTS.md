@@ -83,7 +83,9 @@ instance — no shim needed there.
 - **Host boundary:** the engine must not `import` from `obsidian`. The
   Plugin shape it depends on (`HostPlugin` in `controller.ts`) is
   declared locally. CI-check (manual until automated):
-  `! grep -r "from 'obsidian'" src/engine/`. DOM helpers Obsidian adds to
+  `! grep -rn "^import .*from 'obsidian'" src/engine/` — note the anchor: a
+  bare `grep -r "from 'obsidian'"` always matches, because `controller.ts:7`
+  says in a comment that the file stays free of it. DOM helpers Obsidian adds to
   `HTMLElement` (`createEl`/`createDiv`/`createSpan`/`empty`) are
   polyfilled in the Web-Host (`src/host-web/obsidian-dom-polyfill.ts`).
 - **`src/engine/` diverges from `kuro-theme-settings/src/screensaver/`**
@@ -100,6 +102,13 @@ instance — no shim needed there.
   - `terminal/{narrative,persona,typing,script-bank}.ts` — bottom-strip narrative
   - `hud/{index,boot}.ts` — DOM overlay
   - `data/{defaults,dictionary,presets}.ts` — static config
+  - `data/osm-district.json` — **baked at build time, never fetched.** The
+    `metro` scene renders real OpenStreetMap building footprints, but the
+    screensaver must run fully offline and the Windows `.scr` bundle has a
+    <5 MB budget. `scripts/bake-osm-district.mjs` (dev-only, run by hand) does
+    the Overpass query + projection + simplification and writes this file
+    (~8 KB). Do not add a runtime fetch. Map data © OpenStreetMap
+    contributors, ODbL 1.0 — attribution lives in the README.
   - `controller.ts` — overlay lifecycle, hotkeys, fullscreen; declares
     local `HostPlugin` interface
   - `menubar.ts` — embed-pane control bar (unused in standalone, kept for
