@@ -22,7 +22,7 @@
 </p>
 
 <p align="center">
-  <img alt="Kuro Screensaver — banking flight over procedural CRT terrain" src="docs/images/hero.jpg" width="100%">
+  <img alt="Kuro Screensaver — banking flight over procedural CRT terrain" src="docs/images/hero.jpg" width="820">
 </p>
 
 Started life as a browser engine (extracted from the `kuro-companion` Obsidian
@@ -55,32 +55,32 @@ Six seeded procedural scenes, each recolorable by any of 13 phosphor presets:
 
 <table>
   <tr>
-    <td width="50%"><img alt="Terrain" src="docs/images/scene-terrain.jpg"><br><sub><b>TERRAIN</b> — seam-free infinite wireframe landscape, banking flythrough</sub></td>
-    <td width="50%"><img alt="City" src="docs/images/scene-city.jpg"><br><sub><b>CITY</b> — banking down a neon-wireframe corridor</sub></td>
+    <td width="50%"><img alt="Terrain" src="docs/images/scene-terrain.jpg" width="380"><br><sub><b>TERRAIN</b> — seam-free infinite wireframe landscape, banking flythrough</sub></td>
+    <td width="50%"><img alt="City" src="docs/images/scene-city.jpg" width="380"><br><sub><b>CITY</b> — banking down a neon-wireframe corridor</sub></td>
   </tr>
   <tr>
-    <td><img alt="The Rift" src="docs/images/scene-rift.jpg"><br><sub><b>THE RIFT</b> — barrel-roll dynamics through a fracture</sub></td>
-    <td><img alt="Tunnel" src="docs/images/scene-tunnel.jpg"><br><sub><b>TUNNEL</b> — banking flight down a Catmull-Rom spine</sub></td>
+    <td><img alt="The Rift" src="docs/images/scene-rift.jpg" width="380"><br><sub><b>THE RIFT</b> — barrel-roll dynamics through a fracture</sub></td>
+    <td><img alt="Tunnel" src="docs/images/scene-tunnel.jpg" width="380"><br><sub><b>TUNNEL</b> — banking flight down a Catmull-Rom spine</sub></td>
   </tr>
   <tr>
-    <td><img alt="Void" src="docs/images/scene-void.jpg"><br><sub><b>VOID</b> — flythrough an asteroid belt (depth fade-in)</sub></td>
-    <td><img alt="Matrix" src="docs/images/scene-matrix.jpg"><br><sub><b>MATRIX</b> — multi-layer 3D-depth digital rain</sub></td>
+    <td><img alt="Void" src="docs/images/scene-void.jpg" width="380"><br><sub><b>VOID</b> — flythrough an asteroid belt (depth fade-in)</sub></td>
+    <td><img alt="Matrix" src="docs/images/scene-matrix.jpg" width="380"><br><sub><b>MATRIX</b> — multi-layer 3D-depth digital rain</sub></td>
   </tr>
 </table>
 
 <p align="center">
-  <img alt="Live dynamic banking flight" src="docs/images/motion.gif" width="70%"><br>
+  <img alt="Live dynamic banking flight" src="docs/images/motion.gif" width="320"><br>
   <sub>Live engine — dynamic banking flight over the terrain (Toxic Haze)</sub>
 </p>
 
 <p align="center">
-  <img alt="The narrative terminal in its Apple-Lisa center-window layout" src="docs/images/terminal-window.jpg" width="80%"><br>
+  <img alt="The narrative terminal in its Apple-Lisa center-window layout" src="docs/images/terminal-window.jpg" width="820"><br>
   <sub>The narrative terminal in its <b>Apple-Lisa center-window</b> layout (also available as a bottom strip or full-width band)</sub>
 </p>
 
 ### 13 phosphor presets
 
-<p align="center"><img alt="All 13 color presets" src="docs/images/presets.jpg" width="100%"></p>
+<p align="center"><img alt="All 13 color presets" src="docs/images/presets.jpg" width="820"></p>
 
 <sub>Kuro · Neural Bleed · Rust Signal · Toxic Haze · Biolink · Ghost Protocol ·
 Voidwitch · Circuit · Crimson · Phosphor · Ember · Spectre · Pearl</sub>
@@ -98,7 +98,7 @@ trait × HQ tier × which exchanges fire). When the shift ends the system
 **crashes** — a choreographed CRT collapse to a power-off line, black, then an
 unstable reboot into a fresh shift with a new persona.
 
-<p align="center"><img alt="The diegetic CRT crash sequence" src="docs/images/crash-sequence.jpg" width="100%"></p>
+<p align="center"><img alt="The diegetic CRT crash sequence" src="docs/images/crash-sequence.jpg" width="820"></p>
 
 <sub>Signal failure → glitch storm → power-off collapse → dead screen → reboot →
 new shift. In the pre-rendered video screensaver this black moment is also the
