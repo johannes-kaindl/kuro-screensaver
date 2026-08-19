@@ -202,5 +202,47 @@ do {
     check(renderState(i) == .hidden, "policy display sleep → hidden")
 }
 
+// --- desktop coverage (replaces the unusable NSWindow.occlusionState) -------
+do {
+    let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+
+    check(isDesktopCovered(by: [], screen: screen) == false,
+          "coverage: empty window list → not covered")
+
+    // REGRESSION 2026-08-19: the desktop's own layers sit BELOW level 0. If they
+    // counted, the wallpaper would consider itself covered by the icons it draws
+    // behind — which is exactly the black-desktop bug this replaces.
+    let desktopLevel = -2147483623, wallpaperLevel = desktopLevel + 1, iconLevel = -2147483603
+    let ownLayers = [CoveringWindow(level: wallpaperLevel, bounds: screen),
+                     CoveringWindow(level: iconLevel, bounds: screen)]
+    check(isDesktopCovered(by: ownLayers, screen: screen) == false,
+          "coverage: wallpaper + icon layers never cover the desktop")
+
+    check(isDesktopCovered(by: [CoveringWindow(level: 0, bounds: screen)], screen: screen),
+          "coverage: fullscreen normal window covers")
+
+    check(isDesktopCovered(by: [CoveringWindow(level: 0, bounds: screen, alpha: 0.5)],
+                           screen: screen) == false,
+          "coverage: translucent window does not cover")
+
+    check(isDesktopCovered(by: [CoveringWindow(level: 0, bounds: screen, onscreen: false)],
+                           screen: screen) == false,
+          "coverage: offscreen window does not cover")
+
+    let half = CGRect(x: 0, y: 0, width: 1512, height: 400)
+    check(isDesktopCovered(by: [CoveringWindow(level: 0, bounds: half)], screen: screen) == false,
+          "coverage: partial overlap does not cover (conservative — keep animating)")
+
+    let bigger = CGRect(x: -10, y: -10, width: 2000, height: 1200)
+    check(isDesktopCovered(by: [CoveringWindow(level: 0, bounds: bigger)], screen: screen),
+          "coverage: oversized window covers")
+
+    // Two screens, one covered: the signature must distinguish them per screen.
+    let second = CGRect(x: 1512, y: 0, width: 1920, height: 1080)
+    let sig = coverageSignature(of: [CoveringWindow(level: 0, bounds: screen)],
+                                screens: [screen, second])
+    check(sig == [true, false], "coverage: per-screen signature (got \(sig))")
+}
+
 if failures > 0 { print("\n\(failures) FAILURE(S)"); exit(1) }
 print("\nALL PASS (\(failures == 0))")

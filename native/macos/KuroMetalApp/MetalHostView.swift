@@ -119,8 +119,35 @@ final class MetalHostView: NSView {
         link = nil
     }
 
+    /// Render exactly ONE frame, even while paused. Called once right after the
+    /// view is installed, so a wallpaper that the power policy freezes still shows
+    /// an image. Without it a frozen-before-first-frame window stays opaque black
+    /// and swallows the user's desktop picture — "frozen" is meant to hold the last
+    /// frame, and that only works if a last frame exists.
+    func renderPrimingFrame() {
+        // Fast-forward past the CRT power-on animation first: at t=0 the scene is a
+        // single horizontal scan line, which is a poor thing to freeze on. Step in
+        // tick-sized slices so the simulation stays in its normal dt range.
+        // No waitFrameSlot() needed around these: this runs before the very first
+        // draw, so no frame can be in flight yet. `lastTime` stays 0 — renderFrame()
+        // seeds it itself, and setting it here would make the frame-rate limiter
+        // discard this very frame.
+        if let renderer {
+            for _ in 0..<primingSteps { renderer.advance(dt: primingStep) }
+        }
+        renderFrame()
+    }
+
+    private let primingStep: Double = 0.05      // == tick's dt clamp
+    private let primingSteps = 40               // ≈ 2 s of scene time
+
     @objc private func tick() {
-        guard !paused, let ml = metalLayer, let renderer else { return }
+        guard !paused else { return }
+        renderFrame()
+    }
+
+    private func renderFrame() {
+        guard let ml = metalLayer, let renderer else { return }
         let now = CACurrentMediaTime()
         if lastTime != 0, now - lastTime < minFrameInterval { return }
         // Acquire the frame slot BEFORE advance(): scenes write shared vertex

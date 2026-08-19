@@ -302,9 +302,9 @@ final class ConfigWindowController: NSWindowController {
     }
 
     /// Set the current configuration as the animated desktop background. Persists the
-    /// settings, then boots (+ login-installs) a separate `--wallpaper` process that
-    /// reads them. Clicking again re-applies the latest settings. Remove it via the
-    /// wallpaper's ▦ menu-bar item ("Hintergrund beenden").
+    /// settings, then hosts the wallpaper IN-PROCESS (see setWallpaperFromConfig) and
+    /// installs it for the next login. Clicking again re-applies the latest settings.
+    /// Remove it via the wallpaper's ▦ menu-bar item ("Hintergrund beenden").
     @objc private func setAsWallpaper(_ sender: NSButton) {
         persist()
         (NSApp.delegate as? AppDelegate)?.setWallpaperFromConfig()

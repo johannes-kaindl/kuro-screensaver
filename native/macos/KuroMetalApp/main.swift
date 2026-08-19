@@ -74,8 +74,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func buildWallpaperWindows() {
-        wallpaperWindows.forEach { NotificationCenter.default.removeObserver(self,
-            name: NSWindow.didChangeOcclusionStateNotification, object: $0) }
         wallpaperViews.forEach { $0.stop() }; wallpaperViews.removeAll()
         wallpaperWindows.forEach { $0.orderOut(nil) }; wallpaperWindows.removeAll()
         let (s, cycle) = override ?? AppSettings.make()
@@ -96,9 +94,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             view.setRenderScale(CGFloat(AppSettings.wallpaperRenderScale))
             win.contentView = view
             win.orderFrontRegardless()
-            NotificationCenter.default.addObserver(self, selector: #selector(occlusionChanged),
-                name: NSWindow.didChangeOcclusionStateNotification, object: win)
             view.start()
+            view.renderPrimingFrame()   // one frame BEFORE any policy pause: a frozen
+                                        // wallpaper must show an image, not black
             wallpaperWindows.append(win); wallpaperViews.append(view)
         }
     }
@@ -115,7 +113,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let power else { return }
         for (win, v) in zip(wallpaperWindows, wallpaperViews) {
             var i = RenderPolicyInputs()
-            i.occluded = !win.occlusionState.contains(.visible)
+            // NOT win.occlusionState: AppKit never reports `.visible` for a window at
+            // the desktop level, so this read was permanently true and the wallpaper
+            // paused before its first frame (2026-08-19 black-desktop regression).
+            i.occluded = isDesktopCovered(by: power.windows, screen: win.frame)
             i.screenLocked = power.screenLocked
             i.screensAsleep = power.screensAsleep
             i.onBattery = power.onBattery
@@ -129,8 +130,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
     }
-
-    @objc private func occlusionChanged(_ note: Notification) { applyPowerPolicy() }
 
     /// "Als Hintergrund" from the config window: host the wallpaper IN-PROCESS (so there
     /// is no separate-process flash) and persist it for the next login WITHOUT launching

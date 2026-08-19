@@ -15,13 +15,21 @@ final class PowerPolicy {
     private(set) var thermal = ProcessInfo.processInfo.thermalState
     private(set) var screenLocked = false
     private(set) var screensAsleep = false
+    /// Window-server snapshot for the desktop-coverage check. Replaces
+    /// NSWindow.occlusionState, which never reports `.visible` for a window at the
+    /// desktop level (and whose change notification therefore never fires).
+    private(set) var windows: [CoveringWindow] = []
+    private var coverage: [Bool] = []
 
     private var timer: Timer?
     private var tokens: [(center: NotificationCenter, token: NSObjectProtocol)] = []
 
     func start() {
         onBattery = PowerPolicy.isOnBattery()
-        let t = Timer(timeInterval: 5, repeats: true) { [weak self] _ in self?.pollBattery() }
+        refreshWindows()
+        let t = Timer(timeInterval: 5, repeats: true) { [weak self] _ in
+            self?.pollBattery(); self?.pollCoverage()
+        }
         t.tolerance = 2   // coalesce: exact phase is irrelevant, save wakeups
         RunLoop.main.add(t, forMode: .common); timer = t
 
@@ -53,6 +61,32 @@ final class PowerPolicy {
             apply(); self?.onChange?()
         }
         tokens.append((center, token))
+    }
+
+    /// Re-read the window list and fire onChange only when the per-screen coverage
+    /// verdict actually flipped — the raw list churns constantly and re-applying the
+    /// policy on every twitch would be pure wakeups.
+    private func pollCoverage() {
+        refreshWindows()
+        let screens = NSScreen.screens.map { $0.frame }
+        let now = coverageSignature(of: windows, screens: screens)
+        guard now != coverage else { return }
+        coverage = now
+        onChange?()
+    }
+
+    private func refreshWindows() {
+        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID)
+                as? [[String: Any]] else { windows = []; return }
+        windows = list.compactMap { w in
+            guard let layer = w[kCGWindowLayer as String] as? Int,
+                  let b = w[kCGWindowBounds as String] as? [String: Any],
+                  let rect = CGRect(dictionaryRepresentation: b as CFDictionary)
+            else { return nil }
+            return CoveringWindow(level: layer, bounds: rect,
+                                  alpha: w[kCGWindowAlpha as String] as? Double ?? 1,
+                                  onscreen: w[kCGWindowIsOnscreen as String] as? Bool ?? true)
+        }
     }
 
     private func pollBattery() {
