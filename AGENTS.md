@@ -166,7 +166,11 @@ locally (CI has no Developer ID cert). Cut a release: `bash scripts/bump-version
 X.Y.Z` (single source — writes package.json + the app Info.plist together), commit,
 then `git tag vX.Y.Z && git push origin main vX.Y.Z` (the Forgejo→GitHub push mirror
 forwards the tag to trigger CI). Build + attach the notarized app with
-`scripts/package-native-app.sh`. See `docs/specs/2026-05-28-screensaver-native-port-*.md`.
+`scripts/package-native-app.sh`. **The web page is not part of any of this** —
+`scripts/deploy-page.sh` (rsync, local SSH deploy key, so CI cannot do it) is a
+separate manual step and is therefore the one that gets forgotten: on 2026-08-20 the
+live bundle was still two releases behind and did not know the METRO scene. After a
+release, deploy it and read the live bundle back. See `docs/specs/2026-05-28-screensaver-native-port-*.md`.
 
 ## Related repos
 
