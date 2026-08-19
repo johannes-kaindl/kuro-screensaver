@@ -7,6 +7,10 @@
 #   bash scripts/bump-version.sh 0.4.2
 #
 # - package.json  → "version": "<ver>"
+# - package-lock  → the two top-level "version" fields (npm keeps them in step
+#                   with package.json; without this the lock ships the previous
+#                   release's number and has to be nachgezogen by hand — it was,
+#                   as its own commit, for v0.11.0)
 # - Info.plist    → CFBundleShortVersionString = <ver>, CFBundleVersion += 1
 # - app.rc        → FILEVERSION/PRODUCTVERSION X, Y, Z, 0 + string values
 # - wallpaper.rc  → same, for the KuroWallpaper.exe target (same binary, own identity)
@@ -20,13 +24,14 @@ VER="${1:-}"
 
 PLIST="$ROOT/native/macos/KuroMetalApp/Info.plist"
 PKG="$ROOT/package.json"
+LOCK="$ROOT/package-lock.json"
 RC="$ROOT/native/windows/host/app.rc"
 WRC="$ROOT/native/windows/host/wallpaper.rc"
 
 # Pre-flight: ALL targets must exist and be writable before we touch anything, so a
 # mid-run failure can never leave one file bumped and the others stale (drifted
 # versions are the exact bug this script exists to prevent).
-for f in "$PKG" "$PLIST" "$RC" "$WRC"; do
+for f in "$PKG" "$LOCK" "$PLIST" "$RC" "$WRC"; do
   [ -f "$f" ] || { echo "✗ missing $f" >&2; exit 1; }
   [ -w "$f" ] || { echo "✗ not writable: $f" >&2; exit 1; }
 done
@@ -35,13 +40,19 @@ done
 # rename), validate them, and only then move all into place. trap cleans temps up
 # on any early exit, leaving the originals untouched.
 PKG_TMP="$(mktemp "$ROOT/.bump.pkg.XXXXXX")"
+LOCK_TMP="$(mktemp "$ROOT/.bump.lock.XXXXXX")"
 PLIST_TMP="$(mktemp "$(dirname "$PLIST")/.bump.plist.XXXXXX")"
 RC_TMP="$(mktemp "$(dirname "$RC")/.bump.rc.XXXXXX")"
 WRC_TMP="$(mktemp "$(dirname "$WRC")/.bump.wrc.XXXXXX")"
-trap 'rm -f "$PKG_TMP" "$PLIST_TMP" "$RC_TMP" "$WRC_TMP"' EXIT
+trap 'rm -f "$PKG_TMP" "$LOCK_TMP" "$PLIST_TMP" "$RC_TMP" "$WRC_TMP"' EXIT
 
 # package.json → version (preserve key order + 2-space indent + trailing newline)
 node -e "const fs=require('fs'),p=JSON.parse(fs.readFileSync('$PKG'));p.version='$VER';fs.writeFileSync('$PKG_TMP',JSON.stringify(p,null,2)+'\n')"
+
+# package-lock.json → the root package's two version fields ("" is the root entry
+# in the v3 lockfile). Everything else in the lock is dependency state and must not
+# be touched here — npm owns that.
+node -e "const fs=require('fs'),l=JSON.parse(fs.readFileSync('$LOCK'));l.version='$VER';if(l.packages&&l.packages['']){l.packages[''].version='$VER'}fs.writeFileSync('$LOCK_TMP',JSON.stringify(l,null,2)+'\n')"
 
 # Info.plist → short version = VER, build number = previous + 1 (read from original)
 cp "$PLIST" "$PLIST_TMP"
@@ -65,11 +76,13 @@ stamp_rc "$WRC" "$WRC_TMP"
 
 # Validate the staged temps BEFORE committing any.
 GOT_PKG=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('$PKG_TMP','utf8')).version)")
+GOT_LOCK=$(node -e "const l=JSON.parse(require('fs').readFileSync('$LOCK_TMP','utf8'));process.stdout.write([l.version,l.packages&&l.packages['']?l.packages[''].version:''].join(','))")
 GOT_SHORT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST_TMP")
 GOT_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PLIST_TMP")
 GOT_RC=$(grep -c -E "^ (FILE|PRODUCT)VERSION ${VMAJ}, ${VMIN}, ${VPAT}, 0$" "$RC_TMP" || true)
 GOT_WRC=$(grep -c -E "^ (FILE|PRODUCT)VERSION ${VMAJ}, ${VMIN}, ${VPAT}, 0$" "$WRC_TMP" || true)
 [ "$GOT_PKG" = "$VER" ]            || { echo "✗ staged package.json version mismatch ($GOT_PKG ≠ $VER)" >&2; exit 1; }
+[ "$GOT_LOCK" = "$VER,$VER" ]      || { echo "✗ staged package-lock version mismatch ($GOT_LOCK ≠ $VER,$VER)" >&2; exit 1; }
 [ "$GOT_SHORT" = "$VER" ]          || { echo "✗ staged Info.plist short version mismatch ($GOT_SHORT ≠ $VER)" >&2; exit 1; }
 [ "$GOT_BUILD" = "$((CUR + 1))" ]  || { echo "✗ staged Info.plist build mismatch ($GOT_BUILD ≠ $((CUR + 1)))" >&2; exit 1; }
 [ "$GOT_RC" = "2" ]                || { echo "✗ staged app.rc VERSIONINFO mismatch (expected 2 bumped lines, got $GOT_RC)" >&2; exit 1; }
@@ -82,20 +95,22 @@ grep -q "VALUE \"FileVersion\", \"${VER}.0\"" "$WRC_TMP" || { echo "✗ staged w
 # fail loudly if they disagree — a loud drift error beats the silent stale-plist-as-1.0
 # bug this script exists to prevent.
 mv "$PKG_TMP" "$PKG"
+mv "$LOCK_TMP" "$LOCK"
 mv "$PLIST_TMP" "$PLIST"
 mv "$RC_TMP" "$RC"
 mv "$WRC_TMP" "$WRC"
 trap - EXIT
 
 FIN_PKG=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('$PKG','utf8')).version)")
+FIN_LOCK=$(node -e "const l=JSON.parse(require('fs').readFileSync('$LOCK','utf8'));process.stdout.write(l.version)")
 FIN_SHORT=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PLIST")
 FIN_RC=$(grep -c -E "^ (FILE|PRODUCT)VERSION ${VMAJ}, ${VMIN}, ${VPAT}, 0$" "$RC" || true)
 FIN_WRC=$(grep -c -E "^ (FILE|PRODUCT)VERSION ${VMAJ}, ${VMIN}, ${VPAT}, 0$" "$WRC" || true)
-if [ "$FIN_PKG" != "$VER" ] || [ "$FIN_SHORT" != "$VER" ] || [ "$FIN_RC" != "2" ] || [ "$FIN_WRC" != "2" ]; then
-  echo "✗ version drift after write: package.json=$FIN_PKG, Info.plist=$FIN_SHORT, app.rc=$FIN_RC, wallpaper.rc=$FIN_WRC bumped lines (wanted $VER)" >&2
+if [ "$FIN_PKG" != "$VER" ] || [ "$FIN_LOCK" != "$VER" ] || [ "$FIN_SHORT" != "$VER" ] || [ "$FIN_RC" != "2" ] || [ "$FIN_WRC" != "2" ]; then
+  echo "✗ version drift after write: package.json=$FIN_PKG, package-lock.json=$FIN_LOCK, Info.plist=$FIN_SHORT, app.rc=$FIN_RC, wallpaper.rc=$FIN_WRC bumped lines (wanted $VER)" >&2
   echo "  re-run to repair: bash scripts/bump-version.sh $VER" >&2
   exit 1
 fi
 
-echo "✓ version → $VER   (package.json + Info.plist + app.rc + wallpaper.rc; CFBundleVersion $CUR → $((CUR + 1)))"
+echo "✓ version → $VER   (package.json + package-lock.json + Info.plist + app.rc + wallpaper.rc; CFBundleVersion $CUR → $((CUR + 1)))"
 echo "  next: git commit -am 'chore(release): v$VER' && git tag v$VER && git push origin main v$VER"

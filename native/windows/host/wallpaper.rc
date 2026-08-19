@@ -20,8 +20,8 @@
 IDI_APPICON ICON "assets/kuro.ico"
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0, 11, 0, 0
- PRODUCTVERSION 0, 11, 0, 0
+ FILEVERSION 0, 11, 1, 0
+ PRODUCTVERSION 0, 11, 1, 0
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0x0L
  FILEOS VOS_NT_WINDOWS32
@@ -34,12 +34,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Kuro"
             VALUE "FileDescription", "Kuro Wallpaper"
-            VALUE "FileVersion", "0.11.0.0"
+            VALUE "FileVersion", "0.11.1.0"
             VALUE "InternalName", "KuroWallpaper"
             VALUE "LegalCopyright", "Johannes Kaindl"
             VALUE "OriginalFilename", "KuroWallpaper.exe"
             VALUE "ProductName", "Kuro Wallpaper"
-            VALUE "ProductVersion", "0.11.0"
+            VALUE "ProductVersion", "0.11.1"
         END
     END
     BLOCK "VarFileInfo"

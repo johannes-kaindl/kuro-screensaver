@@ -18,8 +18,8 @@ IDR_PREVIEW_IMAGE RCDATA "assets/preview.jpg"
 IDI_APPICON ICON "assets/kuro.ico"
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 0, 11, 0, 0
- PRODUCTVERSION 0, 11, 0, 0
+ FILEVERSION 0, 11, 1, 0
+ PRODUCTVERSION 0, 11, 1, 0
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0x0L
  FILEOS VOS_NT_WINDOWS32
@@ -32,12 +32,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Kuro"
             VALUE "FileDescription", "Kuro Screensaver"
-            VALUE "FileVersion", "0.11.0.0"
+            VALUE "FileVersion", "0.11.1.0"
             VALUE "InternalName", "KuroScreensaver"
             VALUE "LegalCopyright", "Johannes Kaindl"
             VALUE "OriginalFilename", "KuroScreensaver.scr"
             VALUE "ProductName", "Kuro Screensaver"
-            VALUE "ProductVersion", "0.11.0"
+            VALUE "ProductVersion", "0.11.1"
         END
     END
     BLOCK "VarFileInfo"
