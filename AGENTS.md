@@ -17,7 +17,7 @@ Conventions for AI assistants working in this repo.
 - [ ] CORE-META-10 — `keywords` in `package.json` setzen und Forge-Topics konsistent pflegen.
 - [ ] CORE-AGENT-01 — Abschnitt "## Abweichungen von der Leitkonvention" in dieser Datei ergaenzen.
 - [ ] CORE-AGENT-06 — `.editorconfig` (UTF-8, LF, trim-trailing, final-newline; 2-space default, 4-space TOML, Markdown ohne trim) anlegen.
-- [ ] PROF-TS-01 — npm-Scripts `test` und `lint` ergaenzen (typecheck/build/dev vorhanden).
+- [ ] PROF-TS-01 — npm-Script `lint` ergaenzen (`test` seit dem Pfad-Guard vorhanden: `check-no-abs-paths` + vitest; typecheck/build/dev ebenfalls).
 
 ## What this is
 
@@ -46,6 +46,12 @@ instance — no shim needed there.
 - **Tests:** native logic tests via `bash scripts/run-native-tests.sh` (LCG parity,
   terrain/camera/palette sanity — run in CI). Web: typecheck + visual verification
   (`npm run dev`, or `node scripts/verify-crt.mjs` for headless CRT screenshots).
+- **README images:** `node scripts/render-motion-gif.mjs` re-records `docs/images/motion.gif`
+  from the live engine (needs the dev server + ffmpeg). Its capture params are pinned on
+  purpose — the reactive world drifts with the narrative threat level, and at full bloom
+  the phosphor blows out into a flat sheet with no wireframe left. Sizes are checked by
+  the workspace README linter (`_docs/readme`, maintainer-local): embeds need a **pixel**
+  width, `width="100%"` does not count.
 - **Typecheck:** `npm run typecheck` (must pass before commits touching `src/`).
 - **Build:** `npm run build` → `dist/`.
 - **Backport to plugin:** `./scripts/sync-to-plugin.sh --apply`, then in
