@@ -11,6 +11,10 @@ SRC="$ROOT/native/macos/KuroNativeSaver"
 OUT="/tmp/kuro-native"
 mkdir -p "$OUT"
 
+# Data resources — see run-native-tests.sh: Bundle.main is the executable's directory
+# for a bare CLI binary, so the Core finds them next to $OUT/harness.
+cp "$ROOT/src/engine/data/story-content.json" "$ROOT/src/engine/data/osm-district.json" "$OUT/"
+
 core_src=("$SRC"/Core/*.swift)
 swiftc -O \
   "${core_src[@]}" \

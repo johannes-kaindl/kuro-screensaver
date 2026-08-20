@@ -244,5 +244,87 @@ do {
     check(sig == [true, false], "coverage: per-screen signature (got \(sig))")
 }
 
+// --- StoryContent: the JSON SSOT decodes from the bundle ---------------------
+// The content twin lives in src/engine/data/story-content.json (shared with web).
+// Native loads it as a bundle resource; run-native-tests.sh puts it next to the binary.
+do {
+    let sc = StoryContent.shared
+    check(sc.schemaVersion == 1, "story content schemaVersion is 1 (got \(sc.schemaVersion))")
+    check(sc.presets.count == 13, "story content carries 13 colour presets (got \(sc.presets.count))")
+
+    // Section manifest — every section the web engine authors must survive the Swift decode.
+    // Counts are the guard against a silently half-decoded schema (a missing key would
+    // otherwise just yield an empty array and a mute terminal).
+    let manifest: [(String, Int, Int)] = [
+        ("beats.routine", sc.beats.routine.count, 14),
+        ("beats.hqInboundRoutine", sc.beats.hqInboundRoutine.count, 5),
+        ("beats.hqReplyRoutine", sc.beats.hqReplyRoutine.count, 5),
+        ("beats.intrusionsQuotes", sc.beats.intrusionsQuotes.count, 12),
+        ("beats.intrusionsFragments", sc.beats.intrusionsFragments.count, 5),
+        ("beats.reactionsFirst", sc.beats.reactionsFirst.count, 5),
+        ("beats.reactionsFirstResp", sc.beats.reactionsFirstResp.count, 5),
+        ("beats.hesitations", sc.beats.hesitations.count, 7),
+        ("beats.reactionsAlarm", sc.beats.reactionsAlarm.count, 6),
+        ("beats.reactionsAlarmResp", sc.beats.reactionsAlarmResp.count, 6),
+        ("beats.hqEscalationDrafts", sc.beats.hqEscalationDrafts.count, 3),
+        ("beats.hqNonResponses", sc.beats.hqNonResponses.count, 5),
+        ("beats.reactionsPanic", sc.beats.reactionsPanic.count, 7),
+        ("beats.reactionsPanicResp", sc.beats.reactionsPanicResp.count, 5),
+        ("beats.panicDrafts", sc.beats.panicDrafts.count, 4),
+        ("beats.systemFinal", sc.beats.systemFinal.count, 5),
+        ("mentor.handshake", sc.mentor.handshake.count, 4),
+        ("mentor.exchanges", sc.mentor.exchanges.count, 21),
+        ("film.foreshadow", sc.film.foreshadow.count, 6),
+        ("film.arrival", sc.film.arrival.count, 6),
+        ("film.combat", sc.film.combat.count, 3),
+        ("boot.lines", sc.boot.lines.count, 15),
+        ("boot.headers", sc.boot.headers.count, 8),
+        ("terminalDicts", sc.terminalDicts.count, 4),
+        ("hudHandles", sc.hudHandles.count, 6),
+        ("modeLabels", sc.modeLabels.count, 8),
+        ("flashPhrases", sc.flashPhrases.count, 10),
+        ("alertPhrases", sc.alertPhrases.count, 5),
+        ("commandSessions", sc.commandSessions.count, 23),
+        ("endings.farewells", sc.endings.farewells.count, 6),
+        ("endings.lastWords", sc.endings.lastWords.count, 6),
+        ("arcs", sc.arcs.count, 5),
+        ("chatter", sc.chatter.count, 13),
+    ]
+    let bad = manifest.filter { $0.1 != $0.2 }
+    check(bad.isEmpty, "story content decodes every section (mismatched: \(bad.map { "\($0.0) \($0.1)≠\($0.2)" }))")
+
+    // A command response is a union in the web schema (script-bank.ts:21):
+    // either a bare string or a categorised {cat,text}. Both must decode.
+    let resp = sc.beats.routine.flatMap { $0.resp }
+    check(resp.contains { $0.cat == nil } && resp.contains { $0.cat != nil },
+          "command responses decode in both shapes (bare string and categorised)")
+    check(resp.allSatisfy { !$0.text.isEmpty }, "no command response decodes to empty text")
+
+    // Untagged fragments are legal and stay eligible under every arc (arc.ts:47).
+    let frags = sc.beats.intrusionsFragments
+    check(frags.contains { $0.tags == nil } && frags.contains { ($0.tags?.count ?? 0) > 0 },
+          "intrusion fragments decode both tagged and untagged")
+}
+
+// --- StoryContent: the optional arc fields survive the decode -----------------
+// These are the fields Slices 2/7/8 consume; a Swift Optional that silently stays nil
+// would look like "arc has no bias" rather than "the decode dropped it".
+do {
+    guard let cold = StoryContent.shared.arcs.first(where: { $0.id == "cold-path" }) else {
+        check(false, "arc cold-path present"); exit(1)
+    }
+    check(cold.phaseRouting?["INTRUSION"] == "PANIC", "arc cold-path routes INTRUSION → PANIC")
+    check(cold.durationScale?["PANIC"] == 0.9, "arc cold-path scales PANIC duration")
+    check(cold.beatTags.include == ["trace", "technical"] && cold.beatTags.exclude == ["calm"],
+          "arc cold-path carries both beat-tag lists")
+    check(cold.scenes?["PANIC"]?.first?.scene == "tunnel", "arc cold-path biases PANIC scenes")
+    check(cold.threatCurve?["PANIC"] == [0.8, 1], "arc cold-path carries a threat curve")
+    check(cold.ending.divertOnThreat?.first.map { $0.atStage == 3 && $0.to == "captured" } == true,
+          "arc cold-path diverts to the captured ending at stage 3")
+    let normal = StoryContent.shared.arcs.first { $0.id == "normal" }
+    check(normal?.phaseRouting == nil && normal?.scenes == nil,
+          "arc normal leaves the optional bias fields absent")
+}
+
 if failures > 0 { print("\n\(failures) FAILURE(S)"); exit(1) }
 print("\nALL PASS (\(failures == 0))")

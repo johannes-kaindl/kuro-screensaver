@@ -29,6 +29,13 @@ swiftc -O \
 
 cp "$APPSRC/Info.plist" "$APP/Contents/Info.plist"
 
+# Data resources. story-content.json is the narrative SSOT shared with the web engine;
+# osm-district.json is the build-time-baked OSM district the metro scene renders. Both
+# are loaded via Bundle.main — never fetched (AGENTS.md § Architecture notes).
+mkdir -p "$APP/Contents/Resources"
+cp "$ROOT/src/engine/data/story-content.json" "$ROOT/src/engine/data/osm-district.json" \
+   "$APP/Contents/Resources/"
+
 # App icon: generate AppIcon.icns from the committed 1024² source. Mandatory for a
 # labelled, distributable app — fail loudly rather than silently shipping iconless.
 ICON_SRC="$APPSRC/icon-1024.png"

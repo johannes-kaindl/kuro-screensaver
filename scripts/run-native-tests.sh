@@ -8,6 +8,10 @@ SRC="$ROOT/native/macos/KuroNativeSaver"
 OUT="/tmp/kuro-native"
 mkdir -p "$OUT"
 
+# Data resources. The Core loads these via Bundle.main; for a bare CLI binary that
+# resolves to the executable's own directory, so they must sit next to $OUT/tests.
+cp "$ROOT/src/engine/data/story-content.json" "$ROOT/src/engine/data/osm-district.json" "$OUT/"
+
 core_src=("$SRC"/Core/*.swift)
 swiftc -O \
   "${core_src[@]}" \
