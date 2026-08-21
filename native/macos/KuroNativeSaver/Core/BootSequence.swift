@@ -14,15 +14,11 @@ struct BootSequence {
     private var elapsed: Double = 0
     private(set) var finished = false
 
-    private static let headers: [String: String] = [
-        "terrain":  ">> TERRAIN SWEEP ENGAGED // RECON ALTITUDE",
-        "city":     ">> CITY RECON ONLINE // LOW ALTITUDE APPROACH",
-        "rift":     ">> RIFT INCURSION ACTIVE // INVERSION VECTOR ARMED",
-        "tunnel":   ">> TUNNEL LOCK CONFIRMED // INFIL VECTOR PRIMED",
-        "void":     ">> VOID DRIFT ACTIVE // DEEP SPACE ANCHOR",
-        "wreckage": ">> WRECKAGE FIELD // CORP STATION DEBRIS — SALVAGE SWEEP",
-        "matrix":   ">> MATRIX RAIN ENGAGED // DIGITAL DOWNPOUR",
-    ]
+    /// Facade over the SSOT (`story-content.json` → `boot.headers`), keyed by scene id.
+    /// Used to be a second hand-kept copy of the same table; the web reads it as
+    /// `DICT.BOOT_HEADERS`. The JSON also carries `metro`, which native cannot select yet —
+    /// harmless, and there the day METRO is ported (see AGENTS.md § The Swift twin).
+    private static var headers: [String: String] { StoryContent.shared.boot.headers }
 
     init(scene: String, speed: Settings.BootSpeed) {
         switch speed {

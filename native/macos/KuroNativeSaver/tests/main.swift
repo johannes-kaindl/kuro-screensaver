@@ -397,6 +397,12 @@ do {
 
     // native lastWords are bare strings; the JSON carries the abandon ratio alongside.
     same(Script.lastWords, (sc.endings.lastWords["normal"] ?? []).map { $0.typed }, "endings.lastWords.normal")
+
+    // BootSequence reads its scene headers from the same SSOT. What the parity test cannot
+    // see is a MISSING key: a scene absent from boot.headers silently falls back to
+    // ">> SYSTEM ONLINE", which looks like a design choice rather than a gap.
+    let headerless = SceneRegistry.ids.filter { sc.boot.headers[$0] == nil }
+    check(headerless.isEmpty, "every native scene has a boot header in the SSOT (missing: \(headerless))")
 }
 
 if failures > 0 { print("\n\(failures) FAILURE(S)"); exit(1) }
