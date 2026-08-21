@@ -244,11 +244,10 @@ enum Script {
     ]
 
     // ── Boot log (shown at power-on) ─────────────────────────────────────────
-    static let boot = [
-        "CRONOS-7 BIOS v5.1.0", "NEURAL UPLINK // GHOST RELAY ESTABLISHED",
-        "PROCEDURAL GEOMETRY ENGINE // SEEDED", "SECTOR-7 PERIMETER NOMINAL",
-        "CODEX MATRIX // 2841 NODES SYNCED", "ANCHOR DOCTRINE LOADED",
-        "CHROME RAVEN PROTOCOL // STANDBY", "OBSIDIAN VAULT INTERFACE",
-        "WILDCARD PROTOCOL ARMED", "MIRROR REWRITE STAGED",
-    ]
+    /// Facade over the shared SSOT (`story-content.json` → `StoryContent.boot.lines`).
+    /// Hand-copied literals used to sit here and had drifted: 10 of the web's 15 lines, and
+    /// without the `" ... "` filler the web draws ahead of its right-aligned `[ OK ]`
+    /// (`hud/boot.ts`). Reading the SSOT makes the parity structural instead of a promise
+    /// — see tests/main.swift § Parity.
+    static var boot: [String] { StoryContent.shared.boot.lines }
 }

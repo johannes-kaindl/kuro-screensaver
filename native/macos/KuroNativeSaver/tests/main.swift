@@ -162,6 +162,9 @@ do {
 // A fixed seed + tiny durationScale drives several phases fast; we FNV-1a-hash the
 // visible line stream. Slice 2 (arc layer) must keep this byte-identical when no arc
 // is selected. Capture step prints; the assertion below pins count+hash.
+// Re-pinned 2026-08-21 when Script.boot became an SSOT facade: the first 7 lines are boot
+// lines, and the shared pool differs from the old hand-copied literals (15 lines, `" ... "`
+// filler). Verified line-by-line that ONLY those 7 changed — the other 5 stayed identical.
 do {
     let term = Terminal(seed: 1337)
     term.durationScale = 0.05
@@ -171,7 +174,7 @@ do {
     let visible = term.visibleLines(max: 60).map { $0.text }
     var h: UInt64 = 1469598103934665603
     for byte in visible.joined(separator: "\n").utf8 { h = (h ^ UInt64(byte)) &* 1099511628211 }
-    check(visible.count == 12 && h == 15657498981793719251,
+    check(visible.count == 12 && h == 3190464026768004751,
           "golden narrative stream stable (got count \(visible.count) hash \(h))")
     check(persona0 == "TEL-4747@SCT-7.4-N11:~ █", "golden persona stable (got \(persona0))")
 }
@@ -324,6 +327,76 @@ do {
     let normal = StoryContent.shared.arcs.first { $0.id == "normal" }
     check(normal?.phaseRouting == nil && normal?.scenes == nil,
           "arc normal leaves the optional bias fields absent")
+}
+
+// --- Parity: the hand-maintained Swift literals vs the shared JSON SSOT -------
+// Written BEFORE Script.swift becomes a facade, so a divergence surfaces as a named
+// section rather than as an opaque golden-hash change. Any mismatch here is a content
+// parity finding (AGENTS.md § the Swift twin), not a test defect.
+do {
+    let sc = StoryContent.shared
+    func same(_ a: [String], _ b: [String], _ name: String) {
+        if a == b { check(true, "parity \(name)"); return }
+        let onlyNative = a.filter { !b.contains($0) }
+        let onlyWeb = b.filter { !a.contains($0) }
+        check(false, "parity \(name) — native-only \(onlyNative.count) \(onlyNative.prefix(2)), web-only \(onlyWeb.count) \(onlyWeb.prefix(2))")
+    }
+    same(Script.hqInboundRoutine, sc.beats.hqInboundRoutine, "beats.hqInboundRoutine")
+    same(Script.hqReplyRoutine, sc.beats.hqReplyRoutine, "beats.hqReplyRoutine")
+    same(Script.reactionsFirst, sc.beats.reactionsFirst, "beats.reactionsFirst")
+    same(Script.reactionsAlarm, sc.beats.reactionsAlarm, "beats.reactionsAlarm")
+    same(Script.reactionsPanic, sc.beats.reactionsPanic, "beats.reactionsPanic")
+    same(Script.boot, sc.boot.lines, "boot.lines")
+    same(Script.ghostlinkHandshake, sc.mentor.handshake, "mentor.handshake")
+    check(Script.mentorName == sc.mentor.name, "parity mentor.name")
+    same(Script.farewells, sc.endings.farewells["normal"] ?? [], "endings.farewells.normal")
+    for scene in sc.film.foreshadow.keys.sorted() {
+        same(Script.sceneForeshadow[scene] ?? [], sc.film.foreshadow[scene]!, "film.foreshadow.\(scene)")
+    }
+    for scene in sc.film.arrival.keys.sorted() {
+        same(Script.sceneArrival[scene] ?? [], sc.film.arrival[scene]!, "film.arrival.\(scene)")
+    }
+    for kind in sc.film.combat.keys.sorted() {
+        same(Script.combatLines[kind] ?? [], sc.film.combat[kind]!, "film.combat.\(kind)")
+    }
+
+    // Structured sections: compare TEXT only. The category taxonomies differ by design
+    // (web Cat3 strings vs the native 10-case Terminal.Cat), so a text match means the
+    // facade is a category mapping and nothing more.
+    same(Script.routineBeats.map { $0.cmd }, sc.beats.routine.map { $0.cmd }, "beats.routine.cmd")
+    same(Script.routineBeats.flatMap { $0.resp.map { $0.0 } },
+         sc.beats.routine.flatMap { $0.resp.map { $0.text } }, "beats.routine.resp.text")
+    same(Script.reactionsFirstResp.map { $0.0 }, sc.beats.reactionsFirstResp.map { $0.text }, "beats.reactionsFirstResp.text")
+    same(Script.reactionsAlarmResp.map { $0.0 }, sc.beats.reactionsAlarmResp.map { $0.text }, "beats.reactionsAlarmResp.text")
+    same(Script.reactionsPanicResp.map { $0.0 }, sc.beats.reactionsPanicResp.map { $0.text }, "beats.reactionsPanicResp.text")
+    same(Script.hqNonResponses.map { $0.0 }, sc.beats.hqNonResponses.map { $0.text }, "beats.hqNonResponses.text")
+    same(Script.systemFinal.map { $0.0 }, sc.beats.systemFinal.map { $0.text }, "beats.systemFinal.text")
+    same(Script.intrusionsQuotes.map { $0.text }, sc.beats.intrusionsQuotes.map { $0.text }, "beats.intrusionsQuotes")
+    same(Script.intrusionsFragments.map { $0.text }, sc.beats.intrusionsFragments.map { $0.text }, "beats.intrusionsFragments")
+    same(Script.hesitations.map { $0.typed }, sc.beats.hesitations.map { $0.typed }, "beats.hesitations.typed")
+    same(Script.hqEscalationDrafts.map { $0.final }, sc.beats.hqEscalationDrafts.map { $0.final }, "beats.hqEscalationDrafts.final")
+    same(Script.panicDrafts.map { $0.final }, sc.beats.panicDrafts.map { $0.final }, "beats.panicDrafts.final")
+    same(Script.mentorExchanges.map { $0.out }, sc.mentor.exchanges.map { $0.out }, "mentor.exchanges.out")
+    // Is the web→native category mapping even a function? Collect every (webCat, nativeCat)
+    // pair across all categorised sections; if one web category maps to two native ones the
+    // facade cannot be mechanical.
+    var pairs: [String: Set<String>] = [:]
+    func collect(_ nat: [(String, Terminal.Cat)], _ web: [StoryContent.Line]) {
+        for (n, w) in zip(nat, web) { pairs[w.cat, default: []].insert("\(n.1)") }
+    }
+    collect(Script.routineBeats.flatMap { $0.resp },
+            sc.beats.routine.flatMap { $0.resp }.map { StoryContent.Line(cat: $0.cat ?? "—", text: $0.text) })
+    collect(Script.reactionsFirstResp, sc.beats.reactionsFirstResp)
+    collect(Script.reactionsAlarmResp, sc.beats.reactionsAlarmResp)
+    collect(Script.reactionsPanicResp, sc.beats.reactionsPanicResp)
+    collect(Script.hqNonResponses, sc.beats.hqNonResponses)
+    collect(Script.systemFinal, sc.beats.systemFinal)
+    let ambiguous = pairs.filter { $0.value.count > 1 }
+    check(ambiguous.isEmpty, "web→native category mapping is a function (ambiguous: \(ambiguous))")
+    print("     mapping: \(pairs.mapValues { $0.first! }.sorted { $0.key < $1.key })")
+
+    // native lastWords are bare strings; the JSON carries the abandon ratio alongside.
+    same(Script.lastWords, (sc.endings.lastWords["normal"] ?? []).map { $0.typed }, "endings.lastWords.normal")
 }
 
 if failures > 0 { print("\n\(failures) FAILURE(S)"); exit(1) }

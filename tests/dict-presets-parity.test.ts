@@ -32,7 +32,11 @@ describe('dict/presets SSOT migration parity', () => {
 
   // Hash re-pinned when the `metro` scene was added (its modeLabels.metro +
   // boot.headers.metro entries are legitimate new DICT content, not a refactor).
+  // Re-pinned again 2026-08-21: two boot lines named the web renderer ("WEBGL RENDERER",
+  // "UNREAL BLOOM") and would have been a lie once the native Metal app started reading
+  // the same pool, so they were neutralised to "GPU RENDERER" / "BLOOM". Authored content
+  // change, not a refactor — the native side pins the same pool in tests/main.swift.
   it('DICT pools survive the move into story-content.json unchanged', () => {
-    expect(fnv1a(JSON.stringify(DICT))).toBe(10412751988517699812n);
+    expect(fnv1a(JSON.stringify(DICT))).toBe(17523085815514849234n);
   });
 });

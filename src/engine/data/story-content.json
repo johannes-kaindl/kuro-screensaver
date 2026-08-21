@@ -985,8 +985,8 @@
     "lines": [
       "CRONOS-7 BIOS v5.1.0 ... ",
       "NEURAL UPLINK // GHOST RELAY ESTABLISHED ... ",
-      "WEBGL RENDERER // ANTIALIAS ... ",
-      "UNREAL BLOOM + AFTERIMAGE PASS ... ",
+      "GPU RENDERER // ANTIALIAS ... ",
+      "BLOOM + AFTERIMAGE PASS ... ",
       "PROCEDURAL GEOMETRY ENGINE // SEEDED ... ",
       "SECTOR-7 PERIMETER NOMINAL ... ",
       "CODEX MATRIX // 2841 NODES SYNCED ... ",
