@@ -8,10 +8,18 @@
 # The paths below are derived from what scripts/run-native-tests.sh actually
 # compiles and copies, not guessed:
 #   swiftc  native/macos/KuroNativeSaver/Core/*.swift + tests/main.swift
+#           + native/macos/KuroMetalApp/AppDefaults.swift
 #   cp      src/engine/data/story-content.json, src/engine/data/osm-district.json
+#           + native/shared/query-contract.txt
 # The two JSONs are in the list because they are the shared SSOT the parity guard
 # reads (AGENTS.md § The Swift twin) — a content edit on the web side is exactly
-# what makes the Swift literals drift, and it touches no Swift file at all.
+# what makes the Swift literals drift, and it touches no Swift file at all. The
+# same reasoning adds the last two entries: since 2026-08-30 the tests also hold
+# the app's defaults against the shared query contract, so an edit to either can
+# break this run while touching nothing under KuroNativeSaver/. AppDefaults.swift
+# is named file-by-file on purpose — the rest of KuroMetalApp/ is app plumbing the
+# logic tests never compile, and widening this to the whole directory would put a
+# macOS runner on every icon and window tweak.
 #
 # Deliberately NOT here: the whole-app compile check (scripts/build-native-app.sh)
 # and the headless render smoke test. Those stay in release.yml — they are the
@@ -28,6 +36,8 @@ on:
     branches: ["**"]
     paths:
       - "native/macos/KuroNativeSaver/**"
+      - "native/macos/KuroMetalApp/AppDefaults.swift"
+      - "native/shared/query-contract.txt"
       - "src/engine/data/story-content.json"
       - "src/engine/data/osm-district.json"
       - "scripts/run-native-tests.sh"
