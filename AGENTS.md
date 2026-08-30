@@ -104,13 +104,20 @@ instance — no shim needed there.
   Am 2026-08-30 gegen 21:25 hoerten die Laeufe auf zu starten — mitten in einer Sitzung, ohne
   Fehlermeldung: drei Pushes danach loesten nichts mehr aus, waehrend die 88 Laeufe davor gruen
   in der Liste stehen. Ursache ist kein Repo-Schalter (Actions sind erlaubt) und keine Stoerung,
-  sondern **sehr wahrscheinlich das Konto-Flag selbst** (siehe unten, § Abweichungen): der
-  Stopp faellt zeitlich mit ihm zusammen. Der zweite Kandidat, ein **Account-Budget von `$0`
-  mit "Stop usage: Yes"** unter *Billing → Budgets and alerts*, ist zwar gesetzt, aber diesen
-  Monat nicht ausgeloest — die Nutzung war voll vom Freikontingent gedeckt ($8,38 brutto,
-  $8,38 Rabatt, $0 berechnet). Er bleibt trotzdem eine scharfe Kante, sobald das Kontingent
-  einmal reisst, denn dann stoppt GitHub **alle** Laeufe des Kontos, auch die eines
-  oeffentlichen Repos, die selbst nichts kosten wuerden.
+  sondern **eine Abschaltung auf Kontoebene — GitHub sagt es selbst.** Ein manueller Start
+  ueber `POST …/actions/workflows/ci.yml/dispatches` antwortet:
+  `HTTP 422 {"message": "Actions has been disabled for this user."}`. Das "for this user" ist
+  der Punkt: es haengt am Konto (das seit demselben Abend geflaggt ist, siehe § Abweichungen),
+  nicht an diesem Repo. Der zweite Kandidat, ein **Account-Budget von `$0` mit "Stop usage:
+  Yes"** unter *Billing → Budgets and alerts*, ist zwar gesetzt, hat diesen Monat aber nicht
+  ausgeloest — die Nutzung war voll vom Freikontingent gedeckt ($8,38 brutto, $8,38 Rabatt,
+  $0 berechnet). Er bleibt eine zweite scharfe Kante fuer spaeter.
+  **Womit man das NICHT misst: der Actions-API.** Sie verschweigt die Laeufe dieses Kontos —
+  `actions/runs` meldet fuer jedes Repo hier `total_count: 0`, waehrend fremde Repos echte
+  Zahlen liefern (`microsoft/vscode` 40000, `torvalds/linux` 7) und `actions/workflows`
+  desselben Repos brav vier aktive Workflows zeigt. Wer mit `gh run list` misst, bekommt also
+  **0 auch dann, wenn alles laeuft**. Gueltiges Instrument ist die Weboberflaeche: dort stehen
+  88 Laeufe, der letzte am 2026-08-30 um 21:22.
   Die Aufschluesselung dieses Monats zeigt, wohin das Kontingent geht:
 
   | Posten | Menge | brutto |
