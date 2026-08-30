@@ -56,3 +56,7 @@ target_compile_definitions(KuroWallpaper PRIVATE KURO_WALLPAPER_APP=1)
 
 add_executable(options_test tests/options_test.cpp)
 target_link_libraries(options_test PRIVATE host_lib)
+# The repo root, so the test can read the shared query contract
+# (native/shared/query-contract.txt) that the Linux and web tests read too.
+target_compile_definitions(options_test PRIVATE
+  KURO_REPO_ROOT_DEFAULT="${CMAKE_CURRENT_SOURCE_DIR}/../../..")

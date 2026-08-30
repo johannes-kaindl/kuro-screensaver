@@ -60,6 +60,18 @@ instance — no shim needed there.
   the phosphor blows out into a flat sheet with no wireframe left. Sizes are checked by
   the workspace README linter (`_docs/readme`, maintainer-local): embeds need a **pixel**
   width, `width="100%"` does not count.
+- **The query contract is one file:** `native/shared/query-contract.txt` holds the query that
+  unchanged default settings must produce. Three tests read it — `native/linux/host/tests`,
+  `native/windows/host/tests` (both check the WRITE direction) and
+  `tests/screensaver-params.test.ts` (the READ direction: that query must yield the default
+  settings). **Changing that line is a contract change** and all three sides plus
+  `src/screensaver/params.ts` have to follow it together. Regenerate it, never retype it:
+  `./<build>/options_test --print-default-query`.
+  The web test documents three deliberate exceptions to "defaults in, defaults out" — two are
+  mechanism (`hudPreset` → `custom`, `fxInheritFromTheme` → false, both so query-set values
+  survive a later preset/theme pass) and **one is an open divergence**: `autoCycle` defaults to
+  off on the web and on in the Windows host, whose own header promises the opposite. The test
+  pins the current state rather than hiding it; the decision is open.
 - **Typecheck:** `npm run typecheck` (must pass before commits touching `src/`).
 - **Build:** `npm run build` → `dist/`.
 - **Backport to plugin:** `./scripts/sync-to-plugin.sh --apply`, then in
@@ -170,10 +182,7 @@ instance — no shim needed there.
   push. The windowing, WebKit and dialog halves need the real machine and are not written.
   **Why the options code is copied from Windows rather than shared:** that host is
   `std::wstring` throughout, and sharing would force a rewrite of the *released*, MSVC-only
-  host that cannot be built locally. The contract is meant to be held by one shared test
-  fixture instead — until that exists, `native/windows/host/tests/options_test.cpp` and
-  `native/linux/host/tests/options_test.cpp` pin the same default query **by hand, twice**.
-  Change one, change the other.
+  host that cannot be built locally. The contract is held by a shared fixture instead.
 
 ### The Swift twin
 

@@ -3,15 +3,16 @@
 // [ueberall] in the port plan for exactly that reason).
 //
 // The Linux host is a deliberate TWIN of native/windows/host, down to the field
-// names, so a divergence shows up in a diff instead of hiding. The strongest
-// guard against that drift is the pinned default query below: it is the same
-// fixture the Windows test pins (tests/options_test.cpp, kDefaultQuery), just
-// narrow instead of wide. Task 9 lifts it into ONE shared fixture; until then
-// the two copies must be kept identical by hand.
+// names, so a divergence shows up in a diff instead of hiding. The strongest guard
+// against that drift is native/shared/query-contract.txt: the one default query
+// that this test, native/windows/host/tests/options_test.cpp and
+// tests/screensaver-params.test.ts all read. Changing that line is a CONTRACT
+// change and all three sides have to follow it together.
 #include "options.h"
 
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <string>
 
 static int g_failures = 0;
@@ -31,16 +32,36 @@ static void CheckEq(const std::string& actual, const std::string& expected, cons
     }
 }
 
-// The pinned v0.10 contract: 33 keys, first 12 are the v0.9 prefix. Byte-for-byte
-// the string the Windows host produces for default options — src/screensaver/params.ts
-// reads it, so order and spelling are contract, not taste.
-static const char* kDefaultQuery =
-    "?scene=random&preset=toxic-haze&speed=norm&audio=off&bloom=on&trails=off"
-    "&scan=on&crt=on&matrix=off&terminal=on&radar=on&crosshair=on"
-    "&look=&altitude=low&fog=auto&weather=light-fog&bank=1&reactive=on"
-    "&autocycle=on&cyclemin=5&termlayout=strip&boot=on&bootspeed=normal"
-    "&daynight=on&crtintensity=0.35&curvature=0.012&aperture=0.22"
-    "&bloomstrength=1.4&trailsamount=0.84&ntsc=0&halation=0.15&scale=1&perfadapt=on";
+// The pinned v0.10 contract: 33 keys, first 12 are the v0.9 prefix. It lives in ONE
+// file — native/shared/query-contract.txt — that this test, the Windows test and the
+// web test all read. Before that file existed the Windows and Linux tests each carried
+// their own hand-typed copy, which is the drift this fixture exists to prevent.
+//
+// The repo root comes from a compile define so a bare ./options_test works; the env
+// var is only an override (ctest sets it). A missing or unreadable fixture is a
+// FAILURE, never a skip — a check that can silently skip itself proves nothing.
+static std::string RepoRoot() {
+    const char* env = std::getenv("KURO_REPO_ROOT");
+    if (env && *env) return env;
+    return KURO_REPO_ROOT_DEFAULT;
+}
+
+static std::string ReadSharedContract() {
+    const std::string path = RepoRoot() + "/native/shared/query-contract.txt";
+    std::ifstream f(path);
+    if (!f) {
+        std::printf("FAIL: Fixture nicht lesbar: %s\n", path.c_str());
+        ++g_failures;
+        return "";
+    }
+    std::string line;
+    while (std::getline(f, line)) {
+        if (!line.empty() && line[0] != '#') return line;
+    }
+    std::printf("FAIL: Fixture enthaelt keine Vertragszeile: %s\n", path.c_str());
+    ++g_failures;
+    return "";
+}
 
 static void TestDefaultsMatchEngine() {
     SaverOptions o;
@@ -52,8 +73,10 @@ static void TestDefaultsMatchEngine() {
 }
 
 static void TestDefaultQueryIsBytewiseTheContract() {
-    CheckEq(BuildQueryString(SaverOptions{}), kDefaultQuery,
-            "Default-Query byte-gleich mit dem gepinnten Windows-Fixture");
+    const std::string expected = ReadSharedContract();
+    if (expected.empty()) return;  // ReadSharedContract hat den Fehlschlag schon gezaehlt
+    CheckEq(BuildQueryString(SaverOptions{}), expected,
+            "Default-Query byte-gleich mit dem gemeinsamen Vertrag");
 }
 
 static void TestQueryStartsWithPinnedPrefix() {
@@ -156,8 +179,10 @@ static void TestInvalidValuesFallBackToDefault() {
 // A missing file must produce plain defaults, not a crash and not a half-read
 // struct — the first start of the host is exactly this case.
 static void TestMissingFileYieldsDefaults() {
+    const std::string expected = ReadSharedContract();
+    if (expected.empty()) return;
     SaverOptions o = LoadOptions("/tmp/kuro-does-not-exist-4711.ini");
-    CheckEq(BuildQueryString(o), kDefaultQuery, "fehlende INI -> reine Defaults");
+    CheckEq(BuildQueryString(o), expected, "fehlende INI -> reine Defaults");
 }
 
 // XDG_CONFIG_HOME beats HOME; both land under kuro-screensaver/settings.ini.
@@ -171,7 +196,13 @@ static void TestDefaultIniPathFollowsXdg() {
             "DefaultIniPath: Fallback auf $HOME/.config");
 }
 
-int main() {
+int main(int argc, char** argv) {
+    // Generator-Modus fuer native/shared/query-contract.txt. Die Fixture wird aus dem
+    // Code erzeugt, nicht abgetippt — abgetippt waere sie eine vierte Kopie.
+    if (argc > 1 && std::string(argv[1]) == "--print-default-query") {
+        std::printf("%s\n", BuildQueryString(SaverOptions{}).c_str());
+        return 0;
+    }
     TestDefaultsMatchEngine();
     TestDefaultQueryIsBytewiseTheContract();
     TestQueryStartsWithPinnedPrefix();

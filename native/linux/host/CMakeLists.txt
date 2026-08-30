@@ -17,4 +17,9 @@ target_include_directories(host_lib PUBLIC src)
 enable_testing()
 add_executable(options_test tests/options_test.cpp)
 target_link_libraries(options_test PRIVATE host_lib)
+# The repo root, so the test can read native/shared/query-contract.txt. A compile
+# define rather than only a ctest ENVIRONMENT entry, so a bare ./options_test works
+# too — otherwise the fixture check would quietly do nothing outside ctest.
+target_compile_definitions(options_test PRIVATE
+  KURO_REPO_ROOT_DEFAULT="${CMAKE_CURRENT_SOURCE_DIR}/../../..")
 add_test(NAME options_test COMMAND options_test)

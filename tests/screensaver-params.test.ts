@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { applyParamOverrides } from '../src/screensaver/params';
 import { DEFAULT_SCREENSAVER, HUD_PRESETS, type ScreensaverSettings } from '../src/engine/data/defaults';
 
@@ -169,5 +170,69 @@ describe('applyParamOverrides — kiosk mode', () => {
   it('defaults stay without the param', () => {
     expect(apply('').kioskMode).toBe(false);
     expect(apply('').hud.controlBar).toBe(true);
+  });
+});
+
+// The one contract line all three hosts read: native/shared/query-contract.txt.
+// The native tests check the WRITE direction (default options must produce exactly
+// this query); this checks the READ direction (this query must produce exactly the
+// default settings). Both together are what makes the line a contract rather than
+// two independent opinions that happen to agree today.
+describe('gemeinsames Query-Fixture (native/shared/query-contract.txt)', () => {
+  function contractLine(): string {
+    const raw = readFileSync('native/shared/query-contract.txt', 'utf8');
+    const line = raw.split('\n').find((l) => l.trim() && !l.startsWith('#'));
+    if (!line) throw new Error('query-contract.txt enthält keine Vertragszeile');
+    return line.trim();
+  }
+
+  it('ist vorhanden und beginnt mit ?', () => {
+    expect(contractLine().startsWith('?')).toBe(true);
+  });
+
+  // Defaults in, defaults out — with three documented exceptions, two of them
+  // mechanism and one a real, open divergence.
+  //
+  // MECHANISM (harmless, deliberate):
+  //  - hudPreset 'tactical' → 'custom'. The contract line always carries the HUD keys,
+  //    so `hudOverridden` fires (params.ts:154-157). That flip is what stops
+  //    controller.open()'s applyHudPreset from clobbering query-set HUD flags, and
+  //    since 'tactical' IS the default hud it changes the marker, never the look.
+  //  - fxInheritFromTheme true → false, for the same reason one level down
+  //    (params.ts:141): explicit FX values must not be overwritten by the theme.
+  //
+  // DIVERGENCE (open, decision needed):
+  //  - autoCycle.on. The web default is false (defaults.ts:204), the Windows host
+  //    defaults to true (options.h:35) — while its own header promises "an unset
+  //    registry reproduces the web defaults". One of the two is wrong; changing
+  //    either is a behaviour change to released software, so this test PINS the
+  //    current state instead of hiding it. See the cockpit TaskNote
+  //    "autoCycle-Default divergiert zwischen Web und nativen Hosts".
+  it('ergibt die Default-Settings — bis auf die drei benannten Abweichungen', () => {
+    const settings = structuredClone(DEFAULT_SCREENSAVER);
+    applyParamOverrides(settings, new URLSearchParams(contractLine().slice(1)));
+
+    // The HUD tree itself must be untouched — only the marker moves.
+    expect(settings.hud).toEqual(DEFAULT_SCREENSAVER.hud);
+    expect(settings.hudPreset).toBe('custom');
+    expect(settings.fxInheritFromTheme).toBe(false);
+    // The open divergence, pinned so it cannot drift further unnoticed.
+    expect(settings.autoCycle.on).toBe(true);
+    expect(DEFAULT_SCREENSAVER.autoCycle.on).toBe(false);
+
+    const strip = (x: ScreensaverSettings) => {
+      const { hudPreset: _a, fxInheritFromTheme: _b, autoCycle: _c, ...rest } = x;
+      return rest;
+    };
+    expect(strip(settings)).toEqual(strip(DEFAULT_SCREENSAVER));
+    // autoCycle apart from the disputed flag must still match.
+    expect(settings.autoCycle.intervalMin).toBe(DEFAULT_SCREENSAVER.autoCycle.intervalMin);
+  });
+
+  // Guards the sentence above: 'tactical' really is the default hud. If someone
+  // ever changes the tactical preset, the test above would keep passing while the
+  // native hosts silently started rendering a different HUD than the web default.
+  it('der tactical-Preset ist identisch mit dem Default-HUD', () => {
+    expect(HUD_PRESETS.tactical).toEqual(DEFAULT_SCREENSAVER.hud);
   });
 });

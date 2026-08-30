@@ -12,6 +12,7 @@
 #include <windows.h>
 
 #include <cstdio>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -33,14 +34,39 @@ static void ExpectTrue(bool v, const char* label) {
 }
 
 // v0.10 fixtures — byte-pinned on both sides (plan "Zentrale Kontrakte").
-// The first 12 keys stay the v0.9/C# prefix, keys 13–33 are additive.
-static const wchar_t* kDefaultQuery =
-    L"?scene=random&preset=toxic-haze&speed=norm&audio=off&bloom=on&trails=off"
-    L"&scan=on&crt=on&matrix=off&terminal=on&radar=on&crosshair=on"
-    L"&look=&altitude=low&fog=auto&weather=light-fog&bank=1&reactive=on"
-    L"&autocycle=on&cyclemin=5&termlayout=strip&boot=on&bootspeed=normal"
-    L"&daynight=on&crtintensity=0.35&curvature=0.012&aperture=0.22"
-    L"&bloomstrength=1.4&trailsamount=0.84&ntsc=0&halation=0.15&scale=1&perfadapt=on";
+// The first 12 keys stay the v0.9/C# prefix, keys 13-33 are additive. The line
+// itself lives in native/shared/query-contract.txt and is read at run time — this
+// test, the Linux host's options_test and tests/screensaver-params.test.ts all use
+// that one file. It used to be a hand-typed literal here and a second hand-typed
+// literal on the Linux side; keeping two copies identical by hand is exactly the
+// drift the shared file removes.
+//
+// The repo root arrives as a compile define so a bare options_test.exe works. A
+// missing or unreadable fixture FAILS — a check that can skip itself proves nothing.
+static std::wstring ReadSharedContract() {
+    const std::string path = std::string(KURO_REPO_ROOT_DEFAULT) +
+                             "/native/shared/query-contract.txt";
+    std::ifstream f(path);
+    if (!f) {
+        ++failures;
+        fprintf(stderr, "FAIL shared fixture unreadable: %s\n", path.c_str());
+        return L"";
+    }
+    std::string line;
+    while (std::getline(f, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) line.pop_back();
+        // The contract is pure ASCII by construction (percent-encoded values), so a
+        // widening copy is the whole conversion.
+        return std::wstring(line.begin(), line.end());
+    }
+    ++failures;
+    fprintf(stderr, "FAIL shared fixture has no contract line: %s\n", path.c_str());
+    return L"";
+}
+
+// Filled in main() before any test uses it.
+static std::wstring kDefaultQuery;
 
 static const wchar_t* kFlipQuery =  // without the leading '?'
     L"scene=void&preset=phosphor&speed=fast&audio=on&bloom=off&trails=on"
@@ -66,6 +92,10 @@ static std::wstring WpPrefixed(const std::wstring& saverQuery) {
 }
 
 int main() {
+    // Load the shared contract first — every fixture comparison below depends on it.
+    kDefaultQuery = ReadSharedContract();
+    ExpectTrue(!kDefaultQuery.empty(), "shared query contract loaded");
+
     // 0. Source encoding. The sources are UTF-8 without BOM, so without /utf-8
     // MSVC decodes them as the system codepage and every non-ASCII literal turns
     // to mojibake — the tray menu shipped "Einstellungenâ€¦" through v0.10.
@@ -491,7 +521,7 @@ int main() {
     // still rejected — every save failed. This is the end-to-end guard against
     // that ever being true again.
     {
-        std::wstring msg = std::wstring(kDefaultQuery + 1) + L"&monitormode=per" +
+        std::wstring msg = kDefaultQuery.substr(1) + L"&monitormode=per" +
                            L"&m0id=DELL_ABC1&m0mode=scene&m0scene=matrix&m0preset=phosphor" +
                            L"&m0wmode=random&m0wscene=&m0wpreset=kuro" +
                            WpPrefixed(std::wstring(L"?") + kFlipQuery) + L"&wpmonitormode=span";
