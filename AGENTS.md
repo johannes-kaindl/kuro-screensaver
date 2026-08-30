@@ -9,15 +9,53 @@ Conventions for AI assistants working in this repo.
 
 ## Offene Konventions-Punkte
 
-- [ ] CORE-META-02 — Badge-Zeile um Release- + CI-Badge ergaenzen, Reihenfolge Lizenz·Release·CI·Plattform·Downloads herstellen.
-- [ ] CORE-META-04 — User-Manual nach Diátaxis (Tutorial/How-to/Reference/Explanation) anlegen und aus README verlinken.
-- [ ] CORE-META-06 — `CHANGELOG.md` (keep-a-changelog), `CONTRIBUTING.md`, `SECURITY.md` ergaenzen.
-- [ ] CORE-META-07 — `LICENSING.md` (Dual-License-Option) + `CLA.md` ergaenzen.
-- [ ] CORE-META-08 — `LICENSE-DOCS` (CC BY-SA 4.0) fuer Doku/Texte hinzufuegen.
-- [ ] CORE-META-10 — `keywords` in `package.json` setzen und Forge-Topics konsistent pflegen.
-- [ ] CORE-AGENT-01 — Abschnitt "## Abweichungen von der Leitkonvention" in dieser Datei ergaenzen.
-- [ ] CORE-AGENT-06 — `.editorconfig` (UTF-8, LF, trim-trailing, final-newline; 2-space default, 4-space TOML, Markdown ohne trim) anlegen.
-- [ ] PROF-TS-01 — npm-Script `lint` ergaenzen (`test` seit dem Pfad-Guard vorhanden: `check-no-abs-paths` + vitest; typecheck/build/dev ebenfalls).
+Stand 2026-08-30 — sieben der neun Punkte sind geschlossen; was bleibt, bleibt
+mit Grund.
+
+- [ ] CORE-META-04 — User-Manual nach Diátaxis (Tutorial/How-to/Reference/Explanation)
+      anlegen und aus README verlinken. Nicht am 30.08. mitgemacht: die README traegt
+      heute Tutorial- und Reference-Stoff gemischt, `docs/WINDOWS-INSTALL.md` ist eine
+      How-to. Eine Diátaxis-Aufteilung ist ein Umbau der Nutzerdoku, kein Anlegen von
+      Dateien — und der Zuschnitt (was bleibt in der README, was zieht um) gehoert
+      entschieden, nicht nebenbei gemacht.
+- [ ] PROF-TS-01 — npm-Script `lint`. Das Projekt hat **keinen** Linter: eslint einzufuehren
+      heisst Werkzeugwahl, Konfiguration und ein Bestand von Befunden, die zuerst jemand
+      ansehen muss. Ein `lint`, das die CI sofort rot faerbt oder mit abgeschalteten Regeln
+      startet, waere schlechter als keins. `test`/`typecheck`/`build`/`dev` sind vorhanden.
+
+Geschlossen am 2026-08-30: CORE-META-02 (Badge-Reihenfolge Lizenz·Release·CI·Plattform),
+CORE-META-06 (`CHANGELOG.md` aus der Tag-Historie, `CONTRIBUTING.md`, `SECURITY.md`),
+CORE-META-07 (`LICENSING.md` + `CLA.md`), CORE-META-08 (`LICENSE-DOCS`),
+CORE-META-10 (`keywords` + `license` im Manifest, Forge-Topics),
+CORE-AGENT-01 (Abschnitt unten), CORE-AGENT-06 (`.editorconfig`).
+
+## Abweichungen von der Leitkonvention
+
+Comply-or-explain: was hier bewusst anders laeuft als in `_docs/CONVENTIONS.md`.
+
+- **Commit-Sprache Deutsch, Repo-Sprache Englisch.** README, `AGENTS.md`, Code-Kommentare
+  und die Meta-Dateien sind englisch — das Repo ist oeffentlich und die Zielgruppe nicht
+  deutschsprachig. Commit-Messages und Session-Artefakte sind deutsch, weil sie an den
+  Maintainer gerichtet sind. Die Leitkonvention regelt das nicht; die Trennlinie ist
+  "wer liest das".
+- **`docs/specs/` und `docs/superpowers/` bleiben im Repo liegen.** CORE-META-14 will
+  SDD-Artefakte im Cockpit; die Regel gilt ausdruecklich vorwaerts und erzwingt keine
+  Rueckmigration. Der Altbestand ist eingefroren — nichts Neues kommt dazu —, und
+  `check-no-abs-paths.mjs` haelt in `npm test` die Pfad-Zusage.
+- **Kein CI-Badge in der Badge-Zeile (CORE-META-02).** Die Regel nennt die Reihenfolge
+  Lizenz·Release·CI·Plattform·Downloads und sagt "nicht zutreffende weglassen" — der
+  CI-Fall ist hier keiner: die Actions laufen auf dem **GitHub-Mirror, und der ist
+  privat** (verifiziert 2026-08-30: anonym HTTP 404, waehrend das Forgejo-Repo 200
+  liefert). Ein Actions-Badge waere in der oeffentlichen README dauerhaft ein kaputtes
+  Bild. Es kommt zurueck, sobald der Mirror oeffentlich wird — das ist eine
+  Sichtbarkeits-Entscheidung des Maintainers, keine technische. Das Release-Badge liest
+  dagegen die oeffentliche Forgejo-Instanz und ist geprueft (zeigt v0.11.1).
+- **Der Linux-Host kopiert den Options-Code des Windows-Hosts, statt ihn zu teilen.**
+  Begruendet unter "Native builds": der Windows-Host ist durchgaengig `std::wstring` und
+  MSVC-only, lokal nicht baubar; Teilen hiesse, *ausgelieferten* Code umzuschreiben, den
+  niemand hier kompilieren kann. Gehalten wird die Kopplung stattdessen ueber das
+  gemeinsame Fixture `native/shared/query-contract.txt` — eine Zusage mit Test statt einer
+  Zusage mit Kommentar.
 
 ## What this is
 
