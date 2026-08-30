@@ -42,17 +42,25 @@ Comply-or-explain: was hier bewusst anders laeuft als in `_docs/CONVENTIONS.md`.
   SDD-Artefakte im Cockpit; die Regel gilt ausdruecklich vorwaerts und erzwingt keine
   Rueckmigration. Der Altbestand ist eingefroren — nichts Neues kommt dazu —, und
   `check-no-abs-paths.mjs` haelt in `npm test` die Pfad-Zusage.
-- **Die Sandbox dieser Entwicklungsumgebung ist kein Zeuge fuer externe Erreichbarkeit.**
-  Am 2026-08-30 lieferten `curl` auf `github.com/johannes-kaindl`, das Repo, die Badge-URL
-  und `api.github.com/users/...` **je HTTP 404** — auch mit Browser-User-Agent. Daraus wurde
-  hier zuerst geschlossen, das Konto sei gesperrt und das CI-Badge unbrauchbar. **Beides war
-  falsch:** im Browser des Maintainers sind Profil, Repo und Badge normal erreichbar, das
-  Badge zeigt `ci · passing`. Der 404 kam aus der Sandbox, nicht von GitHub. Wer hier
-  Erreichbarkeit prueft, prueft die eigene Netzwerkstrecke mit — und ein 404 aus `curl` ist
-  erst dann ein Befund, wenn ein Blick von aussen ihn bestaetigt.
-  Aus demselben Irrtum stammte die Lesart, die Actions seien tot: `api.../actions/runs`
-  meldete `total_count: 0`, im Browser stehen **88 Laeufe**. Was daran echt war, steht als
-  eigener Befund unten.
+- **Kein CI-Badge in der Badge-Zeile (CORE-META-02), weil das GitHub-Konto geflaggt ist.**
+  Die Regel nennt die Reihenfolge Lizenz·Release·CI·Plattform·Downloads und sagt "nicht
+  zutreffende weglassen". Der CI-Fall ist hier keiner: die Actions laufen auf dem
+  GitHub-Mirror, und **GitHub blendet das Konto `johannes-kaindl` fuer nicht angemeldete
+  Besucher vollstaendig aus** — Profil, Repos und Badge-URL liefern anonym HTTP 404,
+  waehrend eingeloggt alles normal aussieht (das Repo traegt "Public", das Badge zeigt
+  `ci · passing`). Ein Actions-Badge waere fuer jeden fremden Leser ein kaputtes Bild.
+  Es kommt zurueck, sobald das Flag aufgehoben ist.
+  **Wie das belegt ist — und warum es zwei Anlaeufe brauchte:** der erste Befund stuetzte
+  sich nur auf 404 aus dieser Entwicklungsumgebung. Das ist zu wenig: ein 404 aus einer
+  Sandbox misst die eigene Netzwerkstrecke mit. Der Schluss wurde deshalb zwischenzeitlich
+  zurueckgenommen — **und war doch richtig**, was erst die **Kontrollprobe** zeigte, die von
+  Anfang an gefehlt hatte: dieselbe Strecke, anonym, gegen fremde oeffentliche Ressourcen
+  (`github.com/torvalds`, `api.github.com/repos/microsoft/vscode`) liefert **HTTP 200**, gegen
+  jede Ressource dieses Kontos **404**. Dazu unabhaengig: ein privates Browserfenster des
+  Maintainers sieht dasselbe 404, und GitHubs eigene Support-Seite antwortet mit
+  *"Ihr Konto wurde markiert"* und verlangt eine SMS-Verifizierung. Die Lehre gilt in beide
+  Richtungen: ein einzelner 404 ist kein Befund — und eine Widerlegung ohne Kontrollprobe ist
+  auch keine.
 - **Der Linux-Host kopiert den Options-Code des Windows-Hosts, statt ihn zu teilen.**
   Begruendet unter "Native builds": der Windows-Host ist durchgaengig `std::wstring` und
   MSVC-only, lokal nicht baubar; Teilen hiesse, *ausgelieferten* Code umzuschreiben, den
@@ -96,10 +104,14 @@ instance — no shim needed there.
   Am 2026-08-30 gegen 21:25 hoerten die Laeufe auf zu starten — mitten in einer Sitzung, ohne
   Fehlermeldung: drei Pushes danach loesten nichts mehr aus, waehrend die 88 Laeufe davor gruen
   in der Liste stehen. Ursache ist kein Repo-Schalter (Actions sind erlaubt) und keine Stoerung,
-  sondern ein **Account-Budget von `$0` mit "Stop usage: Yes"** unter *Billing → Budgets and
-  alerts*: sobald das monatliche Freikontingent aufgebraucht ist, stoppt GitHub **alle** Laeufe
-  des Kontos — auch die eines oeffentlichen Repos, die selbst nichts kosten wuerden.
-  Die Aufschluesselung dieses Monats zeigt, wo es hingeht:
+  sondern **sehr wahrscheinlich das Konto-Flag selbst** (siehe unten, § Abweichungen): der
+  Stopp faellt zeitlich mit ihm zusammen. Der zweite Kandidat, ein **Account-Budget von `$0`
+  mit "Stop usage: Yes"** unter *Billing → Budgets and alerts*, ist zwar gesetzt, aber diesen
+  Monat nicht ausgeloest — die Nutzung war voll vom Freikontingent gedeckt ($8,38 brutto,
+  $8,38 Rabatt, $0 berechnet). Er bleibt trotzdem eine scharfe Kante, sobald das Kontingent
+  einmal reisst, denn dann stoppt GitHub **alle** Laeufe des Kontos, auch die eines
+  oeffentlichen Repos, die selbst nichts kosten wuerden.
+  Die Aufschluesselung dieses Monats zeigt, wohin das Kontingent geht:
 
   | Posten | Menge | brutto |
   |---|---|---|
@@ -110,9 +122,9 @@ instance — no shim needed there.
 
   **Knapp 60 % ist Artefakt-Speicher**, nicht Rechenzeit — was zu diesem Repo passt: jeder
   Release-Lauf legt `.scr`, Installer und Zips ab, und die Aufbewahrung steht auf **90 Tagen**
-  (Repo → Settings → Actions → *Artifact and log retention*). Wer hier CI-Ausfaelle sucht,
-  schaut also zuerst auf den Speicher, nicht auf die Minuten. Praktische Folge fuer die Planung:
-  ein Windows- oder Linux-Release ist am Monatsende nicht selbstverstaendlich baubar.
+  — **seit 2026-08-30 auf 7 Tage gesenkt**, weil Release-Assets ohnehin dauerhaft am Release
+  haengen und die 90 Tage nichts sicherten, was nicht schon woanders liegt. Wer hier
+  CI-Kontingent sucht, schaut also zuerst auf den Speicher, nicht auf die Minuten.
 
 - **Tests:** native logic tests via `bash scripts/run-native-tests.sh` (LCG parity,
   terrain/camera/palette sanity — run in CI). Web: typecheck + visual verification
