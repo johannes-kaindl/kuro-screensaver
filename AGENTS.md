@@ -43,6 +43,13 @@ instance — no shim needed there.
 
 ## Workflow conventions
 
+- **CI on every push:** `ci.yml` runs typecheck + `npm test` + the production build on
+  ubuntu for every push on every branch; `native-macos.yml` runs the Swift logic tests,
+  paths-filtered to what can break them (`native/macos/KuroNativeSaver/**`, the two
+  `src/engine/data/*.json` the test script copies, the script itself). Both are the dev
+  loop — `release.yml` keeps the expensive whole-app compile checks at tag time. Before
+  2026-08-30 nothing but a `v*` tag ran the tests, which is how v0.7.0 and v0.10.1 each
+  shipped a break that had been in the tree for weeks.
 - **Tests:** native logic tests via `bash scripts/run-native-tests.sh` (LCG parity,
   terrain/camera/palette sanity — run in CI). Web: typecheck + visual verification
   (`npm run dev`, or `node scripts/verify-crt.mjs` for headless CRT screenshots).

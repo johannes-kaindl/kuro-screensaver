@@ -1,0 +1,59 @@
+# The dev feedback loop for the web engine — runs on EVERY push.
+#
+# Why this exists: until 2026-08-30 `npm test`, `npm run typecheck` and the native
+# logic tests ran only on a `v*` tag push (release.yml), i.e. exactly when a failure
+# is most expensive. That is a recurring failure class in this repo, not a one-off:
+#   - v0.7.0   — the tag failed on `npm ci` (node-22 CI against a node-24 lockfile);
+#                the break had existed since the lockfile commit.
+#   - v0.10.1  — the .iss was compiled by NO workflow; a dedicated job then found two
+#                long-standing breaks within two runs.
+#   - 2026-08-21 — a red SSOT parity test sat uncommitted in the tree; had it been
+#                pushed, nobody would have seen it until the next release.
+#
+# Scope split (deliberate, cost-driven — macOS runners bill 10x Linux):
+#   - THIS workflow: the web engine, ubuntu, unconditional. Cheap, under a minute.
+#   - native-macos.yml: the Swift logic tests, paths-filtered to what can break them.
+#   - release.yml: still owns the expensive whole-app compile checks at tag time.
+name: ci
+
+# No `pull_request:` trigger — every branch already builds via the push trigger,
+# so adding it would just run each internal PR twice. Worth adding if outside
+# forks ever open PRs here.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["**"]
+
+# A new push supersedes the previous run on the same ref. Keeps the queue (and the
+# bill) down on branches that get pushed in quick succession.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # .nvmrc is the single source for the Node major, rather than a literal
+          # repeated per workflow. A drift between the CI Node and the lockfile is
+          # precisely what broke the v0.7.0 tag.
+          node-version-file: ".nvmrc"
+          cache: "npm"
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests
+        # Includes the absolute-path guard (scripts/check-no-abs-paths.mjs) ahead of
+        # vitest — see AGENTS.md § Memory.
+        run: npm test
+      - name: Production build
+        # The Windows .scr ships this exact bundle, so a broken Vite build would
+        # otherwise surface first at package time on a tag — the failure class above.
+        run: npm run build

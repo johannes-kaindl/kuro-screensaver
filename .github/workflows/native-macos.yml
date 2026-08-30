@@ -1,0 +1,51 @@
+# The Swift twin's logic tests (LCG parity, terrain/camera/palette sanity, and the
+# SSOT content-parity guard) on every push that can break them.
+#
+# Split out of ci.yml because GitHub filters `paths:` per WORKFLOW, not per job —
+# and a macOS runner bills ~10x a Linux one, so this must not run on every push.
+# Same shape as windows-host.yml, which already fronts the MSVC-only host this way.
+#
+# The paths below are derived from what scripts/run-native-tests.sh actually
+# compiles and copies, not guessed:
+#   swiftc  native/macos/KuroNativeSaver/Core/*.swift + tests/main.swift
+#   cp      src/engine/data/story-content.json, src/engine/data/osm-district.json
+# The two JSONs are in the list because they are the shared SSOT the parity guard
+# reads (AGENTS.md § The Swift twin) — a content edit on the web side is exactly
+# what makes the Swift literals drift, and it touches no Swift file at all.
+#
+# Deliberately NOT here: the whole-app compile check (scripts/build-native-app.sh)
+# and the headless render smoke test. Those stay in release.yml — they are the
+# expensive half, and the logic tests are the half that catches drift.
+#
+# No `pull_request:` trigger — every branch already builds via the push trigger, so
+# adding it would just run each internal PR twice. Worth adding if outside forks
+# ever open PRs here.
+name: native-macos
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["**"]
+    paths:
+      - "native/macos/KuroNativeSaver/**"
+      - "src/engine/data/story-content.json"
+      - "src/engine/data/osm-district.json"
+      - "scripts/run-native-tests.sh"
+      - ".github/workflows/native-macos.yml"
+
+concurrency:
+  group: native-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  logic-tests:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run native logic tests
+        # swiftc only — no Node, no Xcode, no npm install needed.
+        run: bash scripts/run-native-tests.sh
