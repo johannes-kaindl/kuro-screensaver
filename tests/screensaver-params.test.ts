@@ -190,25 +190,19 @@ describe('gemeinsames Query-Fixture (native/shared/query-contract.txt)', () => {
     expect(contractLine().startsWith('?')).toBe(true);
   });
 
-  // Defaults in, defaults out — with three documented exceptions, two of them
-  // mechanism and one a real, open divergence.
-  //
-  // MECHANISM (harmless, deliberate):
+  // Defaults in, defaults out — with two documented exceptions, both mechanism:
   //  - hudPreset 'tactical' → 'custom'. The contract line always carries the HUD keys,
   //    so `hudOverridden` fires (params.ts:154-157). That flip is what stops
   //    controller.open()'s applyHudPreset from clobbering query-set HUD flags, and
   //    since 'tactical' IS the default hud it changes the marker, never the look.
-  //  - fxInheritFromTheme true → false, for the same reason one level down
-  //    (params.ts:141): explicit FX values must not be overwritten by the theme.
+  //  - fxInheritFromTheme true → false, same reason one level down (params.ts:141):
+  //    explicit FX values must not be overwritten by the theme.
   //
-  // DIVERGENCE (open, decision needed):
-  //  - autoCycle.on. The web default is false (defaults.ts:204), the Windows host
-  //    defaults to true (options.h:35) — while its own header promises "an unset
-  //    registry reproduces the web defaults". One of the two is wrong; changing
-  //    either is a behaviour change to released software, so this test PINS the
-  //    current state instead of hiding it. See the cockpit TaskNote
-  //    "autoCycle-Default divergiert zwischen Web und nativen Hosts".
-  it('ergibt die Default-Settings — bis auf die drei benannten Abweichungen', () => {
+  // There used to be a third entry here — a real divergence, autoCycle, which defaulted
+  // to off on the web and on in the native hosts. This fixture is what surfaced it, and
+  // it was resolved on 2026-08-30 by pulling the native hosts to the web default. Every
+  // other field, autoCycle included, must now match exactly.
+  it('ergibt die Default-Settings — bis auf die zwei Mechanik-Marker', () => {
     const settings = structuredClone(DEFAULT_SCREENSAVER);
     applyParamOverrides(settings, new URLSearchParams(contractLine().slice(1)));
 
@@ -216,17 +210,14 @@ describe('gemeinsames Query-Fixture (native/shared/query-contract.txt)', () => {
     expect(settings.hud).toEqual(DEFAULT_SCREENSAVER.hud);
     expect(settings.hudPreset).toBe('custom');
     expect(settings.fxInheritFromTheme).toBe(false);
-    // The open divergence, pinned so it cannot drift further unnoticed.
-    expect(settings.autoCycle.on).toBe(true);
-    expect(DEFAULT_SCREENSAVER.autoCycle.on).toBe(false);
+    // The former divergence, now pinned as parity rather than as an exception.
+    expect(settings.autoCycle).toEqual(DEFAULT_SCREENSAVER.autoCycle);
 
     const strip = (x: ScreensaverSettings) => {
-      const { hudPreset: _a, fxInheritFromTheme: _b, autoCycle: _c, ...rest } = x;
+      const { hudPreset: _a, fxInheritFromTheme: _b, ...rest } = x;
       return rest;
     };
     expect(strip(settings)).toEqual(strip(DEFAULT_SCREENSAVER));
-    // autoCycle apart from the disputed flag must still match.
-    expect(settings.autoCycle.intervalMin).toBe(DEFAULT_SCREENSAVER.autoCycle.intervalMin);
   });
 
   // Guards the sentence above: 'tactical' really is the default hud. If someone

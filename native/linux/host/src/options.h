@@ -38,7 +38,7 @@ struct SaverOptions {
     std::string weather = "light-fog";   // light-fog|heavy-fog|storm|dust|clear
     std::string bank = "1";              // num 0..2
     bool reactive = true;
-    bool autocycle = true;
+    bool autocycle = false;              // matches defaults.ts:204 (decision 2026-08-30)
     std::string cyclemin = "5";          // num 0.5..10
     std::string termlayout = "strip";    // strip|window
     bool boot = true;

@@ -72,7 +72,7 @@ static const wchar_t* kFlipQuery =  // without the leading '?'
     L"scene=void&preset=phosphor&speed=fast&audio=on&bloom=off&trails=on"
     L"&scan=off&crt=off&matrix=on&terminal=off&radar=off&crosshair=off"
     L"&look=heavy&altitude=high&fog=dense&weather=storm&bank=2&reactive=off"
-    L"&autocycle=off&cyclemin=0.5&termlayout=window&boot=off&bootspeed=cinematic"
+    L"&autocycle=on&cyclemin=0.5&termlayout=window&boot=off&bootspeed=cinematic"
     L"&daynight=off&crtintensity=0.85&curvature=0.022&aperture=0.45"
     L"&bloomstrength=1.6&trailsamount=0.9&ntsc=0.6&halation=0.4&scale=0.66&perfadapt=off";
 

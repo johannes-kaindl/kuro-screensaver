@@ -141,7 +141,7 @@ static void TestFullRoundTripSurvivesEveryField() {
     o.terminal = false;      o.radar = false;        o.crosshair = false;
     o.look = "heavy";        o.altitude = "high";    o.fog = "dense";
     o.weather = "storm";     o.bank = "2";           o.reactive = false;
-    o.autocycle = false;     o.cyclemin = "0.5";     o.termlayout = "window";
+    o.autocycle = true;      o.cyclemin = "0.5";     o.termlayout = "window";
     o.boot = false;          o.bootspeed = "cinematic"; o.daynight = false;
     o.crtintensity = "0.85"; o.curvature = "0.022";  o.aperture = "0.45";
     o.bloomstrength = "1.6"; o.trailsamount = "0.9"; o.ntsc = "0.6";

@@ -67,11 +67,12 @@ instance — no shim needed there.
   settings). **Changing that line is a contract change** and all three sides plus
   `src/screensaver/params.ts` have to follow it together. Regenerate it, never retype it:
   `./<build>/options_test --print-default-query`.
-  The web test documents three deliberate exceptions to "defaults in, defaults out" — two are
-  mechanism (`hudPreset` → `custom`, `fxInheritFromTheme` → false, both so query-set values
-  survive a later preset/theme pass) and **one is an open divergence**: `autoCycle` defaults to
-  off on the web and on in the Windows host, whose own header promises the opposite. The test
-  pins the current state rather than hiding it; the decision is open.
+  The web test documents two deliberate exceptions to "defaults in, defaults out", both
+  mechanism: `hudPreset` → `custom` and `fxInheritFromTheme` → false, so query-set values
+  survive a later preset/theme pass. There was a third — `autoCycle` defaulted to off on the
+  web and on in every native host, contradicting those hosts' own header promise. The fixture
+  found it on its first run (unnoticed since v0.10) and it was resolved on 2026-08-30 by
+  pulling **all three** native hosts to the web default, macOS included.
 - **Typecheck:** `npm run typecheck` (must pass before commits touching `src/`).
 - **Build:** `npm run build` → `dist/`.
 - **Backport to plugin:** `./scripts/sync-to-plugin.sh --apply`, then in

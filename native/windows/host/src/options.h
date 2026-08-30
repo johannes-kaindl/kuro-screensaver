@@ -32,7 +32,7 @@ struct SaverOptions {
     std::wstring weather = L"light-fog";  // light-fog|heavy-fog|storm|dust|clear
     std::wstring bank = L"1";             // num 0..2
     bool reactive = true;
-    bool autocycle = true;
+    bool autocycle = false;               // matches defaults.ts:204 (decision 2026-08-30)
     std::wstring cyclemin = L"5";         // num 0.5..10
     std::wstring termlayout = L"strip";   // strip|window
     bool boot = true;

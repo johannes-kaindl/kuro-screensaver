@@ -10,4 +10,4 @@
 #
 # Nicht von Hand tippen — erzeugt mit:
 #   cmake --build <build> && ./<build>/options_test --print-default-query
-?scene=random&preset=toxic-haze&speed=norm&audio=off&bloom=on&trails=off&scan=on&crt=on&matrix=off&terminal=on&radar=on&crosshair=on&look=&altitude=low&fog=auto&weather=light-fog&bank=1&reactive=on&autocycle=on&cyclemin=5&termlayout=strip&boot=on&bootspeed=normal&daynight=on&crtintensity=0.35&curvature=0.012&aperture=0.22&bloomstrength=1.4&trailsamount=0.84&ntsc=0&halation=0.15&scale=1&perfadapt=on
+?scene=random&preset=toxic-haze&speed=norm&audio=off&bloom=on&trails=off&scan=on&crt=on&matrix=off&terminal=on&radar=on&crosshair=on&look=&altitude=low&fog=auto&weather=light-fog&bank=1&reactive=on&autocycle=off&cyclemin=5&termlayout=strip&boot=on&bootspeed=normal&daynight=on&crtintensity=0.35&curvature=0.012&aperture=0.22&bloomstrength=1.4&trailsamount=0.84&ntsc=0&halation=0.15&scale=1&perfadapt=on

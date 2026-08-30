@@ -42,7 +42,7 @@ enum AppSettings {
     static var wallpaperRenderScale: Double { get { dbl("WallpaperScale", 0.66) } set { store.set(newValue, forKey: "WallpaperScale") } }
     static var weather: String { get { str("Weather", "clear") } set { setStr("Weather", newValue) } }
     static var sound: Bool { get { bool("Sound", false) } set { store.set(newValue, forKey: "Sound") } }
-    static var autoCycle: Bool { get { bool("AutoCycle", true) } set { store.set(newValue, forKey: "AutoCycle") } }
+    static var autoCycle: Bool { get { bool("AutoCycle", false) } set { store.set(newValue, forKey: "AutoCycle") } }
     static var cycleMinutes: Double { get { dbl("CycleMin", 0.5) } set { store.set(newValue, forKey: "CycleMin") } }
     static var idleMinutes: Double { get { dbl("IdleMin", 5) } set { store.set(newValue, forKey: "IdleMin") } }
 
