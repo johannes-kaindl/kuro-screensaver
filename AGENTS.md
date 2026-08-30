@@ -43,8 +43,9 @@ instance — no shim needed there.
 
 ## Workflow conventions
 
-- **CI on every push:** `ci.yml` runs typecheck + `npm test` + the production build on
-  ubuntu for every push on every branch; `native-macos.yml` runs the Swift logic tests,
+- **CI on every push:** `ci.yml` runs, on ubuntu for every push on every branch, two jobs —
+  `web` (typecheck + `npm test` + the production build) and `linux-host` (CMake build + the
+  Linux host's `options_test`); `native-macos.yml` runs the Swift logic tests,
   paths-filtered to what can break them (`native/macos/KuroNativeSaver/**`, the two
   `src/engine/data/*.json` the test script copies, the script itself). Both are the dev
   loop — `release.yml` keeps the expensive whole-app compile checks at tag time. Before
@@ -156,6 +157,23 @@ instance — no shim needed there.
   (`src/screensaver/params.ts`; dialog: `src/settings/`). Requires the WebView2
   runtime (inbox on Windows 11; the host shows a download link if missing).
   Install steps: `docs/WINDOWS-INSTALL.md`.
+- **Linux** — *in progress, one task of nine done.* A GTK3/WebKitGTK-4.1 host in C++
+  (`native/linux/host/`), a deliberate twin of the Windows host down to the file names: one
+  binary, four modes (`--wallpaper`, `--fullscreen`, `--window-id`, `--config`), shipped as a
+  `.deb`. First target is Linux Mint 22.3 Xfce/X11 — chosen because that is the machine
+  available for acceptance; Wayland is deferred. Settings live in
+  `$XDG_CONFIG_HOME/kuro-screensaver/settings.ini`, whose keys are the **registry names of the
+  Windows host** — one vocabulary, two backends.
+  **What exists today:** only `src/options.{h,cpp}` — the pure half (INI + the pinned query
+  contract). It carries no GTK/X11 and therefore builds and tests anywhere, which is why it
+  was written before the window work; `ci.yml`'s `linux-host` job builds and runs it on every
+  push. The windowing, WebKit and dialog halves need the real machine and are not written.
+  **Why the options code is copied from Windows rather than shared:** that host is
+  `std::wstring` throughout, and sharing would force a rewrite of the *released*, MSVC-only
+  host that cannot be built locally. The contract is meant to be held by one shared test
+  fixture instead — until that exists, `native/windows/host/tests/options_test.cpp` and
+  `native/linux/host/tests/options_test.cpp` pin the same default query **by hand, twice**.
+  Change one, change the other.
 
 ### The Swift twin
 
