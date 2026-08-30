@@ -42,22 +42,17 @@ Comply-or-explain: was hier bewusst anders laeuft als in `_docs/CONVENTIONS.md`.
   SDD-Artefakte im Cockpit; die Regel gilt ausdruecklich vorwaerts und erzwingt keine
   Rueckmigration. Der Altbestand ist eingefroren — nichts Neues kommt dazu —, und
   `check-no-abs-paths.mjs` haelt in `npm test` die Pfad-Zusage.
-- **Kein CI-Badge in der Badge-Zeile (CORE-META-02).** Die Regel nennt die Reihenfolge
-  Lizenz·Release·CI·Plattform·Downloads und sagt "nicht zutreffende weglassen" — der
-  CI-Fall ist hier keiner: die Actions laufen auf dem GitHub-Mirror, und **der ist von
-  aussen nicht erreichbar**. Gemessen am 2026-08-30: anonym liefern Repo-Seite,
-  Badge-URL, `api.github.com/repos/johannes-kaindl/kuro-screensaver` **und das
-  Nutzerprofil selbst** je HTTP 404 — auch mit Browser-User-Agent —, waehrend dieselbe
-  API mit dem Token des Kontos das Repo als `private: false` mit vier aktiven Workflows
-  ausliefert. Nicht die Sichtbarkeit des Repos ist die Ursache, sondern der **Zustand
-  des Kontos**; das ist eine Konto-Angelegenheit des Maintainers, nichts, was dieses
-  Repo loesen kann. Ein Actions-Badge waere in der oeffentlichen README so oder so ein
-  dauerhaft kaputtes Bild. Das Release-Badge liest dagegen die oeffentliche
-  Forgejo-Instanz und ist geprueft (zeigt v0.11.1).
-  **Folge fuer die CI-Kontrolle:** Laufergebnisse sind seit dieser Beobachtung nicht mehr
-  abfragbar (`actions/runs` meldet `total_count: 0`, obwohl um 21:12 desselben Tages noch
-  zwei gruene Laeufe gelistet waren). Wer hier CI-Stand behauptet, muss ihn erst wieder
-  belegen koennen — bis dahin gilt lokal Gemessenes.
+- **Die Sandbox dieser Entwicklungsumgebung ist kein Zeuge fuer externe Erreichbarkeit.**
+  Am 2026-08-30 lieferten `curl` auf `github.com/johannes-kaindl`, das Repo, die Badge-URL
+  und `api.github.com/users/...` **je HTTP 404** — auch mit Browser-User-Agent. Daraus wurde
+  hier zuerst geschlossen, das Konto sei gesperrt und das CI-Badge unbrauchbar. **Beides war
+  falsch:** im Browser des Maintainers sind Profil, Repo und Badge normal erreichbar, das
+  Badge zeigt `ci · passing`. Der 404 kam aus der Sandbox, nicht von GitHub. Wer hier
+  Erreichbarkeit prueft, prueft die eigene Netzwerkstrecke mit — und ein 404 aus `curl` ist
+  erst dann ein Befund, wenn ein Blick von aussen ihn bestaetigt.
+  Aus demselben Irrtum stammte die Lesart, die Actions seien tot: `api.../actions/runs`
+  meldete `total_count: 0`, im Browser stehen **88 Laeufe**. Was daran echt war, steht als
+  eigener Befund unten.
 - **Der Linux-Host kopiert den Options-Code des Windows-Hosts, statt ihn zu teilen.**
   Begruendet unter "Native builds": der Windows-Host ist durchgaengig `std::wstring` und
   MSVC-only, lokal nicht baubar; Teilen hiesse, *ausgelieferten* Code umzuschreiben, den
@@ -97,6 +92,28 @@ instance — no shim needed there.
   loop — `release.yml` keeps the expensive whole-app compile checks at tag time. Before
   2026-08-30 nothing but a `v*` tag ran the tests, which is how v0.7.0 and v0.10.1 each
   shipped a break that had been in the tree for weeks.
+- **Actions koennen kontoweit stoppen, und der Treiber ist der Speicher, nicht die Minuten.**
+  Am 2026-08-30 gegen 21:25 hoerten die Laeufe auf zu starten — mitten in einer Sitzung, ohne
+  Fehlermeldung: drei Pushes danach loesten nichts mehr aus, waehrend die 88 Laeufe davor gruen
+  in der Liste stehen. Ursache ist kein Repo-Schalter (Actions sind erlaubt) und keine Stoerung,
+  sondern ein **Account-Budget von `$0` mit "Stop usage: Yes"** unter *Billing → Budgets and
+  alerts*: sobald das monatliche Freikontingent aufgebraucht ist, stoppt GitHub **alle** Laeufe
+  des Kontos — auch die eines oeffentlichen Repos, die selbst nichts kosten wuerden.
+  Die Aufschluesselung dieses Monats zeigt, wo es hingeht:
+
+  | Posten | Menge | brutto |
+  |---|---|---|
+  | **Actions storage** | 14.603 GB-hr | **$4,91** |
+  | Actions Linux | 331 min | $1,99 |
+  | Actions macOS 3-core | 19 min | $1,18 |
+  | Actions Windows | 31 min | $0,31 |
+
+  **Knapp 60 % ist Artefakt-Speicher**, nicht Rechenzeit — was zu diesem Repo passt: jeder
+  Release-Lauf legt `.scr`, Installer und Zips ab, und die Aufbewahrung steht auf **90 Tagen**
+  (Repo → Settings → Actions → *Artifact and log retention*). Wer hier CI-Ausfaelle sucht,
+  schaut also zuerst auf den Speicher, nicht auf die Minuten. Praktische Folge fuer die Planung:
+  ein Windows- oder Linux-Release ist am Monatsende nicht selbstverstaendlich baubar.
+
 - **Tests:** native logic tests via `bash scripts/run-native-tests.sh` (LCG parity,
   terrain/camera/palette sanity — run in CI). Web: typecheck + visual verification
   (`npm run dev`, or `node scripts/verify-crt.mjs` for headless CRT screenshots).

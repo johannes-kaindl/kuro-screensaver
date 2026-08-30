@@ -7,6 +7,7 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-8a4dff?style=flat-square)](LICENSE)
 [![Release](https://img.shields.io/gitea/v/release/jkaindl/kuro-screensaver?gitea_url=https%3A%2F%2Fgit.jkaindl.de&style=flat-square&label=release&color=39ff7a)](https://git.jkaindl.de/jkaindl/kuro-screensaver/releases/latest)
+[![CI](https://github.com/johannes-kaindl/kuro-screensaver/actions/workflows/ci.yml/badge.svg)](https://github.com/johannes-kaindl/kuro-screensaver/actions/workflows/ci.yml)
 [![macOS — Metal](https://img.shields.io/badge/macOS-Metal-39ff7a?style=flat-square&logo=apple&logoColor=060709)](native/macos)
 [![Windows — .scr](https://img.shields.io/badge/Windows-.scr-0078d4?style=flat-square)](native/windows)
 [![Web — three.js](https://img.shields.io/badge/Web-three.js-16e0e0?style=flat-square)](https://threejs.org)
