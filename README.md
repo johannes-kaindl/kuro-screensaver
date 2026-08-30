@@ -6,10 +6,11 @@
 > in Metal), a **real Windows `.scr`**, and in **any browser**.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-8a4dff?style=flat-square)](LICENSE)
+[![Release](https://img.shields.io/gitea/v/release/jkaindl/kuro-screensaver?gitea_url=https%3A%2F%2Fgit.jkaindl.de&style=flat-square&label=release&color=39ff7a)](https://git.jkaindl.de/jkaindl/kuro-screensaver/releases/latest)
 [![macOS — Metal](https://img.shields.io/badge/macOS-Metal-39ff7a?style=flat-square&logo=apple&logoColor=060709)](native/macos)
-[![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square&logo=swift&logoColor=fff)](native/macos)
-[![Web — three.js](https://img.shields.io/badge/Web-three.js-16e0e0?style=flat-square)](https://threejs.org)
 [![Windows — .scr](https://img.shields.io/badge/Windows-.scr-0078d4?style=flat-square)](native/windows)
+[![Web — three.js](https://img.shields.io/badge/Web-three.js-16e0e0?style=flat-square)](https://threejs.org)
+[![Swift](https://img.shields.io/badge/Swift-6-f05138?style=flat-square&logo=swift&logoColor=fff)](native/macos)
 
 <p align="center">
   <a href="https://git.jkaindl.de/jkaindl/kuro-screensaver/releases/latest">
@@ -297,9 +298,18 @@ design history is under [`docs/specs/`](docs/specs/).
 
 ## License
 
-[GNU AGPL-3.0](LICENSE) — copyleft with the network-use clause. If you host this
-engine (or a fork) so others can use it over a network, the source of your
-variant must also be available under the AGPL.
+- **Code** — [GNU AGPL-3.0](LICENSE): copyleft with the network-use clause. If
+  you host this engine (or a fork) so others can use it over a network, the
+  source of your variant must also be available under the AGPL.
+- **Documentation, diagrams and images** in this repository —
+  [CC BY-SA 4.0](LICENSE-DOCS).
+
+A **commercial license** is available for uses the AGPL does not fit (a
+proprietary product, a closed-source service, an App Store build) — see
+[`LICENSING.md`](LICENSING.md). Contributions are made under the
+[Contributor License Agreement](CLA.md); see [`CONTRIBUTING.md`](CONTRIBUTING.md)
+to get started and [`SECURITY.md`](SECURITY.md) to report a vulnerability.
+Release history: [`CHANGELOG.md`](CHANGELOG.md).
 
 ### Third-party data
 
