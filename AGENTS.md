@@ -112,6 +112,12 @@ instance — no shim needed there.
   Yes"** unter *Billing → Budgets and alerts*, ist zwar gesetzt, hat diesen Monat aber nicht
   ausgeloest — die Nutzung war voll vom Freikontingent gedeckt ($8,38 brutto, $8,38 Rabatt,
   $0 berechnet). Er bleibt eine zweite scharfe Kante fuer spaeter.
+  **Entwarnung fuers Wiederanlaufen:** an diesem Repo ist nichts verstellt —
+  `actions/permissions` meldet `enabled: true, allowed_actions: all` (selbst gemessen, ebenso
+  fuer `perlin-studio`; die `epub-exporter`-Session sieht dasselbe an drei weiteren Repos).
+  Die Sperre sitzt ausschliesslich auf Kontoebene. Nach ihrer Aufhebung muss hier **nichts
+  nachgezogen oder neu eingeschaltet werden**, und fuer ein Support-Ticket ist es der Beleg,
+  dass keine Fehlkonfiguration vorliegt.
   **Womit man das NICHT misst: der Actions-API.** Sie verschweigt die Laeufe dieses Kontos —
   `actions/runs` meldet fuer jedes Repo hier `total_count: 0`, waehrend fremde Repos echte
   Zahlen liefern (`microsoft/vscode` 40000, `torvalds/linux` 7) und `actions/workflows`
