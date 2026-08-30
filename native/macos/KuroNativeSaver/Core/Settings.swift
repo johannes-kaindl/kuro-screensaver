@@ -47,8 +47,22 @@ struct Settings {
     var dayNight = false            // slow brightness/bloom day-night cycle
     var matrix = false              // matrix-rain background
     var reactiveWorld = true        // the 3D world reacts to the narrative shift phase (fog/CRT escalation)
-    enum Weather: String, CaseIterable { case clear, storm, dust }
-    var weather: Weather = .clear
+    enum Weather: String, CaseIterable {
+        case clear, lightFog = "light-fog", heavyFog = "heavy-fog", storm, dust
+        /// Fog factor, mirroring controller.ts:363. The web folds weather into
+        /// baseFogDensity (scene default 0.01): 'clear' sets an absolute 0.004,
+        /// 'heavy-fog' multiplies by 2.5, 'light-fog' leaves the scene default.
+        var fogMul: Float {
+            switch self {
+            case .lightFog: return 1        // the no-op case — what .clear used to be here
+            case .clear:    return 0.4      // web: 0.004 / 0.01
+            case .heavyFog: return 2.5
+            case .storm:    return 1.7
+            case .dust:     return 2.4
+            }
+        }
+    }
+    var weather: Weather = .lightFog
     var bankStrength: Float = 1        // flight banking intensity (0 = level flight, 2 = aggressive)
     var crtIntensity: Float = 0.35     // 0..1, drives the glitch scheduler cadence
     var tunnelAutoBoost: Bool = true   // tunnel: speed surge on straight sections

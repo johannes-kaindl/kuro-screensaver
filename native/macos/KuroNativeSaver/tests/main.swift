@@ -405,5 +405,126 @@ do {
     check(headerless.isEmpty, "every native scene has a boot header in the SSOT (missing: \(headerless))")
 }
 
+// --- weather vocabulary vs the web (controller.ts:363) -----------------------
+// The web folds weather into baseFogDensity (scene default 0.01): 'clear' sets an
+// absolute 0.004 (= x0.4), 'heavy-fog' multiplies by 2.5, 'light-fog' is the no-op
+// scene default. Until 2026-08-30 the native enum had only clear/storm/dust, where
+// .clear WAS the no-op — same picture as the web's light-fog, under the web's name
+// for a different value, with two web values unreachable on macOS.
+do {
+    check(Settings.Weather.allCases.map { $0.rawValue }.sorted()
+          == ["clear", "dust", "heavy-fog", "light-fog", "storm"],
+          "weather vocabulary matches the web")
+    check(Settings.Weather.lightFog.fogMul == 1, "light-fog is the scene default (no-op)")
+    check(Settings.Weather.clear.fogMul == 0.4, "clear thins the fog (web 0.004 / 0.01)")
+    check(Settings.Weather.heavyFog.fogMul == 2.5, "heavy-fog x2.5 (web parity)")
+    check(Settings.Weather.dust.fogMul == 2.4, "dust x2.4 unchanged")
+    check(Settings.Weather.storm.fogMul == 1.7, "storm x1.7 unchanged")
+}
+
+// --- app defaults vs the shared query contract -------------------------------
+// The Metal app hung on NO parity checkpoint until 2026-08-30: the web, Windows
+// and Linux sides all pin native/shared/query-contract.txt, while macOS read its
+// own UserDefaults and could drift freely. That is exactly how autoCycle slipped
+// away from the engine unnoticed since v0.10 — found by hand, not by a test.
+//
+// This section closes that hole: every key of the contract is either CHECKED
+// against AppDefaults or listed as a deliberate exception WITH a reason. A key
+// that is neither fails the run, so a future contract change cannot be adopted
+// by three hosts and silently skipped by the fourth.
+do {
+    guard let url = Bundle.main.url(forResource: "query-contract", withExtension: "txt") else {
+        // A checkpoint that can skip itself proves nothing (the Linux host makes
+        // the same call). Missing fixture = failure, not a skipped test.
+        print("FAIL - query-contract.txt not found next to the executable (\(Bundle.main.bundlePath))")
+        failures += 1
+        exit(1)
+    }
+    let text = try! String(contentsOf: url, encoding: .utf8)
+    guard let line = text.split(separator: "\n").first(where: { $0.hasPrefix("?") }) else {
+        print("FAIL - query-contract.txt holds no query line"); failures += 1; exit(1)
+    }
+    var contract: [String: String] = [:]
+    for pair in line.dropFirst().split(separator: "&", omittingEmptySubsequences: false) {
+        let kv = pair.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+        contract[String(kv[0])] = kv.count > 1 ? String(kv[1]) : ""
+    }
+    check(contract.count >= 30, "contract parsed (\(contract.count) keys)")
+
+    var seen = Set<String>()
+    func want(_ key: String, _ got: String) {
+        seen.insert(key)
+        guard let exp = contract[key] else {
+            check(false, "contract has key '\(key)'"); return
+        }
+        check(got == exp, "default \(key): \(got) == contract \(exp)")
+    }
+    func wantNum(_ key: String, _ got: Double) {
+        seen.insert(key)
+        guard let exp = contract[key], let e = Double(exp) else {
+            check(false, "contract has numeric key '\(key)'"); return
+        }
+        check(got == e, "default \(key): \(got) == contract \(e)")
+    }
+    // Float fields are compared IN Float: the contract carries decimals, the app
+    // carries Float, and 0.35 widened to Double is 0.3499999940395355 — a Double
+    // comparison would measure the widening, not the value.
+    func wantFloat(_ key: String, _ got: Float) {
+        seen.insert(key)
+        guard let exp = contract[key], let e = Float(exp) else {
+            check(false, "contract has numeric key '\(key)'"); return
+        }
+        check(got == e, "default \(key): \(got) == contract \(e)")
+    }
+    func wantBool(_ key: String, _ got: Bool) { want(key, got ? "on" : "off") }
+
+    want("scene", AppDefaults.scene)
+    want("preset", AppDefaults.preset)
+    want("speed", AppDefaults.speed)
+    want("altitude", AppDefaults.cityAltitude)
+    want("fog", AppDefaults.fog)
+    want("weather", AppDefaults.weather)
+    want("termlayout", AppDefaults.terminalLayout)
+    want("bootspeed", AppDefaults.bootSpeed)
+    wantBool("audio", AppDefaults.sound)
+    wantBool("matrix", AppDefaults.matrix)
+    wantBool("radar", AppDefaults.showRadar)
+    wantBool("reactive", AppDefaults.reactiveWorld)
+    wantBool("autocycle", AppDefaults.autoCycle)
+    wantBool("boot", AppDefaults.bootEnabled)
+    wantBool("daynight", AppDefaults.dayNight)
+    wantFloat("bank", AppDefaults.bankStrength)
+    wantNum("cyclemin", AppDefaults.cycleMinutes)
+    wantFloat("crtintensity", AppDefaults.intensity)
+    wantFloat("curvature", AppDefaults.curvature)
+    wantFloat("aperture", AppDefaults.apertureMask)
+    wantFloat("ntsc", AppDefaults.ntsc)
+    wantFloat("halation", AppDefaults.halation)
+
+    // Deliberate exceptions — each one is a key the app genuinely has no 1:1
+    // counterpart for, NOT a value that happens to disagree. Adding to this list
+    // is a decision; letting a key fall through it is not possible (see below).
+    let skipped: [String: String] = [
+        "look":          "display-only on macOS (which one-click Look is selected); the contract carries it empty",
+        "terminal":      "web splits terminal on/off from the layout; macOS encodes both in termlayout",
+        "crosshair":     "no separate app setting — folded into showHud",
+        "bloom":         "web fx toggle; macOS has only the bloomScale multiplier",
+        "bloomstrength": "per-preset strength on macOS (bloomScale multiplies it) — different scale, not comparable",
+        "trails":        "web fx toggle; macOS trails is a single amount where 0 means off",
+        "trailsamount":  "web damp (0.5..0.95) vs macOS persistence amount — different meaning, see the trails finding",
+        "scan":          "no macOS equivalent; scanlines are part of the CRT composite",
+        "crt":           "web CRT-sim toggle; macOS drives it from crtintensity alone",
+        "scale":         "render scale is wallpaper-only on macOS (WallpaperScale, 0.66)",
+        "perfadapt":     "adaptive quality is a web/Windows host feature; the Metal app has its own frame policy",
+    ]
+    for (k, why) in skipped { seen.insert(k); _ = why }
+
+    let unhandled = Set(contract.keys).subtracting(seen)
+    check(unhandled.isEmpty,
+          "every contract key is checked or a named exception (unhandled: \(unhandled.sorted()))")
+    let stale = seen.subtracting(Set(contract.keys))
+    check(stale.isEmpty, "no exception names a key the contract dropped (stale: \(stale.sorted()))")
+}
+
 if failures > 0 { print("\n\(failures) FAILURE(S)"); exit(1) }
 print("\nALL PASS (\(failures == 0))")
