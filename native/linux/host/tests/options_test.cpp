@@ -9,6 +9,7 @@
 // tests/screensaver-params.test.ts all read. Changing that line is a CONTRACT
 // change and all three sides have to follow it together.
 #include "options.h"
+#include "render_policy.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -196,6 +197,50 @@ static void TestDefaultIniPathFollowsXdg() {
             "DefaultIniPath: Fallback auf $HOME/.config");
 }
 
+// --- Render-Policy: die reine Entscheidungstabelle ---------------------------
+// Erwartungen sind an native/windows/host/src/render_policy.cpp und
+// Core/RenderPolicy.swift geeicht, nicht am Plan: BEIDE ausgelieferten Hosts
+// behandeln "verdeckt" als Hidden (null Aufwachvorgaenge), nicht als Frozen.
+// Auf einem Desktop ist verdeckt der Normalfall — jedes maximierte Fenster —,
+// und ein festgehaltener Frame, den niemand sieht, ist genau der Verbrauch,
+// den diese Politik einsparen soll.
+static void TestRenderPolicy() {
+    PolicyInputs in;                       // Standard: sichtbar, Netzstrom
+    Check(DecideRenderPolicy(in).state == RenderState::Animating, "sichtbar -> animiert");
+    Check(DecideRenderPolicy(in).fps == 30, "Netzstrom -> 30 fps");
+
+    PolicyInputs occ; occ.occluded = true;
+    Check(DecideRenderPolicy(occ).state == RenderState::Hidden, "verdeckt -> versteckt");
+    Check(DecideRenderPolicy(occ).fps == 0, "versteckt -> 0 fps");
+
+    PolicyInputs lock; lock.sessionLocked = true;
+    Check(DecideRenderPolicy(lock).state == RenderState::Hidden, "gesperrt -> versteckt");
+    PolicyInputs dpms; dpms.displayOff = true;
+    Check(DecideRenderPolicy(dpms).state == RenderState::Hidden, "Bildschirm aus -> versteckt");
+
+    // Die teuer gelernte Regel (macOS v0.11.0): ohne ersten Frame gibt es kein
+    // Bild zum Festhalten, und "haltet das letzte Bild" wird zur opaken Platte
+    // ueber dem Desktophintergrund. Sie steht VOR der Unsichtbarkeit, weil der
+    // Fehler genau dann auftrat: Wallpaper gesetzt, sofort verdeckt, nie gemalt.
+    PolicyInputs fresh; fresh.hadFirstFrame = false; fresh.occluded = true;
+    Check(DecideRenderPolicy(fresh).state == RenderState::Animating,
+          "vor dem ersten Frame wird NICHT stillgelegt");
+    Check(DecideRenderPolicy(fresh).fps == 30, "vor dem ersten Frame volle Rate");
+
+    PolicyInputs bat; bat.onBattery = true;                 // animateOnBattery = false
+    Check(DecideRenderPolicy(bat).state == RenderState::Frozen, "Akku ohne Erlaubnis -> eingefroren");
+    Check(DecideRenderPolicy(bat).fps == 0, "eingefroren -> 0 fps");
+
+    PolicyInputs bat2; bat2.onBattery = true; bat2.animateOnBattery = true;
+    Check(DecideRenderPolicy(bat2).state == RenderState::Animating, "Akku mit Erlaubnis -> animiert");
+    Check(DecideRenderPolicy(bat2).fps == 10, "Akku -> gedrosselte Rate");
+
+    // Unsichtbarkeit schlaegt die Akku-Erlaubnis: sonst animierte das Wallpaper
+    // im Akkubetrieb hinter einem maximierten Fenster weiter.
+    PolicyInputs both; both.onBattery = true; both.animateOnBattery = true; both.occluded = true;
+    Check(DecideRenderPolicy(both).state == RenderState::Hidden, "verdeckt schlaegt Akku-Erlaubnis");
+}
+
 int main(int argc, char** argv) {
     // Generator-Modus fuer native/shared/query-contract.txt. Die Fixture wird aus dem
     // Code erzeugt, nicht abgetippt — abgetippt waere sie eine vierte Kopie.
@@ -214,6 +259,7 @@ int main(int argc, char** argv) {
     TestInvalidValuesFallBackToDefault();
     TestMissingFileYieldsDefaults();
     TestDefaultIniPathFollowsXdg();
+    TestRenderPolicy();
     std::printf(g_failures ? "\n%d FEHLER\n" : "\nALLE TESTS BESTANDEN\n", g_failures);
     return g_failures ? 1 : 0;
 }
