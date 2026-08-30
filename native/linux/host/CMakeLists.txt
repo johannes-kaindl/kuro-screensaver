@@ -11,7 +11,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # do not replace this file. Keep host_lib as the shared static lib so the test
 # and the eventual binary link the same objects.
 add_library(host_lib STATIC
-  src/options.cpp)
+  src/options.cpp
+  src/render_policy.cpp)
 target_include_directories(host_lib PUBLIC src)
 
 enable_testing()
