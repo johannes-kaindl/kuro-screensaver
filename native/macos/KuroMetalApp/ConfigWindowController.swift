@@ -14,7 +14,8 @@ final class ConfigWindowController: NSWindowController {
     private let speeds = [("Langsam", "slow"), ("Normal", "norm"), ("Schnell", "fast")]
     private let alts = [("Niedrig", "low"), ("Mittel", "mid"), ("Hoch", "high")]
     private let fogs = [("Weit", "clear"), ("Auto", "auto"), ("Kurz", "dense")]   // Sichtweite
-    private let weathers = [("Klar", "clear"), ("Sturm", "storm"), ("Staub", "dust")]
+    private let weathers = [("Leichter Nebel", "light-fog"), ("Klar", "clear"),
+                            ("Dichter Nebel", "heavy-fog"), ("Sturm", "storm"), ("Staub", "dust")]
     private let cycleMins: [Double] = [0.5, 1, 2, 5]
     private let idleMins: [Double] = [1, 2, 5, 10, 15]
     private let termLayouts = [("Aus", "off"), ("Unten", "strip"), ("Leiste (unten)", "stripdark"), ("Fenster (Lisa)", "window")]

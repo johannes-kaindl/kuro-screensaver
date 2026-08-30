@@ -481,12 +481,13 @@ final class Renderer {
             let dn = 0.5 + 0.5 * sin(tf / 240 * 2 * .pi)   // 0 night .. 1 day (4-min cycle)
             expo *= 0.7 + 0.6 * dn; bloomMul *= 0.8 + 0.5 * dn; fogMul *= 1 + 0.5 * (1 - dn)
         }
+        fogMul *= settings.weather.fogMul
         switch settings.weather {
         case .storm:
             let surge = max(0, sin(tf * 3)) * max(0, sin(tf * 0.7))
-            bloomMul *= 1.3 + surge * 1.4; fogMul *= 1.7   // visible storm even at low threat
-        case .dust: fogMul *= 2.4; bloomMul *= 0.8
-        case .clear: break
+            bloomMul *= 1.3 + surge * 1.4                  // visible storm even at low threat
+        case .dust: bloomMul *= 0.8
+        case .clear, .lightFog, .heavyFog: break
         }
         // Reactive world: the shift's threat closes the fog in + surges the bloom
         // (CRT halation/ntsc + glitch handled in advance + p6 below).
