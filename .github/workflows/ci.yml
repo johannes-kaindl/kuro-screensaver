@@ -1,4 +1,4 @@
-# The dev feedback loop for the web engine — runs on EVERY push.
+# The dev feedback loop for everything ubuntu can build — runs on EVERY push.
 #
 # Why this exists: until 2026-08-30 `npm test`, `npm run typecheck` and the native
 # logic tests ran only on a `v*` tag push (release.yml), i.e. exactly when a failure
@@ -11,7 +11,9 @@
 #                pushed, nobody would have seen it until the next release.
 #
 # Scope split (deliberate, cost-driven — macOS runners bill 10x Linux):
-#   - THIS workflow: the web engine, ubuntu, unconditional. Cheap, under a minute.
+#   - THIS workflow: everything that builds on ubuntu — the web engine, and the pure
+#     half of the Linux host (options: INI + query, no GTK/X11). Unconditional,
+#     cheap, under a minute.
 #   - native-macos.yml: the Swift logic tests, paths-filtered to what can break them.
 #   - release.yml: still owns the expensive whole-app compile checks at tag time.
 name: ci
@@ -57,3 +59,23 @@ jobs:
         # The Windows .scr ships this exact bundle, so a broken Vite build would
         # otherwise surface first at package time on a tag — the failure class above.
         run: npm run build
+
+  linux-host:
+    # The pure half of the Linux host (native/linux/host): options.cpp — INI
+    # persistence and the pinned query contract. No GTK, no X11, no WebKit, so it
+    # configures and builds on a bare ubuntu runner in seconds. The GTK half
+    # (windows, WebView) arrives with plan tasks 1/3/4 and needs the real machine;
+    # this job deliberately covers only what a runner can honestly verify.
+    #
+    # It is here rather than "later, with task 8" because a test nothing runs is
+    # the failure class this whole workflow exists to close.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure + build (CMake)
+        run: |
+          cmake -S native/linux/host -B native/linux/host/build
+          cmake --build native/linux/host/build
+      - name: Run options tests
+        run: ./native/linux/host/build/options_test
