@@ -16,6 +16,7 @@ dist
 native/windows/bin
 native/windows/obj
 native/windows/host/build
+native/linux/host/build
 native/macos/build
 native/macos/DerivedData
 native/macos/*.xcodeproj
