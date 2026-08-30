@@ -44,12 +44,20 @@ Comply-or-explain: was hier bewusst anders laeuft als in `_docs/CONVENTIONS.md`.
   `check-no-abs-paths.mjs` haelt in `npm test` die Pfad-Zusage.
 - **Kein CI-Badge in der Badge-Zeile (CORE-META-02).** Die Regel nennt die Reihenfolge
   Lizenz·Release·CI·Plattform·Downloads und sagt "nicht zutreffende weglassen" — der
-  CI-Fall ist hier keiner: die Actions laufen auf dem **GitHub-Mirror, und der ist
-  privat** (verifiziert 2026-08-30: anonym HTTP 404, waehrend das Forgejo-Repo 200
-  liefert). Ein Actions-Badge waere in der oeffentlichen README dauerhaft ein kaputtes
-  Bild. Es kommt zurueck, sobald der Mirror oeffentlich wird — das ist eine
-  Sichtbarkeits-Entscheidung des Maintainers, keine technische. Das Release-Badge liest
-  dagegen die oeffentliche Forgejo-Instanz und ist geprueft (zeigt v0.11.1).
+  CI-Fall ist hier keiner: die Actions laufen auf dem GitHub-Mirror, und **der ist von
+  aussen nicht erreichbar**. Gemessen am 2026-08-30: anonym liefern Repo-Seite,
+  Badge-URL, `api.github.com/repos/johannes-kaindl/kuro-screensaver` **und das
+  Nutzerprofil selbst** je HTTP 404 — auch mit Browser-User-Agent —, waehrend dieselbe
+  API mit dem Token des Kontos das Repo als `private: false` mit vier aktiven Workflows
+  ausliefert. Nicht die Sichtbarkeit des Repos ist die Ursache, sondern der **Zustand
+  des Kontos**; das ist eine Konto-Angelegenheit des Maintainers, nichts, was dieses
+  Repo loesen kann. Ein Actions-Badge waere in der oeffentlichen README so oder so ein
+  dauerhaft kaputtes Bild. Das Release-Badge liest dagegen die oeffentliche
+  Forgejo-Instanz und ist geprueft (zeigt v0.11.1).
+  **Folge fuer die CI-Kontrolle:** Laufergebnisse sind seit dieser Beobachtung nicht mehr
+  abfragbar (`actions/runs` meldet `total_count: 0`, obwohl um 21:12 desselben Tages noch
+  zwei gruene Laeufe gelistet waren). Wer hier CI-Stand behauptet, muss ihn erst wieder
+  belegen koennen — bis dahin gilt lokal Gemessenes.
 - **Der Linux-Host kopiert den Options-Code des Windows-Hosts, statt ihn zu teilen.**
   Begruendet unter "Native builds": der Windows-Host ist durchgaengig `std::wstring` und
   MSVC-only, lokal nicht baubar; Teilen hiesse, *ausgelieferten* Code umzuschreiben, den
