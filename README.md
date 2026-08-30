@@ -1,6 +1,6 @@
 # Kuro Screensaver
 
-> A retro-CRT 3D screensaver: six seeded procedural scenes, a full synthetic
+> A retro-CRT 3D screensaver: eight seeded procedural scenes, a full synthetic
 > CRT signal-degradation pass, a self-typing operator-under-attack terminal, and
 > a procedural audio layer. Runs as a **native macOS screensaver** (live-rendered
 > in Metal), a **real Windows `.scr`**, and in **any browser**.
@@ -51,7 +51,7 @@ plus a native flat-HUD toggle and richer preset colours.
 
 ## Gallery
 
-Six seeded procedural scenes, each recolorable by any of 13 phosphor presets:
+Eight seeded procedural scenes, each recolorable by any of 13 phosphor presets:
 
 <table>
   <tr>
@@ -65,6 +65,10 @@ Six seeded procedural scenes, each recolorable by any of 13 phosphor presets:
   <tr>
     <td><img alt="Void" src="docs/images/scene-void.jpg" width="380"><br><sub><b>VOID</b> — flythrough an asteroid belt (depth fade-in)</sub></td>
     <td><img alt="Matrix" src="docs/images/scene-matrix.jpg" width="380"><br><sub><b>MATRIX</b> — multi-layer 3D-depth digital rain</sub></td>
+  </tr>
+  <tr>
+    <td><img alt="Metro" src="docs/images/scene-metro.jpg" width="380"><br><sub><b>METRO</b> — a real OpenStreetMap district as a CRT wireframe city</sub></td>
+    <td><img alt="Wreckage" src="docs/images/scene-wreckage.jpg" width="380"><br><sub><b>WRECKAGE</b> — drifting debris field, evasive flight</sub></td>
   </tr>
 </table>
 
@@ -149,8 +153,9 @@ All versions: **[releases page](https://git.jkaindl.de/jkaindl/kuro-screensaver/
 
 ## Features
 
-- **Six procedural 3D scenes** — `TERRAIN · CITY · THE RIFT · TUNNEL · VOID` plus
-  a static **MATRIX** rain scene. **Dynamic banking flight**: a weaving camera
+- **Eight procedural 3D scenes** — `TERRAIN · CITY · THE RIFT · TUNNEL · VOID ·
+  WRECKAGE · METRO` plus a static **MATRIX** rain scene. **METRO** flies a real
+  OpenStreetMap district, baked at build time so the saver stays fully offline. **Dynamic banking flight**: a weaving camera
   that banks into its turns (adjustable strength, always-level start) with
   occasional eased maneuvers; seam-free infinite terrain; a Catmull-Rom tunnel
   spine; barrel rolls in The Rift. Same seed → same run.
