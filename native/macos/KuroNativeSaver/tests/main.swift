@@ -158,6 +158,26 @@ do {
           "foreshadow fires ~0.6s (scaled) before phase end, not hardcoded 6s (got progress \(firedAtProgress))")
 }
 
+// --- boot line selection: shuffled from the seeded LCG, not the pool's first 7 ---
+// Web parity (hud/boot.ts): the pool is shuffled, then 7 are taken. Native took
+// `prefix(7)` and thus showed 8 of the 15 authored lines NEVER — the reachability
+// check below is the one that pins that, and it was the red test for the change.
+do {
+    var a = LCG(seed: 4242), b = LCG(seed: 4242)
+    let ra = shuffledPrefix(Script.boot, 7, &a), rb = shuffledPrefix(Script.boot, 7, &b)
+    check(ra == rb, "same seed → same boot lines (harness renders stay byte-stable)")
+    check(ra.count == 7 && Set(ra).count == 7, "7 distinct lines (got \(ra.count), \(Set(ra).count) distinct)")
+    check(Set(ra).isSubset(of: Set(Script.boot)), "picked lines all come from the pool")
+
+    // Through the real caller, not just the helper: BootSequence is what the screen
+    // shows, and `prefix(7)` there is what left 8 of 15 authored lines unreachable.
+    var seen = Set<String>()
+    for s in Int32(1)...Int32(200) { seen.formUnion(BootSequence.lines(seed: s)) }
+    check(seen.count == Script.boot.count,
+          "every authored boot line is reachable on screen (saw \(seen.count) of \(Script.boot.count))")
+    check(BootSequence.lines(seed: 99) == BootSequence.lines(seed: 99), "boot selection is seed-stable")
+}
+
 // --- Terminal: deterministic golden stream (additive-invariant guard for arc work) ---
 // A fixed seed + tiny durationScale drives several phases fast; we FNV-1a-hash the
 // visible line stream. Slice 2 (arc layer) must keep this byte-identical when no arc
@@ -165,6 +185,13 @@ do {
 // Re-pinned 2026-08-21 when Script.boot became an SSOT facade: the first 7 lines are boot
 // lines, and the shared pool differs from the old hand-copied literals (15 lines, `" ... "`
 // filler). Verified line-by-line that ONLY those 7 changed — the other 5 stayed identical.
+// Re-pinned 2026-09-02 when the boot log started SHUFFLING the pool instead of taking
+// `prefix(7)` (decision: web parity, 8 of 15 authored lines were unreachable). Same
+// property proven the same way, and this time by reconstruction rather than by eye: the
+// OLD pinned hash 3190464026768004751 is exactly FNV-1a over `[old prefix(7) boot lines]
+// + [the 5 narrative lines measured after the change]` — so the narrative stream is
+// byte-identical and only the 7 boot lines moved. That the shift did not drift at all is
+// by construction: `bootLog()` draws from its own LCG (seed &+ 2323), not from `rng`.
 do {
     let term = Terminal(seed: 1337)
     term.durationScale = 0.05
@@ -174,7 +201,7 @@ do {
     let visible = term.visibleLines(max: 60).map { $0.text }
     var h: UInt64 = 1469598103934665603
     for byte in visible.joined(separator: "\n").utf8 { h = (h ^ UInt64(byte)) &* 1099511628211 }
-    check(visible.count == 12 && h == 3190464026768004751,
+    check(visible.count == 12 && h == 6793128131140453674,
           "golden narrative stream stable (got count \(visible.count) hash \(h))")
     check(persona0 == "TEL-4747@SCT-7.4-N11:~ █", "golden persona stable (got \(persona0))")
 }

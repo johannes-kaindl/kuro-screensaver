@@ -26,3 +26,21 @@ func freshSeed() -> Int32 {
     let lo = Int32(truncatingIfNeeded: ms)
     return lo ^ Int32.random(in: Int32.min...Int32.max)
 }
+
+/// Fisher-Yates over a copy, then take the first `count` — the seeded twin of the
+/// web's boot-line pick (`hud/boot.ts`). Two things it deliberately is NOT:
+/// `Array.shuffled()` draws from the system RNG, which would make a fixed-seed
+/// harness render stop being byte-stable; and a comparator shuffle
+/// (`sort { _,_ in Bool.random() }`) is not uniform — the pool's leading entries
+/// come up measurably more often, which is exactly the web bug this replaces.
+/// `rng.next()` is strictly < 1, so `j` never exceeds `i`.
+func shuffledPrefix<T>(_ pool: [T], _ count: Int, _ rng: inout LCG) -> [T] {
+    var a = pool
+    if a.count > 1 {
+        for i in stride(from: a.count - 1, to: 0, by: -1) {
+            let j = Int(rng.next() * Double(i + 1))
+            a.swapAt(i, j)
+        }
+    }
+    return Array(a.prefix(count))
+}

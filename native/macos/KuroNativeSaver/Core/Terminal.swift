@@ -15,6 +15,7 @@ final class Terminal {
     private(set) var lines: [Line] = []
     private var typed = ""
     private var rng: LCG
+    private let seed: Int32
     private var persona: Persona
 
     /// Scales every phase's duration AND the foreshadow lead (web parity:
@@ -53,13 +54,20 @@ final class Terminal {
     private var restUntil: Double = 0
 
     /// Open with a BIOS boot log already on screen (reads as "machine just woke").
-    init() { rng = LCG(seed: freshSeed()); persona = Persona.make(); bootLog() }
+    init() { let s = freshSeed(); seed = s; rng = LCG(seed: s); persona = Persona.make(); bootLog() }
 
     /// Deterministic init for tests / reproducible shifts (persona derives from the seed).
-    init(seed: Int32) { rng = LCG(seed: seed); persona = Persona.make(&rng); bootLog() }
+    init(seed s: Int32) { seed = s; rng = LCG(seed: s); persona = Persona.make(&rng); bootLog() }
 
     private func bootLog() {
-        for b in Script.boot.prefix(7) { lines.append(Line(text: prefix(.status) + b, category: .status)) }
+        // Shuffled, not `prefix(7)`: the pool holds 15 authored lines and the first seven
+        // were the only ones ever shown (web parity, hud/boot.ts). Drawn from an OWN stream
+        // rather than `rng`, so that adding a boot line later shifts these seven and nothing
+        // else — the shift's narrative stays put, and the golden re-pin stays explainable.
+        var r = LCG(seed: seed &+ 2323)
+        for b in shuffledPrefix(Script.boot, 7, &r) {
+            lines.append(Line(text: prefix(.status) + b, category: .status))
+        }
     }
 
     // MARK: - public (read by Hud)

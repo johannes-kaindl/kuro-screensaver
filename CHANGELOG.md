@@ -17,6 +17,14 @@ recording it as it happened.
 
 ### Changed
 
+- **The BIOS boot sequence now draws its lines from the whole pool.** Both the
+  overlay and the terminal backlog took the first seven of the fifteen authored
+  lines, so eight of them were never shown on macOS; they are now shuffled with
+  a proper Fisher-Yates. The web did shuffle, but with
+  `sort(() => Math.random() - 0.5)`, which is not uniform — the pool's leading
+  lines appeared measurably more often. Both sides now share one selector
+  (`shufflePick` / `shuffledPrefix`), and on native it draws from the seeded
+  engine RNG, so a fixed seed still renders identically.
 - **The automatic scene change is off by default on every platform.** It had
   been on in all three native hosts and off on the web since v0.10, while those
   hosts promised in their own headers to reproduce the web defaults. Anyone who

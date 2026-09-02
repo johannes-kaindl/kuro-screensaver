@@ -149,7 +149,8 @@ final class Renderer {
         // Startup: BIOS boot overlay first (then it fires powerOn on finish), else
         // power on straight away.
         if settings.bootEnabled {
-            boot = BootSequence(scene: SceneRegistry.ids[sceneIndex], speed: settings.bootSpeed)
+            boot = BootSequence(scene: SceneRegistry.ids[sceneIndex], speed: settings.bootSpeed,
+                                seed: (settings.seed ?? freshSeed()) &+ 1717)
         } else {
             crash.powerOn()   // diegetic CRT power-on (image expands out of a line + flickers)
         }

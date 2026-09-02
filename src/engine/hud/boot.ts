@@ -1,6 +1,7 @@
 // @ts-nocheck
 // Boot sequence overlay — VT323 with [ OK ] right-aligned per line.
 import { DICT, pickFrom } from '../data/dictionary';
+import { shufflePick } from '../engine/rng';
 import type { SceneId } from '../data/defaults';
 
 const SPEED_MAP = {
@@ -29,7 +30,7 @@ export function showBoot(host: HTMLElement, scene: SceneId, speedKey: 'fast' | '
     overlay.appendChild(inner);
     host.appendChild(overlay);
 
-    const lines = [...DICT.BOOT_LINES].sort(() => Math.random() - 0.5).slice(0, 7).map(l => [l, 'OK'] as const);
+    const lines = shufflePick(DICT.BOOT_LINES, 7, Math.random).map(l => [l, 'OK'] as const);
     lines.push(['', '']);
     lines.push([DICT.BOOT_HEADERS[scene], '']);
     let i = 0;

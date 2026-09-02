@@ -20,13 +20,21 @@ struct BootSequence {
     /// harmless, and there the day METRO is ported (see AGENTS.md § The Swift twin).
     private static var headers: [String: String] { StoryContent.shared.boot.headers }
 
-    init(scene: String, speed: Settings.BootSpeed) {
+    /// The seven pool lines this boot shows, in order. Split out of `init` so a test can
+    /// read the selection without a TextRenderer — and shuffled rather than `prefix(7)`,
+    /// which showed 8 of the 15 authored lines never (web parity, hud/boot.ts).
+    static func lines(seed: Int32) -> [String] {
+        var rng = LCG(seed: seed)
+        return shuffledPrefix(Script.boot, 7, &rng)
+    }
+
+    init(scene: String, speed: Settings.BootSpeed, seed: Int32) {
         switch speed {
         case .fast:      lineDur = 0.06; endHold = 0.30
         case .normal:    lineDur = 0.16; endHold = 0.60
         case .cinematic: lineDur = 0.32; endHold = 1.00
         }
-        var r: [(String, Bool, Bool)] = Script.boot.prefix(7).map { ($0, true, false) }
+        var r: [(String, Bool, Bool)] = BootSequence.lines(seed: seed).map { ($0, true, false) }
         r.append(("", false, false))                                     // spacer
         r.append((BootSequence.headers[scene] ?? ">> SYSTEM ONLINE", false, true))
         rows = r
