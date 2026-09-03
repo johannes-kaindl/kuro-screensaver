@@ -70,9 +70,22 @@ do {
 // Guards against scene drift (e.g. a scene added to the web SCENE_REGISTRY but not
 // here, or vice versa). Keep in sync with src/engine/engine/core.ts SCENE_REGISTRY.
 do {
-    check(SceneRegistry.ids.count == 7, "7 scenes (+ wreckage)")
+    check(SceneRegistry.ids.count == 8, "8 scenes (+ wreckage, + metro)")
     check(Set(SceneRegistry.ids).count == SceneRegistry.ids.count, "scene ids unique")
     check(SceneRegistry.ids.contains("matrix"), "matrix scene registered")
+    check(SceneRegistry.ids.contains("metro"), "metro scene registered")
+
+    // Every registered scene needs its HUD strings, or the slab falls back to the id.
+    // The mode labels live in the shared SSOT (story-content.json § modeLabels), so this
+    // also pins that the native table is a FACADE over it and not a second hand-copy —
+    // the drift that let macOS keep a stale scene list in the first place.
+    let missingLabel = SceneRegistry.ids.filter { SceneMeta.label[$0] == nil }
+    let missingModes = SceneRegistry.ids.filter { (SceneMeta.modes[$0]?.count ?? 0) != 3 }
+    check(missingLabel.isEmpty, "every scene has a HUD label (missing: \(missingLabel))")
+    check(missingModes.isEmpty, "every scene has 3 mode labels (missing: \(missingModes))")
+    let ssot = StoryContent.shared.modeLabels
+    let drift = SceneRegistry.ids.filter { SceneMeta.modes[$0] != ssot[$0] }
+    check(drift.isEmpty, "mode labels come from the SSOT, not a copy (drifted: \(drift))")
 }
 
 // --- FlightDirector: envelope math (mirrors src/engine/modes/flight-director.ts) --

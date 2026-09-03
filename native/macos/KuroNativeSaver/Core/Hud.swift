@@ -8,14 +8,13 @@ import Foundation
 enum SceneMeta {
     static let label: [String: String] = [
         "terrain": "TERRAIN", "city": "CITY", "rift": "THE RIFT", "tunnel": "TUNNEL", "void": "VOID",
-        "wreckage": "WRECKAGE", "matrix": "MATRIX",
+        "wreckage": "WRECKAGE", "matrix": "MATRIX", "metro": "METRO",
     ]
-    static let modes: [String: [String]] = [
-        "terrain": ["RECON", "SWEEP", "PATROL"], "city": ["LOW LEVEL", "URBAN", "HIGH PASS"],
-        "rift": ["THE RIFT", "CHASM", "INVERSION"], "tunnel": ["INFIL", "TRANSIT", "BOOST"],
-        "void": ["DRIFT", "BELT", "SWARM"], "wreckage": ["WRECKAGE", "SALVAGE", "DEBRIS"],
-        "matrix": ["RAIN", "CASCADE", "DELUGE"],
-    ]
+    /// Facade over the SSOT (`story-content.json` → `modeLabels`), which the web reads as
+    /// `DICT.MODE_LABELS`. Used to be a second hand-kept copy of the same table — and a
+    /// copy is how the native side came to know one scene fewer than the web
+    /// (AGENTS.md § The Swift twin: literals that duplicate SSOT content become facades).
+    static var modes: [String: [String]] { StoryContent.shared.modeLabels }
 }
 
 final class Hud {
