@@ -40,6 +40,12 @@ recording it as it happened.
 
 ### Added
 
+- **macOS renders the METRO scene.** The Metal app is a hand-maintained Swift
+  twin of the engine, and METRO existed only in TypeScript — so the Mac drew
+  its film from seven scenes while web and Windows had eight. Nothing was
+  broken; it was simply missing. The macOS scene list, the settings dropdown,
+  the random pick and the scene hotkeys all read one list, so they gained it
+  together.
 - A Linux host is in progress: `native/linux/host/` (GTK3/WebKitGTK, first
   target Linux Mint 22.3 Xfce/X11). So far only the settings/query half exists.
 - `native/shared/query-contract.txt` — the query that unchanged defaults must
