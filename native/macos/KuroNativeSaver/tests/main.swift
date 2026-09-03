@@ -206,6 +206,74 @@ do {
     check(persona0 == "TEL-4747@SCT-7.4-N11:~ █", "golden persona stable (got \(persona0))")
 }
 
+// --- METRO: district decode + prism geometry (pure, no Metal) ---------------
+// The web twin is engine/geo-extrude.ts + scenes/metro.ts. These are the parts that
+// can be checked without a GPU: the delta/decimetre decoding of the baked OSM rings,
+// the prism edge emission, and the claim that the procedural footprint is always a
+// SIMPLE polygon (self-intersecting rings extrude into visual garbage).
+do {
+    func near(_ a: Float, _ b: Float, _ eps: Float = 1e-4) -> Bool { abs(a - b) < eps }
+    func ringNear(_ a: [Float], _ b: [Float]) -> Bool {
+        a.count == b.count && zip(a, b).allSatisfy { near($0, $1) }
+    }
+
+    // First pair absolute, the rest deltas — all in decimetres, scaled to metres.
+    let r = MetroGeo.decodeRing([100, -50, 10, 5, -20, 0], scale: 0.1)
+    check(ringNear(r, [10, -5, 11, -4.5, 9, -4.5]), "decodeRing: absolute head, delta tail, scaled (got \(r))")
+
+    // The real baked district decodes and stays finite.
+    let d = District.shared
+    check(d.footprints.count == 131 && near(Float(d.meta.scale), 0.1) && d.meta.spanZ == 443,
+          "district loads (131 footprints, scale 0.1, spanZ 443) — got \(d.footprints.count)")
+    var minV: Float = .greatestFiniteMagnitude, maxV: Float = -.greatestFiniteMagnitude, shortest = Int.max
+    for f in d.footprints {
+        let ring = MetroGeo.decodeRing(f.r, scale: Float(d.meta.scale))
+        shortest = min(shortest, ring.count / 2)
+        for v in ring { minV = min(minV, v); maxV = max(maxV, v) }
+    }
+    check(shortest >= 3, "every baked footprint has >= 3 vertices (shortest \(shortest))")
+    check(minV.isFinite && maxV.isFinite && maxV - minV < 1000,
+          "decoded district stays in a sane metre range (\(minV)…\(maxV))")
+
+    // Prism edges: n sides → bottom + top + vertical = 3n segments = 18n floats,
+    // and every y is either baseY or topY (no stray heights).
+    let square: [Float] = [0, 0, 10, 0, 10, 10, 0, 10]
+    var buf = [Float]()
+    MetroGeo.appendPrismEdges(&buf, ring: square, baseY: 2, height: 8)
+    check(buf.count == 18 * 4, "prism of a quad emits 3 segments per side (got \(buf.count) floats)")
+    let ys = stride(from: 1, to: buf.count, by: 3).map { buf[$0] }
+    check(ys.allSatisfy { near($0, 2) || near($0, 10) }, "prism vertices sit on baseY or topY only")
+
+    // Degenerate input must not crash or emit anything.
+    var empty = [Float]()
+    MetroGeo.appendPrismEdges(&empty, ring: [0, 0, 1, 1], baseY: 0, height: 5)
+    MetroGeo.appendPrismEdges(&empty, ring: square, baseY: 0, height: 0)
+    check(empty.isEmpty, "a 2-vertex ring or zero height emits nothing (got \(empty.count))")
+
+    // shrink keeps the centroid and scales the extent.
+    let sh = MetroGeo.shrink(square, 0.5)
+    let (scx, scz) = MetroGeo.centroid(sh), (ocx, ocz) = MetroGeo.centroid(square)
+    check(near(scx, ocx) && near(scz, ocz), "shrink keeps the centroid")
+    check(near(sh[0], 2.5) && near(sh[1], 2.5), "shrink halves the extent (got \(sh[0]), \(sh[1]))")
+
+    // The procedural footprint must be SIMPLE. It is built star-shaped around its own
+    // offset, and the anisotropic scaling (aspect/stretchZ, both > 0) preserves angular
+    // order — so the check is: are the vertex angles around the offset monotone?
+    var worst = 0
+    for seed in Int32(1)...Int32(300) {
+        var rng = LCG(seed: seed)
+        let ox = Float(-40 + Int(seed) % 80), oz = Float(Int(seed) % 50)
+        let ring = MetroGeo.starFootprint(&rng, ox: ox, oz: oz, baseR: 5 + rng.nextF() * 9,
+                                          aspect: 0.7 + rng.nextF() * 0.7, stretchZ: 0.7 + rng.nextF() * 0.6)
+        let n = ring.count / 2
+        var angles = (0..<n).map { atan2(ring[$0 * 2 + 1] - oz, ring[$0 * 2] - ox) }
+        // rotate so the sequence starts at the minimum, then it must increase throughout
+        if let mi = angles.indices.min(by: { angles[$0] < angles[$1] }) { angles = Array(angles[mi...] + angles[..<mi]) }
+        for i in 1..<angles.count where angles[i] <= angles[i - 1] { worst += 1 }
+    }
+    check(worst == 0, "procedural footprints are star-shaped ⇒ simple (\(worst) angle inversions in 300 seeds)")
+}
+
 // --- wallpaper render policy (pure decision table) --------------------------
 do {
     var i = RenderPolicyInputs()
