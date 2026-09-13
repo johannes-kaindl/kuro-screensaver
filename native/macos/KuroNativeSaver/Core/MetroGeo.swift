@@ -98,7 +98,9 @@ enum MetroGeo {
 
     /// Facade windows for a prism, mirroring geo-extrude.ts: one grid per facet, a
     /// 35 % fill roll per cell, the quad pushed 5 cm out along the facet's outward
-    /// normal. Draws exactly as many random numbers as the web does, in the same order.
+    /// normal. Draws only the fill roll: the web also rolls per facet for enemy tint and
+    /// per window for blinking (geo-extrude.ts), so the two streams are not in step —
+    /// same distribution, not the same sequence, which parity does not ask for.
     static func facadeWindows(ring: [Float], baseY: Float, height: Float,
                               _ rng: inout LCG) -> [WindowSlot] {
         let n = ring.count / 2
