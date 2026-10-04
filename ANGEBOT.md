@@ -7,13 +7,13 @@ liefert:
     format: "WebM 1280x720 aus Playwright (recordVideo), 15 s; Parameter in der URL von screensaver.html"
     deterministisch_aus: []
     befehl: "npm run dev, dann node scripts/render-proof.mjs  (Szene und Preset in der URL-Konstante des Skripts)"
-    lizenz: "AGPL-3.0-or-later"
+    lizenz: "AGPL-3.0-only; kommerzielle Lizenz auf Anfrage (LICENSING.md)"
   - id: motion-gif
     artefakt: das README-GIF der Terrain-Szene, unter dem GIF-Budget des Workspace-Standards
     format: "GIF 640 px breit, 8 Bilder je Sekunde, 4 s, 16 Farben"
     deterministisch_aus: []
     befehl: "npm run dev, dann node scripts/render-motion-gif.mjs"
-    lizenz: "AGPL-3.0-or-later"
+    lizenz: "AGPL-3.0-only; kommerzielle Lizenz auf Anfrage (LICENSING.md)"
 nicht_geliefert:
   - was: deterministische Bildfolge aus Szene, Seed, Preset und Zeit (dasselbe Bild bei derselben Zeit)
     grund: Die Engine laeuft nach Wanduhr (performance.now, requestAnimationFrame); ein Modus „rendere Zeitpunkt t" fehlt. Bedarf der Medienintegration (Spec § 6, erste Zeile), wird gebaut, wenn ein Storyboard ihn verlangt
