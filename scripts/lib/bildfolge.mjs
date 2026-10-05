@@ -6,9 +6,10 @@ import { createHash } from 'node:crypto';
 export const SCENES = ['terrain', 'city', 'rift', 'tunnel', 'void', 'wreckage', 'matrix'];
 export const CLOCKS = ['page', 'virtual'];
 export const CRASHES = ['none', 'forward', 'reverse'];
+export const RENDERERS = ['metal', 'swiftshader'];
 export const LICENSE = 'AGPL-3.0-only';
 
-const DEFAULTS = { preset: 'kuro', seed: 1, fps: 24, seconds: 10, width: 1920, height: 1080, clock: 'page', crash: 'none', warmup: 3, threat: null, allowDirty: false, check: false, out: null };
+const DEFAULTS = { preset: 'kuro', seed: 1, fps: 24, seconds: 10, width: 1920, height: 1080, clock: 'page', crash: 'none', renderer: 'metal', warmup: 3, threat: null, extra: '', allowDirty: false, check: false, out: null };
 
 function num(name, raw, lo, hi, integer = false) {
   const v = Number(raw);
@@ -40,6 +41,8 @@ export function parseArgs(argv) {
       case 'clock': if (!CLOCKS.includes(raw)) throw new Error(`--clock: expected one of ${CLOCKS.join(', ')}, got ${JSON.stringify(raw)}`); o.clock = raw; break;
       case 'crash': if (!CRASHES.includes(raw)) throw new Error(`--crash: expected one of ${CRASHES.join(', ')}, got ${JSON.stringify(raw)}`); o.crash = raw; break;
       case 'out': o.out = raw; break;
+      case 'renderer': if (!RENDERERS.includes(raw)) throw new Error(`--renderer: expected one of ${RENDERERS.join(', ')}, got ${JSON.stringify(raw)}`); o.renderer = raw; break;
+      case 'extra': if (!/^[A-Za-z0-9_=&.-]*$/.test(raw)) throw new Error(`--extra: expected a query string like crt=off&bloom=off, got ${JSON.stringify(raw)}`); o.extra = raw; break;
       default: throw new Error(`unknown option --${key}`);
     }
   }
@@ -51,8 +54,9 @@ export function parseArgs(argv) {
 export function frameName(i) { return `frame-${String(i).padStart(4, '0')}.png`; }
 
 export function pageUrl(o) {
-  const q = new URLSearchParams({ scene: o.scene, preset: o.preset, seed: String(o.seed), terminal: 'off', radar: 'off', crosshair: 'off', audio: 'off' });
+  const q = new URLSearchParams({ scene: o.scene, preset: o.preset, seed: String(o.seed), hud: 'off', audio: 'off' });
   if (o.threat !== null) q.set('threat', String(o.threat));
+  for (const [k, v] of new URLSearchParams(o.extra)) q.set(k, v);   // pass-through engine params (crt=off, altitude=high, …)
   return `http://localhost:5173/screensaver.html?${q.toString()}`;
 }
 
@@ -64,7 +68,7 @@ export function reverseFrames(frames) {
 export function buildManifest(o, frames, herkunft) {
   return {
     scene: o.scene, preset: o.preset, seed: o.seed, fps: o.fps, seconds: o.seconds, width: o.width, height: o.height,
-    clock: o.clock, crash: o.crash, warmup_s: o.warmup, threat: o.threat, url: pageUrl(o),
+    clock: o.clock, crash: o.crash, renderer: o.renderer, warmup_s: o.warmup, threat: o.threat, url: pageUrl(o),
     frames,
     herkunft: { repo: 'kuro-screensaver', commit: herkunft.commit, unsauber: herkunft.unsauber, license: LICENSE, playwright: herkunft.playwright, chromium: herkunft.chromium },
   };
@@ -78,6 +82,23 @@ export function compareManifests(a, b) {
     if (!x || !y || x.sha256 !== y.sha256) verschieden.push((x ?? y).file);
   }
   return { gleich: verschieden.length === 0, verschieden, anzahl: n };
+}
+
+/**
+ * Verdict over per-frame pixel differences (max absolute 8-bit difference, fraction of differing
+ * pixels). Byte-identical frames are the goal and the measured norm (2026-10-05, CITY/TUNNEL in kuro,
+ * Chromium via Metal: 47 of 48 and 48 of 48 frames byte-identical once the clock is paused before load,
+ * network is idle before the first tick and the compositor's animation clock is frozen). The residual on
+ * the remaining frames was at most 2 of 255 — GPU rounding in the post-FX chain. `noiseMax` (8) is the
+ * tolerance for that; above it something in the timeline differed (a crash flash that came late in one
+ * run showed 241).
+ */
+export function bewerteDifferenzen(diffs, noiseMax = 8) {
+  const max = diffs.reduce((m, d) => Math.max(m, d.max), 0);
+  const identisch = diffs.filter((d) => d.max === 0).length;
+  const stufe = diffs.length === 0 ? 'leer' : max === 0 ? 'byte-gleich' : max <= noiseMax ? 'gleich bis auf Rauschen' : 'verschieden';
+  const abweichend = diffs.filter((d) => d.max > noiseMax).map((d) => d.file);
+  return { stufe, max, identisch, anzahl: diffs.length, abweichend, ok: stufe !== 'verschieden' && stufe !== 'leer' };
 }
 
 export function dirtyFromPorcelain(text) {

@@ -7,6 +7,7 @@
 //   ?preset=<colour-preset-key>                                  (default: toxic-haze)
 //   ?audio=on|off                                                (default: off)
 //   ?seed=<int>                                                  (pins settings.seedLock; render-sequence.mjs)
+//   ?hud=minimal|tactical|full|off                              (named HUD preset; off = no readouts, no control bar)
 //   plus the persistent FX/HUD/speed toggles handled in params.ts
 //   (?speed, ?bloom, ?trails, ?scan, ?crt, ?matrix, ?terminal, ?radar, ?crosshair)
 //

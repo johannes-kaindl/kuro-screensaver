@@ -41,6 +41,14 @@ describe('applyParamOverrides', () => {
     expect(apply('').seedLock).toBeNull();
   });
 
+  it('selects a named HUD preset via hud=<name> and ignores unknown names', () => {
+    expect(apply('hud=off').hudPreset).toBe('off');
+    expect(apply('hud=minimal').hudPreset).toBe('minimal');
+    expect(apply('hud=bogus').hudPreset).toBe(DEFAULT_SCREENSAVER.hudPreset);
+    // a named preset wins over the single toggles: controller.open() re-applies it
+    expect(apply('hud=off&terminal=on').hudPreset).toBe('off');
+  });
+
   it('toggles fx.trails and fx.scan', () => {
     expect(apply('trails=on').fx.trails.on).toBe(true);
     expect(apply('scan=off').fx.scan.on).toBe(false);

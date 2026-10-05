@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  parseArgs, frameName, reverseFrames, buildManifest, compareManifests, dirtyFromPorcelain, seededRandomSource, sha256,
+  parseArgs, frameName, reverseFrames, buildManifest, compareManifests, bewerteDifferenzen, dirtyFromPorcelain, seededRandomSource, sha256,
 } from '../scripts/lib/bildfolge.mjs';
 
 describe('parseArgs', () => {
@@ -17,6 +17,12 @@ describe('parseArgs', () => {
     expect(() => parseArgs(['--scene', 'city', '--seconds', '-1'])).toThrow(/seconds/);
     expect(() => parseArgs(['--scene', 'city', '--crash', 'sideways'])).toThrow(/crash.*none, forward, reverse/);
     expect(() => parseArgs(['--scene', 'city', '--clock', 'wall'])).toThrow(/clock.*page, virtual/);
+    expect(() => parseArgs(['--scene', 'city', '--renderer', 'cuda'])).toThrow(/renderer.*metal, swiftshader/);
+  });
+  it('passes --extra through to the page URL and rejects junk', () => {
+    const o = parseArgs(['--scene', 'city', '--extra', 'crt=off&bloom=off']);
+    expect(o.extra).toBe('crt=off&bloom=off');
+    expect(() => parseArgs(['--scene', 'city', '--extra', 'crt=off; rm'])).toThrow(/--extra/);
   });
   it('requires --scene', () => {
     expect(() => parseArgs([])).toThrow(/--scene/);
@@ -52,6 +58,7 @@ describe('buildManifest', () => {
     expect(m.scene).toBe('tunnel');
     expect(m.seed).toBe(7);
     expect(m.url).toContain('scene=tunnel&preset=kuro&seed=7');
+    expect(buildManifest(parseArgs(['--scene', 'city', '--extra', 'crt=off']), [], { commit: 'a', unsauber: [], playwright: '1', chromium: '1' }).url).toContain('&crt=off');
     expect(m.herkunft).toEqual({ repo: 'kuro-screensaver', commit: 'abc', unsauber: [], license: 'AGPL-3.0-only', playwright: '1.60.0', chromium: '140' });
     expect(m.frames).toHaveLength(1);
   });
@@ -68,6 +75,21 @@ describe('compareManifests (Review Focus 3)', () => {
   });
   it('treats a different frame count as different', () => {
     expect(compareManifests(a, { frames: a.frames.slice(0, 1) }).gleich).toBe(false);
+  });
+});
+
+describe('bewerteDifferenzen (Review Focus 3, Toleranz)', () => {
+  it('is byte-identical when every max is 0', () => {
+    expect(bewerteDifferenzen([{ file: 'a', max: 0, fraction: 0 }, { file: 'b', max: 0, fraction: 0 }])).toMatchObject({ stufe: 'byte-gleich', max: 0, identisch: 2, anzahl: 2, abweichend: [], ok: true });
+  });
+  it('tolerates rendering noise up to noiseMax and names nothing', () => {
+    expect(bewerteDifferenzen([{ file: 'a', max: 7, fraction: 0.2 }, { file: 'b', max: 0, fraction: 0 }])).toMatchObject({ stufe: 'gleich bis auf Rauschen', max: 7, identisch: 1, abweichend: [], ok: true });
+  });
+  it('names the frames above the tolerance and fails', () => {
+    expect(bewerteDifferenzen([{ file: 'a', max: 3, fraction: 0.1 }, { file: 'b', max: 90, fraction: 0.5 }])).toMatchObject({ stufe: 'verschieden', max: 90, abweichend: ['b'], ok: false });
+  });
+  it('treats an empty list as not ok', () => {
+    expect(bewerteDifferenzen([]).ok).toBe(false);
   });
 });
 

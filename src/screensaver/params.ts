@@ -161,4 +161,10 @@ export function applyParamOverrides(settings: ScreensaverSettings, params: URLSe
   // would clobber the flags we just set, so switch to 'custom' to make them stick.
   // 'tactical' is identical to the default hud, so non-overridden fields are unchanged.
   if (hudOverridden) settings.hudPreset = 'custom';
+
+  // hud=<preset>: a named HUD preset (minimal | tactical | full | off) — wins over the single
+  // toggles above, because controller.open() re-applies the named preset over hud.*.
+  // `off` is what a render for a composition wants: no readouts, no control bar, no kanji.
+  const hudPreset = readEnum(params, 'hud', ['minimal', 'tactical', 'full', 'off'] as const);
+  if (hudPreset !== undefined) settings.hudPreset = hudPreset;
 }
