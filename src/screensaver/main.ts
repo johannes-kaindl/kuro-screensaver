@@ -6,6 +6,7 @@
 //   ?scene=random|terrain|city|rift|tunnel|void|wreckage|matrix  (default: random)
 //   ?preset=<colour-preset-key>                                  (default: toxic-haze)
 //   ?audio=on|off                                                (default: off)
+//   ?seed=<int>                                                  (pins settings.seedLock; render-sequence.mjs)
 //   plus the persistent FX/HUD/speed toggles handled in params.ts
 //   (?speed, ?bloom, ?trails, ?scan, ?crt, ?matrix, ?terminal, ?radar, ?crosshair)
 //

@@ -33,6 +33,14 @@ describe('applyParamOverrides', () => {
     expect(apply('bloom=on').fx.bloom.on).toBe(true);
   });
 
+  it('pins the engine seed via seed=<int> and ignores malformed values', () => {
+    expect(apply('seed=7').seedLock).toBe(7);
+    expect(apply('seed=0').seedLock).toBe(0);
+    expect(apply('seed=abc').seedLock).toBe(DEFAULT_SCREENSAVER.seedLock);
+    expect(apply('seed=1.5').seedLock).toBe(DEFAULT_SCREENSAVER.seedLock);
+    expect(apply('').seedLock).toBeNull();
+  });
+
   it('toggles fx.trails and fx.scan', () => {
     expect(apply('trails=on').fx.trails.on).toBe(true);
     expect(apply('scan=off').fx.scan.on).toBe(false);

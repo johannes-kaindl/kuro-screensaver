@@ -59,6 +59,12 @@ export function applyParamOverrides(settings: ScreensaverSettings, params: URLSe
   const crt = readBool(params, 'crt');
   if (crt !== undefined) settings.crtSim.on = crt;
 
+  // seed=<int>: pin the engine seed (settings.seedLock) so a render is reproducible
+  // (scripts/render-sequence.mjs). Integers only; `readNum` would accept 1.5, and a
+  // fractional seed would be lied about by the manifest that records it.
+  const seedRaw = params.get('seed');
+  if (seedRaw !== null && /^[0-9]{1,10}$/.test(seedRaw)) settings.seedLock = parseInt(seedRaw, 10);
+
   let hudOverridden = false;
 
   const terminal = readBool(params, 'terminal');
