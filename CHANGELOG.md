@@ -17,12 +17,7 @@ recording it as it happened.
 
 ### Added
 
-- **Deterministic image sequences** — `scripts/render-sequence.mjs` renders a scene (and the
-  CRT crash sequence, forward or reverse) as a PNG sequence that is reproducible from its
-  parameters: a faked clock (Playwright `page.clock`), a seeded `Math.random`, `?seed=` pinning
-  `settings.seedLock`, `?hud=<preset>` (`off` for footage) and the compositor's animation clock
-  frozen and seeked per frame. `--check` renders twice and compares hashes and pixel differences.
-  Built for the trailer of neurovim-obsidian (media integration, Gate 6).
+- **Deterministic image sequences** — `scripts/render-sequence.mjs` renders a scene (and the CRT crash sequence, forward or reverse) as a PNG sequence that is reproducible from its parameters: a faked clock (Playwright `page.clock`), a seeded `Math.random`, `?seed=` pinning `settings.seedLock`, `?hud=<preset>` and `?ping=off` (footage without readouts, control bar, kanji or the radar ring), the compositor's animation clock frozen and seeked per frame, and the script's own Vite dev server on a free port. `--check` renders twice and compares hashes and pixel differences. Built for the trailer of neurovim-obsidian (media integration, Gate 6).
 
 ### Changed
 

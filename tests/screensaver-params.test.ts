@@ -49,6 +49,12 @@ describe('applyParamOverrides', () => {
     expect(apply('hud=off&terminal=on').hudPreset).toBe('off');
   });
 
+  it('switches the radar ping off via ping=off (a render for a composition must not show it)', () => {
+    expect(apply('ping=off').fx.radarPing.on).toBe(false);
+    expect(apply('ping=on').fx.radarPing.on).toBe(true);
+    expect(apply('').fx.radarPing.on).toBe(DEFAULT_SCREENSAVER.fx.radarPing.on);
+  });
+
   it('toggles fx.trails and fx.scan', () => {
     expect(apply('trails=on').fx.trails.on).toBe(true);
     expect(apply('scan=off').fx.scan.on).toBe(false);

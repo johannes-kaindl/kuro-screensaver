@@ -167,4 +167,9 @@ export function applyParamOverrides(settings: ScreensaverSettings, params: URLSe
   // `off` is what a render for a composition wants: no readouts, no control bar, no kanji.
   const hudPreset = readEnum(params, 'hud', ['minimal', 'tactical', 'full', 'off'] as const);
   if (hudPreset !== undefined) settings.hudPreset = hudPreset;
+
+  // ping=on|off: the radar ping ring is an fx, not part of a HUD preset — a render for a composition
+  // must be able to switch it off on its own.
+  const ping = readBool(params, 'ping');
+  if (ping !== undefined) settings.fx.radarPing.on = ping;
 }

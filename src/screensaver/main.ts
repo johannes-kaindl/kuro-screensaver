@@ -8,6 +8,7 @@
 //   ?audio=on|off                                                (default: off)
 //   ?seed=<int>                                                  (pins settings.seedLock; render-sequence.mjs)
 //   ?hud=minimal|tactical|full|off                              (named HUD preset; off = no readouts, no control bar)
+//   ?ping=on|off                                                 (radar ping ring)
 //   plus the persistent FX/HUD/speed toggles handled in params.ts
 //   (?speed, ?bloom, ?trails, ?scan, ?crt, ?matrix, ?terminal, ?radar, ?crosshair)
 //

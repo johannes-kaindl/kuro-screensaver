@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  parseArgs, frameName, reverseFrames, buildManifest, compareManifests, bewerteDifferenzen, dirtyFromPorcelain, seededRandomSource, sha256,
+  parseArgs, frameName, reverseFrames, buildManifest, compareManifests, bewerteDifferenzen, darfGeleertWerden, dirtyFromPorcelain, pageUrl, seededRandomSource, sha256,
 } from '../scripts/lib/bildfolge.mjs';
 
 describe('parseArgs', () => {
@@ -10,7 +10,8 @@ describe('parseArgs', () => {
     expect(o.out).toBe('render-out/city-kuro-s1');
   });
   it('rejects an unknown scene naming the allowed ones', () => {
-    expect(() => parseArgs(['--scene', 'bogus'])).toThrow(/scene.*terrain, city, rift, tunnel, void, wreckage, matrix/);
+    expect(() => parseArgs(['--scene', 'bogus'])).toThrow(/scene.*terrain, city, rift, tunnel, void, wreckage, matrix, metro/);
+    expect(parseArgs(['--scene', 'metro']).scene).toBe('metro');
   });
   it('rejects fps, seconds, crash and clock out of range (Review Focus 1)', () => {
     expect(() => parseArgs(['--scene', 'city', '--fps', '0'])).toThrow(/fps/);
@@ -23,6 +24,9 @@ describe('parseArgs', () => {
     const o = parseArgs(['--scene', 'city', '--extra', 'crt=off&bloom=off']);
     expect(o.extra).toBe('crt=off&bloom=off');
     expect(() => parseArgs(['--scene', 'city', '--extra', 'crt=off; rm'])).toThrow(/--extra/);
+    // reserved keys would make the manifest lie about scene, seed, preset, hud or audio
+    expect(() => parseArgs(['--scene', 'city', '--extra', 'seed=9'])).toThrow(/--extra.*seed/);
+    expect(() => parseArgs(['--scene', 'city', '--extra', 'scene=void&crt=off'])).toThrow(/--extra.*scene/);
   });
   it('requires --scene', () => {
     expect(() => parseArgs([])).toThrow(/--scene/);
@@ -79,17 +83,39 @@ describe('compareManifests (Review Focus 3)', () => {
 });
 
 describe('bewerteDifferenzen (Review Focus 3, Toleranz)', () => {
-  it('is byte-identical when every max is 0', () => {
-    expect(bewerteDifferenzen([{ file: 'a', max: 0, fraction: 0 }, { file: 'b', max: 0, fraction: 0 }])).toMatchObject({ stufe: 'byte-gleich', max: 0, identisch: 2, anzahl: 2, abweichend: [], ok: true });
+  it('is byte-identical only when every hash matches (not when the luma difference happens to be 0)', () => {
+    expect(bewerteDifferenzen([{ file: 'a', max: 0, hashGleich: true }, { file: 'b', max: 0, hashGleich: true }])).toMatchObject({ stufe: 'byte-gleich', max: 0, identisch: 2, anzahl: 2, abweichend: [], ok: true });
+    expect(bewerteDifferenzen([{ file: 'a', max: 0, hashGleich: false }])).toMatchObject({ stufe: 'gleich bis auf Rauschen', identisch: 0 });
   });
-  it('tolerates rendering noise up to noiseMax and names nothing', () => {
-    expect(bewerteDifferenzen([{ file: 'a', max: 7, fraction: 0.2 }, { file: 'b', max: 0, fraction: 0 }])).toMatchObject({ stufe: 'gleich bis auf Rauschen', max: 7, identisch: 1, abweichend: [], ok: true });
+  it('tolerates rendering noise up to noiseMax, counts identical frames by hash', () => {
+    expect(bewerteDifferenzen([{ file: 'a', max: 7, hashGleich: false }, { file: 'b', max: 0, hashGleich: true }])).toMatchObject({ stufe: 'gleich bis auf Rauschen', max: 7, identisch: 1, abweichend: [], ok: true });
   });
   it('names the frames above the tolerance and fails', () => {
-    expect(bewerteDifferenzen([{ file: 'a', max: 3, fraction: 0.1 }, { file: 'b', max: 90, fraction: 0.5 }])).toMatchObject({ stufe: 'verschieden', max: 90, abweichend: ['b'], ok: false });
+    expect(bewerteDifferenzen([{ file: 'a', max: 3, hashGleich: false }, { file: 'b', max: 90, hashGleich: false }])).toMatchObject({ stufe: 'verschieden', max: 90, abweichend: ['b'], ok: false });
   });
   it('treats an empty list as not ok', () => {
     expect(bewerteDifferenzen([]).ok).toBe(false);
+  });
+});
+
+describe('darfGeleertWerden (Review C1: --out must not wipe foreign directories)', () => {
+  it('allows a missing or empty directory and one holding only our own output', () => {
+    expect(darfGeleertWerden(null)).toBe(true);
+    expect(darfGeleertWerden([])).toBe(true);
+    expect(darfGeleertWerden(['frame-0000.png', 'frame-0001.png', 'bildfolge.json', '.rev', 'konkat.txt'])).toBe(true);
+  });
+  it('refuses a directory with anything else in it', () => {
+    expect(darfGeleertWerden(['frame-0000.png', 'notes.md'])).toBe(false);
+    expect(darfGeleertWerden(['.git'])).toBe(false);
+  });
+});
+
+describe('pageUrl', () => {
+  it('switches HUD and radar ping off and takes the server base', () => {
+    const u = pageUrl(parseArgs(['--scene', 'city']), 'http://127.0.0.1:5199');
+    expect(u.startsWith('http://127.0.0.1:5199/screensaver.html?')).toBe(true);
+    expect(u).toContain('hud=off');
+    expect(u).toContain('ping=off');
   });
 });
 
