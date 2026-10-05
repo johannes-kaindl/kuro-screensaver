@@ -15,6 +15,15 @@ recording it as it happened.
 
 ## [Unreleased]
 
+### Added
+
+- **Deterministic image sequences** — `scripts/render-sequence.mjs` renders a scene (and the
+  CRT crash sequence, forward or reverse) as a PNG sequence that is reproducible from its
+  parameters: a faked clock (Playwright `page.clock`), a seeded `Math.random`, `?seed=` pinning
+  `settings.seedLock`, `?hud=<preset>` (`off` for footage) and the compositor's animation clock
+  frozen and seeked per frame. `--check` renders twice and compares hashes and pixel differences.
+  Built for the trailer of neurovim-obsidian (media integration, Gate 6).
+
 ### Changed
 
 - **The BIOS boot sequence now draws its lines from the whole pool.** Both the

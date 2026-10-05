@@ -256,6 +256,28 @@ window with a live preview.
 
 ---
 
+
+### Deterministic image sequences (dev)
+
+`scripts/render-sequence.mjs` renders a scene as a PNG sequence that is reproducible from its
+parameters: the engine keeps running on wall-clock APIs, but Playwright drives a faked clock
+(`page.clock`, paused before the page loads and advanced by `1000/fps` ms per frame), seeds
+`Math.random`, pins the engine seed via `?seed=` and switches the HUD off via `?hud=off`.
+The crash sequence comes from the DEV-only `window.__kuro` hook, so the dev server must run.
+
+```bash
+npm run dev
+node scripts/render-sequence.mjs --scene city --preset kuro --seed 7 --seconds 15 --fps 24
+node scripts/render-sequence.mjs --scene city --crash forward --seconds 5   # or --crash reverse
+node scripts/render-sequence.mjs --scene city --seconds 2 --check          # render twice, compare
+```
+
+Output goes to `render-out/<scene>-<preset>-s<seed>/` as `frame-NNNN.png` plus `bildfolge.json`
+(parameters, time and sha256 per frame, provenance with the commit). `--check` reports
+byte-identical frames or the maximum pixel difference; measured on Metal, two runs agree to
+within 2/255 (GPU rounding in the post-FX chain), so a different Chromium or GPU may produce
+different bytes from the same timeline. Needs `ffmpeg` for `--check`.
+
 ## Architecture at a glance
 
 **Native (`native/macos/`)** — a platform-agnostic Metal renderer plus a thin host:

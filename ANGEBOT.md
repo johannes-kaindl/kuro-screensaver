@@ -1,6 +1,6 @@
 ---
 repo: kuro-screensaver
-stand: 2026-10-04
+stand: 2026-10-05
 liefert:
   - id: szene-video
     artefakt: eine der acht Szenen in einem Phosphor-Preset als Videoaufnahme der laufenden Engine, Parameter per URL (Szene, Preset, Nebel, Wetter, Bloom, Hoehe, HUD aus)
@@ -14,28 +14,38 @@ liefert:
     deterministisch_aus: []
     befehl: "npm run dev, dann node scripts/render-motion-gif.mjs"
     lizenz: "AGPL-3.0-only; kommerzielle Lizenz auf Anfrage (LICENSING.md)"
+  - id: szene-bildfolge
+    artefakt: deterministische PNG-Bildfolge einer Szene in einem Preset aus Seed, Dauer und Bildrate, dasselbe Bild bei derselben Zeit, mit bildfolge.json (Parameter, Zeit und sha256 je Bild, Herkunft mit Commit)
+    format: "PNG frame-NNNN.png, Groesse und fps als Parameter (Standard 1920x1080, 24 fps), ohne HUD und Terminal; bildfolge.json daneben"
+    deterministisch_aus: [szene, preset, seed, fps, dauer, groesse, commit, chromium-version, gpu]
+    befehl: "npm run dev, dann node scripts/render-sequence.mjs --scene <szene> --preset <id> --seed <n> --seconds <s> --fps <n>; --check rendert zweimal und vergleicht Hashes und Pixeldifferenz"
+    lizenz: "AGPL-3.0-only; kommerzielle Lizenz auf Anfrage (LICENSING.md)"
+  - id: absturz-bildfolge
+    artefakt: die CRT-Absturzsequenz (Signalstoerung, Kollaps auf die Linie, Schwarz, Reboot-Flackern) ueber einer Szene als Bildfolge, vorwaerts oder rueckwaerts
+    format: "wie szene-bildfolge; --crash forward|reverse, rueckwaerts mit neu ab 0 gezaehltem t"
+    deterministisch_aus: [szene, preset, seed, fps, dauer, groesse, commit, chromium-version, gpu]
+    befehl: "npm run dev, dann node scripts/render-sequence.mjs --scene <szene> --preset kuro --crash forward --seconds 5"
+    lizenz: "AGPL-3.0-only; kommerzielle Lizenz auf Anfrage (LICENSING.md)"
 nicht_geliefert:
-  - was: deterministische Bildfolge aus Szene, Seed, Preset und Zeit (dasselbe Bild bei derselben Zeit)
-    grund: Die Engine laeuft nach Wanduhr (performance.now, requestAnimationFrame); ein Modus „rendere Zeitpunkt t“ fehlt. Bedarf der Medienintegration (Spec § 6, erste Zeile), wird gebaut, wenn ein Storyboard ihn verlangt
   - was: Szene als Live-Ebene in einer fremden Komposition (Three.js-Adapter von HyperFrames)
-    grund: braucht denselben Modus wie die Bildfolge
-  - was: Absturzsequenz als Bildfolge oder Video
-    grund: nur über scripts/crash-preview.mjs mit DEV-Hook window.__kuro, kein Angebot
+    grund: braucht einen Modus der Engine, der t von aussen nimmt; die Bildfolge umgeht ihn ueber die gestellte Uhr des Renderers
   - was: CRT-Pass als eigenstaendiger Effekt auf fremdem Material
     grund: Der Pass haengt an der Engine (src/engine/fx/crt-sim.ts); als Baustein kommt er in clipwerk, nachgebaut aus den Werten im Rollenblatt von birds of yore
 ---
 # Angebot
 
-Der Screensaver liefert **Bewegtbild seiner Welt**: acht geseedete Szenen, dreizehn Phosphor-Presets, Bankflüge; die Absturzsequenz steht unter „nicht geliefert“. Heute als Aufnahme der laufenden Engine, nicht als deterministische Bildfolge; der Unterschied steht oben unter „nicht geliefert“, weil ein Konsument ihn kennen muss.
+Der Screensaver liefert **Bewegtbild seiner Welt**: acht geseedete Szenen, dreizehn Phosphor-Presets, Bankflüge, die CRT-Absturzsequenz. Seit 2026-10-05 als **deterministische Bildfolge** (`szene-bildfolge`, `absturz-bildfolge`) neben der Aufnahme der laufenden Engine (`szene-video`).
+
+Wie die Bildfolge deterministisch wird, ohne die Engine umzubauen: Die Engine läuft weiter nach Wanduhr, aber der Renderer (`scripts/render-sequence.mjs`, Playwright) stellt die Uhr. `page.clock` wird vor dem Laden auf einen festen Zeitpunkt pausiert und je Bild um `1000/fps` ms vorgerückt, `Math.random` ist vor dem Laden durch einen geseedeten Generator ersetzt, `?seed=` pinnt `settings.seedLock`, `?hud=off` nimmt Readouts, Kontrollleiste und Kanji aus dem Bild, die Animationsuhr des Compositors ist per CDP eingefroren und wird je Bild über die Web-Animations-API auf die gestellte Zeit gesetzt. Jede dieser Stufen ist gemessen (2026-10-05, CITY und TUNNEL in `kuro`, Chromium 148 über Metal): ohne sie weichen zwei Läufe in jedem Bild ab, mit ihnen sind 45 bis 48 von 48 Bildern byte-gleich und der Rest um höchstens 2 von 255 verschieden (GPU-Rundung in der Effektkette). `chromium-version` und `gpu` stehen deshalb in `deterministisch_aus`: ein anderer Rasterizer gibt andere Bytes (SwiftShader gemessen: 1 von 48 gleich). `--check` rendert zweimal und meldet `byte-gleich`, `gleich bis auf Rauschen` (bis 8 von 255) oder `verschieden` mit den Bildern.
 
 ## Holen
 
-Dev-Server starten, Szene und Parameter in der URL des Skripts setzen, `node scripts/render-proof.mjs` ausführen; Ergebnis `render-out/proof.webm`. Ein Konsument friert die Datei ein und stempelt Repo, Commit, Lizenz, Szene, Preset und URL-Parameter (PROF-MEDIA-02); ohne die Parameter ist die Aufnahme nicht reproduzierbar.
+Dev-Server starten (`npm run dev`; der Absturz braucht den DEV-Hook `window.__kuro`), dann `node scripts/render-sequence.mjs --scene city --preset kuro --seed 7 --seconds 15 --fps 24`; Ergebnis `render-out/<szene>-<preset>-s<seed>/` mit `frame-NNNN.png` und `bildfolge.json` (Herkunft: Repo, Commit, Lizenz, Playwright- und Chromium-Version, dazu `unsauber` leer, sonst bricht das Skript ab, außer mit `--allow-dirty` für Messläufe). Ein Konsument übernimmt `bildfolge.json` → `herkunft` ins Manifest (PROF-MEDIA-02); `render-out/` ist nicht im Git. Für das WebM weiter `node scripts/render-proof.mjs` (Szene und Preset in der URL-Konstante des Skripts).
 
 ## Was es nicht ist
 
-Kein seekbares Material: zwei Aufnahmen mit denselben Parametern unterscheiden sich im Takt. Keine Tonspur im Export; die prozedurale Klangschicht läuft nur live. Beide Skripte laufen headful mit Metal (`--use-angle=metal`), brauchen also einen Mac mit GPU und ein sichtbares Fenster; das GIF-Skript braucht `ffmpeg` im PATH.
+Keine Tonspur im Export; die prozedurale Klangschicht läuft nur live. Die Skripte laufen headful mit Metal (`--use-angle=metal`), brauchen also einen Mac mit GPU und ein sichtbares Fenster (`--renderer swiftshader` läuft headless, ist aber gemessen langsamer und weniger reproduzierbar); `render-sequence.mjs --check` und das GIF-Skript brauchen `ffmpeg` im PATH. Das WebM aus `render-proof.mjs` bleibt nicht seekbar (Wanduhr); wer Determinismus braucht, nimmt die Bildfolge.
 
 ## Geprüft
 
-`npm test` (vitest, 121 Tests bestanden am 2026-10-04); `node scripts/verify-crt.mjs` für den CRT-Pass (am 2026-10-04 nicht erneut gelaufen); das Motion-GIF liegt unter Budget (1756 KB von 2048 KB am 2026-10-04, `render-motion-gif.mjs` bricht sonst ab).
+`npm test` (vitest, 141 Tests bestanden am 2026-10-05, darunter `tests/bildfolge.test.ts` für Argumente, Umkehrung, Manifest und Vergleich); `render-sequence.mjs --check` am 2026-10-05: CITY 2 s 45–48/48 byte-gleich (max 1/255), TUNNEL 47/48 (max 1), Absturz 3 s in drei Läufen 17/72, 17/72, 72/72 (max 2, 2, 0). Gelieferte Folgen 2026-10-05 (Gate 6 der Welle Medien-1): CITY und TUNNEL je 15 s, Absturz vorwärts und rückwärts je 5 s, Preset `kuro`, Seed 7, 24 fps. `node scripts/verify-crt.mjs` für den CRT-Pass (nicht erneut gelaufen); das Motion-GIF liegt unter Budget (1756 KB von 2048 KB am 2026-10-04).
