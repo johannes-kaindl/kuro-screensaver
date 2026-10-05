@@ -62,6 +62,7 @@ describe('buildManifest', () => {
     expect(m.scene).toBe('tunnel');
     expect(m.seed).toBe(7);
     expect(m.url).toContain('scene=tunnel&preset=kuro&seed=7');
+    expect(buildManifest({ ...opts, base: 'http://127.0.0.1:5199' }, [], { commit: 'a', unsauber: [], playwright: '1', chromium: '1' }).url.startsWith('http://127.0.0.1:5199/')).toBe(true);   // the manifest names the server that really served the page
     expect(buildManifest(parseArgs(['--scene', 'city', '--extra', 'crt=off']), [], { commit: 'a', unsauber: [], playwright: '1', chromium: '1' }).url).toContain('&crt=off');
     expect(m.herkunft).toEqual({ repo: 'kuro-screensaver', commit: 'abc', unsauber: [], license: 'AGPL-3.0-only', playwright: '1.60.0', chromium: '140' });
     expect(m.frames).toHaveLength(1);

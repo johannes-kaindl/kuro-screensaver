@@ -75,7 +75,7 @@ export function reverseFrames(frames) {
 export function buildManifest(o, frames, herkunft) {
   return {
     scene: o.scene, preset: o.preset, seed: o.seed, fps: o.fps, seconds: o.seconds, width: o.width, height: o.height,
-    clock: o.clock, crash: o.crash, renderer: o.renderer, warmup_s: o.warmup, threat: o.threat, url: pageUrl(o),
+    clock: o.clock, crash: o.crash, renderer: o.renderer, warmup_s: o.warmup, threat: o.threat, extra: o.extra, url: pageUrl(o, o.base),
     frames,
     herkunft: { repo: 'kuro-screensaver', commit: herkunft.commit, unsauber: herkunft.unsauber, license: LICENSE, playwright: herkunft.playwright, chromium: herkunft.chromium },
   };

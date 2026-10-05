@@ -153,7 +153,7 @@ async function capture(outDir, base) {
     for (const f of out) writeFileSync(join(outDir, f.file), readFileSync(join(tmp, f.file)));
     rmSync(tmp, { recursive: true });
   }
-  const manifest = buildManifest({ ...opts, seconds: total / opts.fps }, out, { commit, unsauber, playwright: playwrightVersion, chromium: chromiumVersion });
+  const manifest = buildManifest({ ...opts, seconds: total / opts.fps, base }, out, { commit, unsauber, playwright: playwrightVersion, chromium: chromiumVersion });
   writeFileSync(join(outDir, 'bildfolge.json'), JSON.stringify(manifest, null, 2) + '\n');
   return manifest;
 }
