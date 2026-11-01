@@ -42,31 +42,6 @@ Comply-or-explain: was hier bewusst anders laeuft als in `_docs/CONVENTIONS.md`.
   SDD-Artefakte im Cockpit; die Regel gilt ausdruecklich vorwaerts und erzwingt keine
   Rueckmigration. Der Altbestand ist eingefroren — nichts Neues kommt dazu —, und
   `check-no-abs-paths.mjs` haelt in `npm test` die Pfad-Zusage.
-- **Kein CI-Badge in der Badge-Zeile (CORE-META-02), weil das GitHub-Konto geflaggt ist.**
-  Die Regel nennt die Reihenfolge Lizenz·Release·CI·Plattform·Downloads und sagt "nicht
-  zutreffende weglassen". Der CI-Fall ist hier keiner: die Actions laufen auf dem
-  GitHub-Mirror, und **GitHub blendet das Konto `johannes-kaindl` fuer nicht angemeldete
-  Besucher vollstaendig aus** — Profil, Repos und Badge-URL liefern anonym HTTP 404,
-  waehrend eingeloggt alles normal aussieht (das Repo traegt "Public", das Badge zeigt
-  `ci · passing`). Ein Actions-Badge waere fuer jeden fremden Leser ein kaputtes Bild.
-  Es kommt zurueck, sobald das Flag aufgehoben ist.
-  **Wie das belegt ist — und warum es zwei Anlaeufe brauchte:** der erste Befund stuetzte
-  sich nur auf 404 aus dieser Entwicklungsumgebung. Das ist zu wenig: ein 404 aus einer
-  Sandbox misst die eigene Netzwerkstrecke mit. Der Schluss wurde deshalb zwischenzeitlich
-  zurueckgenommen — **und war doch richtig**, was erst die **Kontrollprobe** zeigte, die von
-  Anfang an gefehlt hatte: dieselbe Strecke, anonym, gegen fremde oeffentliche Ressourcen
-  (`github.com/torvalds`, `api.github.com/repos/microsoft/vscode`) liefert **HTTP 200**, gegen
-  jede Ressource dieses Kontos **404**. Dazu unabhaengig: ein privates Browserfenster des
-  Maintainers sieht dasselbe 404, und GitHubs eigene Support-Seite antwortet mit
-  *"Ihr Konto wurde markiert"* und verlangt eine SMS-Verifizierung. Die Lehre gilt in beide
-  Richtungen: ein einzelner 404 ist kein Befund — und eine Widerlegung ohne Kontrollprobe ist
-  auch keine.
-- **Der Linux-Host kopiert den Options-Code des Windows-Hosts, statt ihn zu teilen.**
-  Begruendet unter "Native builds": der Windows-Host ist durchgaengig `std::wstring` und
-  MSVC-only, lokal nicht baubar; Teilen hiesse, *ausgelieferten* Code umzuschreiben, den
-  niemand hier kompilieren kann. Gehalten wird die Kopplung stattdessen ueber das
-  gemeinsame Fixture `native/shared/query-contract.txt` — eine Zusage mit Test statt einer
-  Zusage mit Kommentar.
 
 ## What this is
 
@@ -100,45 +75,6 @@ instance — no shim needed there.
   loop — `release.yml` keeps the expensive whole-app compile checks at tag time. Before
   2026-08-30 nothing but a `v*` tag ran the tests, which is how v0.7.0 and v0.10.1 each
   shipped a break that had been in the tree for weeks.
-- **Actions koennen kontoweit stoppen, und der Treiber ist der Speicher, nicht die Minuten.**
-  Am 2026-08-30 gegen 21:25 hoerten die Laeufe auf zu starten — mitten in einer Sitzung, ohne
-  Fehlermeldung: drei Pushes danach loesten nichts mehr aus, waehrend die 88 Laeufe davor gruen
-  in der Liste stehen. Ursache ist kein Repo-Schalter (Actions sind erlaubt) und keine Stoerung,
-  sondern **eine Abschaltung auf Kontoebene — GitHub sagt es selbst.** Ein manueller Start
-  ueber `POST …/actions/workflows/ci.yml/dispatches` antwortet:
-  `HTTP 422 {"message": "Actions has been disabled for this user."}`. Das "for this user" ist
-  der Punkt: es haengt am Konto (das seit demselben Abend geflaggt ist, siehe § Abweichungen),
-  nicht an diesem Repo. Der zweite Kandidat, ein **Account-Budget von `$0` mit "Stop usage:
-  Yes"** unter *Billing → Budgets and alerts*, ist zwar gesetzt, hat diesen Monat aber nicht
-  ausgeloest — die Nutzung war voll vom Freikontingent gedeckt ($8,38 brutto, $8,38 Rabatt,
-  $0 berechnet). Er bleibt eine zweite scharfe Kante fuer spaeter.
-  **Entwarnung fuers Wiederanlaufen:** an diesem Repo ist nichts verstellt —
-  `actions/permissions` meldet `enabled: true, allowed_actions: all` (selbst gemessen, ebenso
-  fuer `perlin-studio`; die `epub-exporter`-Session sieht dasselbe an drei weiteren Repos).
-  Die Sperre sitzt ausschliesslich auf Kontoebene. Nach ihrer Aufhebung muss hier **nichts
-  nachgezogen oder neu eingeschaltet werden**, und fuer ein Support-Ticket ist es der Beleg,
-  dass keine Fehlkonfiguration vorliegt.
-  **Womit man das NICHT misst: der Actions-API.** Sie verschweigt die Laeufe dieses Kontos —
-  `actions/runs` meldet fuer jedes Repo hier `total_count: 0`, waehrend fremde Repos echte
-  Zahlen liefern (`microsoft/vscode` 40000, `torvalds/linux` 7) und `actions/workflows`
-  desselben Repos brav vier aktive Workflows zeigt. Wer mit `gh run list` misst, bekommt also
-  **0 auch dann, wenn alles laeuft**. Gueltiges Instrument ist die Weboberflaeche: dort stehen
-  88 Laeufe, der letzte am 2026-08-30 um 21:22.
-  Die Aufschluesselung dieses Monats zeigt, wohin das Kontingent geht:
-
-  | Posten | Menge | brutto |
-  |---|---|---|
-  | **Actions storage** | 14.603 GB-hr | **$4,91** |
-  | Actions Linux | 331 min | $1,99 |
-  | Actions macOS 3-core | 19 min | $1,18 |
-  | Actions Windows | 31 min | $0,31 |
-
-  **Knapp 60 % ist Artefakt-Speicher**, nicht Rechenzeit — was zu diesem Repo passt: jeder
-  Release-Lauf legt `.scr`, Installer und Zips ab, und die Aufbewahrung steht auf **90 Tagen**
-  — **seit 2026-08-30 auf 7 Tage gesenkt**, weil Release-Assets ohnehin dauerhaft am Release
-  haengen und die 90 Tage nichts sicherten, was nicht schon woanders liegt. Wer hier
-  CI-Kontingent sucht, schaut also zuerst auf den Speicher, nicht auf die Minuten.
-
 - **Tests:** native logic tests via `bash scripts/run-native-tests.sh` (LCG parity,
   terrain/camera/palette sanity — run in CI). Web: typecheck + visual verification
   (`npm run dev`, or `node scripts/verify-crt.mjs` for headless CRT screenshots).
@@ -148,33 +84,6 @@ instance — no shim needed there.
   the phosphor blows out into a flat sheet with no wireframe left. Sizes are checked by
   the workspace README linter (`_docs/readme`, maintainer-local): embeds need a **pixel**
   width, `width="100%"` does not count.
-- **The query contract is one file:** `native/shared/query-contract.txt` holds the query that
-  unchanged default settings must produce. Four tests read it — `native/linux/host/tests`,
-  `native/windows/host/tests` (both check the WRITE direction), `tests/screensaver-params.test.ts`
-  (the READ direction: that query must yield the default settings) and, since 2026-08-30,
-  `native/macos/KuroNativeSaver/tests/main.swift` (macOS `AppDefaults` must equal the contract).
-  **Changing that line is a contract change** and all four sides plus
-  `src/screensaver/params.ts` have to follow it together. Regenerate it, never retype it:
-  `./<build>/options_test --print-default-query`.
-  The web test documents two deliberate exceptions to "defaults in, defaults out", both
-  mechanism: `hudPreset` → `custom` and `fxInheritFromTheme` → false, so query-set values
-  survive a later preset/theme pass. There was a third — `autoCycle` defaulted to off on the
-  web and on in every native host, contradicting those hosts' own header promise. The fixture
-  found it on its first run (unnoticed since v0.10) and it was resolved on 2026-08-30 by
-  pulling **all three** native hosts to the web default, macOS included.
-  **macOS joined the fixture later the same day** and was the loose end that made autoCycle
-  possible: the Metal app reads `UserDefaults` and hung on no parity checkpoint at all, so it
-  could drift freely. Its defaults now live in `native/macos/KuroMetalApp/AppDefaults.swift`
-  (the macOS counterpart to `data/defaults.ts`) — extracted from `AppSettings` precisely so a
-  test can read them without touching a store. The check is exhaustive by construction: every
-  contract key is either compared or listed as a **named exception with a reason**, and a key
-  that is neither fails the run — a later contract change cannot be adopted by three hosts and
-  silently skipped by the fourth. Two more divergences fell out of it at once (`cycleMinutes`
-  0.5 vs 5 — a factor of 10 — and `dayNight` off vs on) plus a vocabulary gap: `Settings.Weather`
-  knew only `clear/storm/dust`, where native `.clear` was in fact the web's `light-fog` (both the
-  no-op scene default) while the web's own `clear` and `heavy-fog` had no native value at all.
-  The enum now carries the web vocabulary with the fog factor on the enum (like `Fog.mul`),
-  derived from `controller.ts:363`, not guessed.
 - **Typecheck:** `npm run typecheck` (must pass before commits touching `src/`).
 - **Build:** `npm run build` → `dist/`.
 - **Backport to plugin:** `./scripts/sync-to-plugin.sh --apply`, then in
@@ -185,6 +94,15 @@ instance — no shim needed there.
   the rolled-back engine. Decide a strategy first (see rollback spec).
 - **Commit style:** Conventional Commits. AI-pair commits get a
   `Co-Authored-By: Claude <model> <noreply@anthropic.com>` trailer.
+
+## Context index
+
+- Bevor du die README oder etwas unter `.github/` änderst oder wissen willst, warum kein CI-Badge in der README steht und warum Actions stehen: `.claude/rules/github-konto-flag.md` (geflaggtes GitHub-Konto, Messung mit Kontrollprobe).
+- Bevor du den Query-Vertrag (`native/shared/query-contract.txt`), `src/screensaver/params.ts` oder die Defaults eines Hosts änderst: `.claude/rules/query-vertrag.md`.
+- Bevor du unter `native/` arbeitest (macOS-Metal-App, Windows-`.scr`, Linux-Host, Abweichung zum Options-Code): `.claude/rules/native-hosts.md`.
+- Bevor du macOS-Swift-Code oder die Story-Quelle (`story-content.json`) änderst: `.claude/rules/swift-zwilling.md`.
+- Bevor du unter `src/engine/` oder `src/host-web/` Dateien anlegst, verschiebst oder `src/engine/data/osm-district.json` anfasst: `.claude/rules/engine-layout.md` (Engine-Unterlayout, gebackene OSM-Daten, kein Runtime-Fetch).
+- Bevor du ein Release schneidest oder die Web-Seite deployst: `.claude/rules/release.md`.
 
 ## Memory
 
@@ -223,125 +141,12 @@ instance — no shim needed there.
   with the rolled-back engine — see rollback spec for options A/B/C.
   Excluded from sync (when re-enabled): `host-obsidian.ts`,
   `embed-view.ts`, `host.ts` (plugin-only or unused-in-plugin).
-- **Engine sub-layout** (note the doubled `engine/` is intentional —
-  outer `engine/` is the library namespace, inner is the THREE-renderer):
-  - `engine/{core,materials,rng,color,scenes/}` — render loop + scenes
-  - `fx/crt-sim.ts` — CRT signal-degradation post-pass
-  - `audio/synth.ts` — Web Audio synthesizer
-  - `terminal/{narrative,persona,typing,script-bank}.ts` — bottom-strip narrative
-  - `hud/{index,boot}.ts` — DOM overlay
-  - `data/{defaults,dictionary,presets}.ts` — static config
-  - `data/osm-district.json` — **baked at build time, never fetched.** The
-    `metro` scene renders real OpenStreetMap building footprints, but the
-    screensaver must run fully offline and the Windows `.scr` bundle has a
-    <5 MB budget. `scripts/bake-osm-district.mjs` (dev-only, run by hand) does
-    the Overpass query + projection + simplification and writes this file
-    (~8 KB). Do not add a runtime fetch. Map data © OpenStreetMap
-    contributors, ODbL 1.0 — attribution lives in the README.
-  - `controller.ts` — overlay lifecycle, hotkeys, fullscreen; declares
-    local `HostPlugin` interface
-  - `menubar.ts` — embed-pane control bar (unused in standalone, kept for
-    plugin backport)
-  - `host.ts` — leftover `ScreensaverHost` interface from the 2026-05-26
-    boundary refactor; not consumed by the rolled-back controller. Will
-    be re-evaluated on the next sync roundtrip.
 - **Presets:** `src/engine/data/presets.ts` holds the color presets that
   used to live in `kuro-theme-settings/src/legacy.ts`. Both repos now
   import from the engine path.
 - **Plugin variants (v1 vs v2):** lives in the `kuro-theme-settings`
   repo. Engine code is variant-agnostic — same engine bundle in both
   plugin builds.
-
-## Native builds (`native/`)
-
-- **macOS** — a standalone fullscreen **Metal app** (`native/macos/KuroMetalApp/`
-  + the shared engine in `native/macos/KuroNativeSaver/Core/`). The whole engine
-  runs live on the GPU (no WebView, no pre-rendered video). Built with `swiftc`
-  (no Xcode) via `scripts/build-native-app.sh` (deployment floor **macOS 14** — the render loop uses `NSView.displayLink`/CADisplayLink); notarized + uploaded to the release
-  locally via `scripts/package-native-app.sh`. Dev tools live alongside Core:
-  `harness/` (headless PNG renders), `tests/`, `tools/`.
-- **Windows** — a real `.scr` (`native/windows/host/`, C++/Win32 + WebView2
-  hosting `screensaver.html`; the `/c` dialog hosts `settings.html`). MSVC-only:
-  built via CMake in CI (`windows-host.yml` on push for the dev loop,
-  `release.yml` for releases) — there is no local macOS build. Package is
-  `KuroScreensaver.scr` + `web/` (<5 MB; the .NET WinForms host and its
-  self-contained runtime were removed in v0.9.0). Optional Inno Setup installer
-  (`native/windows/installer/KuroScreensaver.iss`) compiles on the Windows CI
-  runner. Persistent settings (scene/colour/speed/FX/HUD) live in
-  `HKCU\Software\KuroScreensaver` and are bridged web↔.scr via query params
-  (`src/screensaver/params.ts`; dialog: `src/settings/`). Requires the WebView2
-  runtime (inbox on Windows 11; the host shows a download link if missing).
-  Install steps: `docs/WINDOWS-INSTALL.md`.
-- **Linux** — *in progress, one task of nine done.* A GTK3/WebKitGTK-4.1 host in C++
-  (`native/linux/host/`), a deliberate twin of the Windows host down to the file names: one
-  binary, four modes (`--wallpaper`, `--fullscreen`, `--window-id`, `--config`), shipped as a
-  `.deb`. First target is Linux Mint 22.3 Xfce/X11 — chosen because that is the machine
-  available for acceptance; Wayland is deferred. Settings live in
-  `$XDG_CONFIG_HOME/kuro-screensaver/settings.ini`, whose keys are the **registry names of the
-  Windows host** — one vocabulary, two backends.
-  **What exists today:** `src/options.{h,cpp}` — the pure half (INI + the pinned query
-  contract) — and `src/render_policy.{h,cpp}`, the visibility/power decision table. Neither
-  carries GTK/X11, so both build and test anywhere, which is why they were written before the
-  window work; `ci.yml`'s `linux-host` job builds and runs them on every push. The windowing,
-  WebKit and dialog halves need the real machine and are not written. The policy's *signals*
-  (VisibilityNotify, DPMS, upower) are part of that unwritten half — what exists is the table
-  they will feed.
-  **The policy table is the third port**, after Windows and `Core/RenderPolicy.swift`, and it
-  follows those two rather than the plan: both shipped hosts treat *occluded* as **Hidden**
-  (zero wakeups), while the plan's draft had it as Frozen. On a desktop, occluded is the normal
-  case — any maximised window — so a held frame nobody can see would have been exactly the cost
-  the policy exists to avoid, and the plan's test pinned it. It carries one input neither twin
-  has, `hadFirstFrame`, ordered *before* the invisibility check: freezing or hiding with nothing
-  painted yet leaves an opaque rectangle over the desktop picture, which is the macOS v0.11.0
-  bug one storey down.
-  **Why the options code is copied from Windows rather than shared:** that host is
-  `std::wstring` throughout, and sharing would force a rewrite of the *released*, MSVC-only
-  host that cannot be built locally. The contract is held by a shared fixture instead.
-
-### The Swift twin
-
-The native engine logic is a **hand-maintained, line-for-line twin** of the TS engine
-(`Core/Script.swift` ↔ `terminal/script-bank.ts`, FilmDirector, palettes …). Two rules keep
-that twin from silently drifting apart:
-
-- **Story CONTENT is authored once**, in `src/engine/data/story-content.json`. The web reads
-  it through `data/dictionary.ts`; native decodes the same file via `Core/StoryContent.swift`
-  (`Bundle.main` — the build scripts drop the JSON next to every binary, so tests, harness and
-  `.app` share one code path). Swift-side literals that duplicate SSOT content should become
-  facades over `StoryContent.shared` — `Script.boot` is the first one.
-- **Story LOGIC stays a twin** (phases, timing, RNG) — that is deliberate, not debt.
-
-`tests/main.swift` § *Parity* compares the remaining Swift literals section by section against
-the JSON. **A mismatch there is a content-parity finding, not a test defect**: fix the content
-or move the literal to the SSOT, do not relax the test. Both sides additionally pin a golden
-hash (`tests/main.swift`, `tests/dict-presets-parity.test.ts`); when an authored content change
-moves them, re-pin *with* a comment saying why — an unexplained re-pin is indistinguishable
-from an accident.
-
-Content that names the runtime is a trap: a line reading `WEBGL RENDERER` is true on the web
-and a lie in the Metal app. Shared content stays platform-neutral.
-
-**Deprecated 2026-06-03 (v0.5.0):** all macOS `.saver` paths were removed — the
-WebGL `.saver`/`.app` scaffold (`KuroScreensaverApp`/`KuroScreensaver`), the live
-native `.saver` host (`KuroNativeSaver/Host`), and the 13 pre-rendered video
-`.saver`s (`KuroVideoSaver`). macOS Tahoe's sandboxed `legacyScreenSaver` process
-broke live GPU compositing; the notarized native app replaces all of them. The
-xcodegen `project.yml` + the `package-macos.sh`/`build-native-saver.sh`/
-`build-video-savers.sh`/`upload-video-assets.sh`/`render-saver-videos.mjs` scripts
-are gone too.
-
-Releases: GitHub Actions (`johannes-kaindl/kuro-screensaver`) typechecks + runs the
-native tests, compile-checks the macOS app, builds the Windows `.scr`, and attaches
-the `.scr` to the release. The **notarized macOS app** is built + attached
-locally (CI has no Developer ID cert). Cut a release: `bash scripts/bump-version.sh
-X.Y.Z` (single source — writes package.json + the app Info.plist together), commit,
-then `git tag vX.Y.Z && git push origin main vX.Y.Z` (the Forgejo→GitHub push mirror
-forwards the tag to trigger CI). Build + attach the notarized app with
-`scripts/package-native-app.sh`. **The web page is not part of any of this** —
-`scripts/deploy-page.sh` (rsync, local SSH deploy key, so CI cannot do it) is a
-separate manual step and is therefore the one that gets forgotten: on 2026-08-20 the
-live bundle was still two releases behind and did not know the METRO scene. After a
-release, deploy it and read the live bundle back. See `docs/specs/2026-05-28-screensaver-native-port-*.md`.
 
 ## Related repos
 
